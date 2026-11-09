@@ -1,0 +1,12 @@
+# Python
+.venv/
+__pycache__/
+
+# Source build output: rebuildable, never commit
+build/
+*.bsp
+*.prt
+*.lin
+*.vmx
+*.log
+*.vpk

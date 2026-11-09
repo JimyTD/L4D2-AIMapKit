@@ -1,0 +1,6 @@
+vendor/
+.venv/
+mapkit.local.json
+tools/forbidden.local.txt
+__pycache__/
+samples/*/build/
