@@ -1,0 +1,22 @@
+{
+ "python": "Python 3.10 以上（python.org 或 winget install Python.Python.3.12），建议在项目里建虚拟环境：python -m venv .venv",
+ "python_packages": {
+  "srctools": "srctools",
+  "shapely": "shapely",
+  "numpy": "numpy",
+  "PIL": "pillow",
+  "scipy": "scipy",
+  "skimage": "scikit-image"
+ },
+ "tools": {
+  "git": "winget install Git.Git",
+  "git-lfs": "winget install GitHub.GitLFS，然后 git lfs install"
+ },
+ "game_dir_candidates": [
+  "C:/Program Files (x86)/Steam/steamapps/common/Left 4 Dead 2",
+  "D:/SteamLibrary/steamapps/common/Left 4 Dead 2",
+  "E:/SteamLibrary/steamapps/common/Left 4 Dead 2"
+ ],
+ "game": "用户在 Steam 里安装 Left 4 Dead 2；装在其他库目录时，把路径写进 kit.local.json 的 game_dir",
+ "authoring_tools": "用户在 Steam 库的“工具”里安装 Left 4 Dead 2 Authoring Tools"
+}

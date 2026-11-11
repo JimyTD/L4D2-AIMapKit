@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>L4D2 AIMapKit：设计线流程</title>
+<style>
+:root{--ink:#1f2328;--mut:#57606a;--line:#d0d7de;--bg:#f6f8fa;--card:#fff;--plan:#0969da;--det:#1a7f37;--gate:#bf8700;--agent:#8250df;--own:#cf222e}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.55 'Microsoft YaHei','PingFang SC',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;gap:20px;align-items:flex-end;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+h1{font-size:20px;margin:0}.sub{color:var(--mut);font-size:13px}
+nav{display:inline-flex}nav button{border:1px solid var(--line);background:#fff;padding:5px 14px;cursor:pointer;font:inherit;margin-left:-1px}
+nav button.on{background:var(--ink);color:#fff;border-color:var(--ink)}nav button:first-child{border-radius:6px 0 0 6px}nav button:last-child{border-radius:0 6px 6px 0}
+main{padding:16px 20px}.tab{display:none}.tab.on{display:block}
+.flow{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:16px;align-items:start}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px}
+.lane{border-left:4px solid var(--plan);padding-left:14px;margin-bottom:6px}
+.lane.det{border-color:var(--det)}.lane.post{border-color:#6e7781}
+.lane h2{font-size:14px;margin:0 0 8px;color:var(--mut);font-weight:600}
+.loop{border:1.5px dashed var(--det);border-radius:8px;padding:10px 10px 4px;position:relative;margin:4px 0 8px}
+.loop>.tag{position:absolute;top:-10px;left:12px;background:var(--bg);padding:0 6px;font-size:12px;color:var(--det);font-weight:600}
+.node{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;cursor:pointer;margin:0}
+.node:hover{border-color:#8c959f}.node.sel{border-color:var(--ink);box-shadow:0 0 0 2px #1f232822}
+.node .id{font-weight:700;font-size:13px;color:#fff;background:var(--plan);border-radius:5px;text-align:center;padding:3px 0}
+.lane.det .node .id{background:var(--det)}.lane.post .node .id{background:#6e7781}
+.node .t{font-weight:600}.node .o{color:var(--mut);font-size:12.5px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.chip{font-size:11.5px;border-radius:10px;padding:1px 7px;white-space:nowrap;border:1px solid}
+.c-gate{color:var(--gate);border-color:#e3b341;background:#fff8c5}.c-own{color:var(--own);border-color:#ff8182;background:#ffebe9}
+.c-agent{color:var(--agent);border-color:#c297ff;background:#fbefff}.c-loop{color:var(--det);border-color:#4ac26b;background:#dafbe1}
+.arrow{height:16px;margin-left:26px;border-left:2px solid #8c959f;position:relative}
+.arrow::after{content:'';position:absolute;left:-6px;bottom:-2px;border:5px solid transparent;border-top:7px solid #8c959f}
+.gate{display:flex;align-items:center;gap:8px;margin:2px 0 2px 14px;font-size:12px;color:var(--gate)}
+.gate i{width:12px;height:12px;background:#fff8c5;border:1.5px solid var(--gate);transform:rotate(45deg);display:inline-block}
+#detail{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto}
+#detail h3{margin:0 0 4px;font-size:17px}#detail .k{font-size:12px;color:var(--mut);font-weight:600;margin:12px 0 4px;text-transform:none}
+#detail ul{margin:0;padding-left:18px}#detail li{margin:2px 0}
+code{font-family:Consolas,'Courier New',monospace;font-size:12.5px;background:#eff2f5;border-radius:4px;padding:0 4px}
+.st{font-size:11px;border-radius:8px;padding:0 6px;margin-left:4px;color:#fff;white-space:nowrap}
+.s-ok{background:#1a7f37}.s-gen{background:#bf8700}.s-new{background:#cf222e}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #eaeef2;padding:6px 8px;text-align:left;vertical-align:top}th{color:var(--mut);font-weight:600;background:#f6f8fa}
+.tree{font-family:Consolas,'Courier New',monospace;font-size:13px;line-height:1.7;white-space:pre;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;overflow:auto}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin:0 0 12px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+h2.sec{font-size:16px;margin:0 0 10px}
+.seq{display:grid;grid-template-columns:150px repeat(3,minmax(0,1fr));gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.seq div{padding:8px 10px;border-bottom:1px solid #eaeef2;font-size:13px}.seq .h{background:#f6f8fa;font-weight:600;color:var(--mut)}
+.seq .r{font-weight:600}
+</style></head><body>
+<header><div><h1>L4D2 AIMapKit：设计线流程</h1><div class="sub">从“一个主题”到“可交给生成的整关规格”。给人看的说明；agent 按 SKILL.md 和 references/ 工作。生成线还没写进 Kit。</div></div>
+<nav id="tabs"><button class="on" data-t="flow">流程图</button><button data-t="skill">Skill 结构</button><button data-t="scripts">脚本清单</button><button data-t="agents">子 agent 协作</button><button data-t="gates">门槛与规则</button><button data-t="session">新会话怎么开工</button></nav></header>
+<main>
+
+<section class="tab on" id="t-flow">
+<div class="legend"><span><span class="chip c-gate">脚本</span>机器门槛：脚本退出码 0 才能往下</span><span><span class="chip c-own">拍板</span>用户门槛：交评审页，拍板后写进拍板记录</span><span><span class="chip c-agent">子 agent</span>可以并行派出</span><span><span class="chip c-loop">循环</span>逐个重复</span></div>
+<div class="flow"><div id="flowcol"></div>
+<div class="card" id="detail"><div class="sub">点左边任一步，查看：输入、要做的事、用哪些脚本、交什么、怎样算完成、能派什么子 agent、常见坑。</div></div></div>
+</section>
+
+<section class="tab" id="t-skill"><div class="cols">
+<div><h2 class="sec">层级：入口 → 步骤 → 格式 → 脚本</h2><div class="tree" id="tree"></div></div>
+<div class="card"><h2 class="sec">每一层管什么</h2><table id="layers"></table>
+<h2 class="sec" style="margin-top:16px">Kit 和项目的边界</h2><table id="bound"></table></div></div></section>
+
+<section class="tab" id="t-scripts"><div class="card"><h2 class="sec">标准化脚本</h2>
+<div class="sub" style="margin-bottom:8px">都在 <code>scripts/kit.py</code> 里。所有判定脚本都读项目的 <code>standards/decisions.json</code>，不写死数字；退出码 0 才算通过。</div>
+<table id="scripts"></table></div></section>
+
+<section class="tab" id="t-agents"><div class="cols">
+<div class="card"><h2 class="sec">什么时候派子 agent</h2><table id="agentwhen"></table></div>
+<div class="card"><h2 class="sec">协作规则</h2><ul id="agentrules"></ul>
+<h2 class="sec" style="margin-top:16px">派活说明的固定格式</h2><div class="tree" id="brief"></div></div></div>
+<div class="cols" style="margin-top:16px"><div class="card"><h2 class="sec">并行主线（不是子 agent）</h2><ul><li>每关详设（D1–D7）是一条主线：一个新会话，跑主模型</li><li>用户在 D0 决定同时开几条（不超过 <code>kit.local.json</code> 的上限），登记在 <code>PROJECT.md</code></li><li>主线之间靠 <code>PROJECT.md</code> 和共享结构体的写入关协调：共享结构体只有写入关能改，其他关只引用</li><li>每条主线各自和用户拍板；瓶颈在用户的审阅带宽，默认 2 条</li></ul></div><div class="card"><h2 class="sec">一关主线里的子 agent（示意）</h2><div class="seq" id="seq"></div></div></div></section>
+
+<section class="tab" id="t-gates"><div class="cols">
+<div class="card"><h2 class="sec">每一步的两道门槛</h2><table id="gatetbl"></table></div>
+<div class="card"><h2 class="sec">硬规则（违反就停）</h2><ul id="hard"></ul></div>
+<div class="card"><h2 class="sec">设计原则（每条都来自一次返工）</h2><table id="princ"></table></div>
+</div></section>
+
+<section class="tab" id="t-session"><div class="cols">
+<div class="card"><h2 class="sec">新会话的前五分钟</h2><ol id="start"></ol></div>
+<div class="card"><h2 class="sec"><code>kit status</code> 的输出（示意）</h2><div class="tree" id="status"></div></div>
+<div class="card"><h2 class="sec">验收：一个不了解背景的新 agent</h2><ul id="accept"></ul></div>
+</div></section>
+</main>
+<script>
+const STEPS=[
+ {lane:'plan',title:'规划阶段：做几关，每关走哪、玩什么、节奏怎样'},
+ {id:'P0',t:'开项目',o:'建骨架、体检依赖、请示并安装、仓库设置',chips:['gate','own'],
+  in:['用户给的主题（真实地点或虚构概念）'],
+  do:['<code>kit init</code> 复制项目模板：资料库、标准、设计、工具输出目录、要人做的步骤清单（HUMAN.md）、项目 AGENTS.md（讨论只读、不推送、不启动游戏）',
+      '<b>体检</b>：<code>kit doctor</code> 逐项查两条线的依赖（设计线：Python 和虚拟环境、srctools 等库、L4D2 本体、git 和 Git LFS、网络；搭建线：Authoring Tools、Blender 和 Source Tools、中文字体），列出缺什么、版本、装在哪',
+      '<b>请示并安装</b>：把缺的列成一张清单一次请用户批准；批准后由 agent 安装。清单就是批准范围，以后新增依赖要改清单并再请示。只有 Steam 里的游戏和 Authoring Tools 要用户登录账号自己装，写进 HUMAN.md 并附步骤',
+      '本机路径（游戏目录、Blender）写进项目的本机配置 <code>kit.local.json</code>（不提交），脚本不写死',
+      '<b>再体检</b>：<code>kit doctor</code> 全部通过',
+      '<b>仓库</b>：文本走普通 git，图片等二进制走 Git LFS，编译产物不提交；资料库有网络照片的项目仓库不能公开',
+      '<b>项目状态</b>：建 <code>PROJECT.md</code>（当前阶段和步骤、每条线由哪个会话在做、最近一次交接、下一步）。每步结束更新；<code>kit status</code> 按项目文件算出实际进度，和它对不上就报警',
+      '建待决定列表 <code>standards/decisions.json</code>：引擎事实已填，因地图而异的项留空待定',
+      '<b>agent 配置</b>：检查当前工具支不支持子 agent、能不能指定模型、能不能新开会话；问用户主模型档和轻量档各用什么模型、并行主线最多开几条，写进 <code>kit.local.json</code>。不支持子 agent 时，所有子 agent 任务由主 agent 自己做（流程照走，只是慢）'],
+  tools:['kit init ','kit doctor（含 agent 能力）','kit status'],
+  out:['项目目录骨架','<code>PROJECT.md</code>（项目状态和交接）','<code>HUMAN.md</code>（要人做的步骤）','<code>kit.local.json</code>（本机路径，不提交）','<code>standards/decisions.json</code>（只有引擎事实）'],
+  done:['用户批准了依赖清单','<code>kit doctor</code> 全部通过','<code>kit.local.json</code> 写了两档模型和并行上限','<code>kit status</code> 能识别项目，报告“下一步 P1”'],
+  pit:['设计做到一半、或交给搭建时才发现缺工具，整条线停下','脚本里写死本机游戏目录，换机器就跑不了']},
+ {id:'P1',t:'定目标与规模',o:'真实度档位、关数与时长、体验曲线、卖点与非目标',chips:['own'],
+  in:['主题'],
+  do:['用固定问卷一次问完：真实度档位（复刻 / 借景 / 虚构）、几关和每关时长、每关一句话体验、一句话卖点、目标与非目标','只问只有用户能定的方向；现场事实留给 P2','不在这一步切关'],
+  tools:['kit check campaign（字段齐全）'],
+  out:['<code>design/plan/DESIGN.md</code> 前几章','<code>design/plan/campaign.json</code>（关数、时长范围、真实度档位，供后续脚本读）'],
+  done:['用户确认'],
+  pit:['目标没定就开始画图','把“包含某地标”当目标，而不是“在那里做什么”']},
+ {id:'P2',t:'采资料并建索引',o:'先采底（地理数据 + 每个地点的概况），按问题查，按用途索引',chips:['gate','agent'],
+  in:['概要里的地点清单'],
+  do:['<b>先采底</b>：地理数据（OSM、卫星影像，一种来源一份缓存，写明缩放级别和范围）；每个候选地点一页结论：是什么、大致结构、有没有室内资料','<b>按问题查</b>：每次调研先写下要回答的问题，答上了就停；照片和结构细节到 D2 做到那个结构体时再按需查','<b>入库</b>：每条有编号、来源地址或口述原话、来源等级、对象、用途 <code>use</code>（地理数据 / 结构依据 / 外观参考 / 游戏资料 / 素材，可多选）；认不出对象的照片不入库；认错的不删，加勘误','口述当场入库','结论写进 <code>findings/&lt;对象&gt;.md</code>，每条引用资料编号；设计数据的 <code>src</code> 也引用编号，从任何元素都能反查依据','下载缓存统一位置，<code>kit geo fetch</code> 先查缓存'],
+  tools:['kit geo fetch ','kit sources add / check','kit sources find &lt;对象&gt; --use &lt;用途&gt;'],
+  out:['<code>sources/index.json</code> 和资料目录','<code>findings/&lt;对象&gt;.md</code>'],
+  done:['<code>sources check</code>：编号唯一、文件存在、等级和用途合法、每条有来源','软提示：“无关”“存疑”超过一半时警告（调研方式不对）'],
+  agents:'<b>轻量档</b>，按问题派：每个子 agent 拿一组问题，只往 <code>sources/_inbox/&lt;agent&gt;.json</code> 交候选条目；主 agent 合并、编号，并抽查分级',
+  pit:['按地点批量搜图：大部分无关或存疑','另一条线不知道已有什么，重复下载、重复找图','网络照片标题常错；中文网页搜索常失效，图片搜索更可靠；官方资源防盗链就截图入库']},
+ {id:'P3',t:'坐标与地基数值',o:'画任何图之前必须先定',chips:['gate','own'],
+  in:['地理数据'],
+  do:['<b>坐标</b>：选原点，米制，x 东 y 北；每次换算后跑像素级防镜像检查（用一个已知地物的颜色）','<b>引擎事实直接用</b>（写在 Kit，不讨论）：1 单位 = 2.54 cm、每轴 32768 单位、跑速 220 单位/秒','<b>项目定的地基</b>写进待决定列表：边距（可用范围）、压缩上限、面数预算目标','尺度目标（走廊、层高）留到 D1 量过原版再定','真实度为“虚构”时没有真实坐标：只定地基数值，跳过防镜像'],
+  tools:['kit geo（坐标换算、影像地理参照）','kit geo check-mirror'],
+  out:['<code>standards/decisions.json</code> 的坐标和地基项'],
+  done:['防镜像检查通过','用户同意地基数值'],
+  pit:['做到一半才定标尺：所有尺度和时长重算','坐标链路里翻转两次：整张图镜像，评审才发现']},
+ {id:'P4',t:'切关与关卡设计',o:'每关一个源文件；玩法当场核实原版依据；逐关拍板',chips:['gate','own','agent','loop'],
+  in:['资料索引和结论','地基数值','campaign.json'],
+  do:['<b>切关</b>：按“有没有玩法撑得住”选区域，不按名气；相邻两关共用安全屋（坐标一致）；关与关有对比（室内/室外、高压/低压、昼/夜）；每关时间和天气按需要定，写成字段',
+      '<b>每关一个源文件</b> <code>design/plan/levels/L&lt;n&gt;.json</code>：路线途经点和每段模式（室外、室内、楼上、载具）、段落、玩法、事件、资源、路障、刷怪口、守点、安全屋。<code>kit plan build</code> 寻路后合成 <code>levels.json</code>',
+      '<b>DESIGN.md 只写数据装不下的</b>：职责、核心问题、段落叙述、背景（与玩法分开）、技术风险、验收标准',
+      '<b>每个玩法必填原版依据</b>：用哪个实体、哪张原版地图有先例；实体名脚本查游戏实体定义',
+      '<b>设计规则</b>：设计玩法不设计演出；背景和玩法分开；没有掩体战斗，优先油桶、煤气罐、烟花箱、警报车这类原版交互；小型特感交给导演；每处 1–2 个玩法并串进流程；没意义的赶路比短更糟；资料不够就缩小可玩范围',
+      '<b>时长</b>：纯跑时间 × 2–3 加守点等待，对照 campaign.json 的范围'],
+  tools:['kit plan build（寻路、合成）','kit plan verify','kit game classes（实体名）'],
+  out:['<code>design/plan/levels/L&lt;n&gt;.json</code>','<code>design/plan/data/levels.json</code>（生成）','<code>DESIGN.md</code> 每关一章'],
+  done:['<code>kit plan verify</code>：室内不出楼、室外不穿楼不下水、事件资源在路线上、刷怪口不在楼内、安全屋衔接、范围预算、时长在区间、实体名存在','一关一拍板'],
+  agents:'<b>轻量档</b>，按玩法派：去原版地图里找先例，返回实体名、接线方式、出处；实体名过脚本',
+  pit:['一次出五关：大面积返工','关卡内容写死在脚本里：换项目要重写','文档和数据各写一份：对不上','用广播、影像填空；设计“掩体战斗”；写了游戏里没有的物品；把有名但没玩法的地方放进主线']},
+ {id:'P5',t:'规划视图与规划定稿',o:'规划视图从数据生成；全部关定稿后重画总览',chips:['gate','own'],
+  in:['各关已拍板的源文件'],
+  do:['规划视图从 <code>levels.json</code> 生成：北向朝上、卫星底图、路线按模式区分、事件资源图标、拥挤处局部放大；一个交互页加每关海报','逐关拍板在 P4 已做；这里只在全部关定稿后重画总览，确认关与关的衔接和节奏曲线','结论写进拍板记录'],
+  tools:['kit plan render ','kit plan verify'],
+  out:['<code>design/plan/views/</code>','<code>design/plan/reports/</code>'],
+  done:['校验全部通过；视图比数据新','用户确认整个战役的规划'],
+  pit:['图是手画或手改的：数据一改就过期']},
+ {lane:'det',title:'详设阶段：每关的空间具体长什么样（D0 一次；之后每关一条主线，可并行）'},
+ {id:'D0',t:'详设准备（项目级，一次）',o:'项目级尺度目标、地面类型、跨关共享的结构体、并行主线分工',chips:['gate','own'],
+  in:['定稿的全部关卡规划'],
+  do:['<b>尺度目标</b>：<code>kit game measure</code> 量原版地图的同类空间（走廊、层高、房间开间、楼梯），定成目标写进待决定列表；最低值只给有意做窄的地方。所有关共用','<b>地面类型清单</b>：这张地图用哪些地面（如车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石），每种写能不能走、默认标高，写进待决定列表','<b>跨关共享的结构体</b>：列出衔接安全屋和多关都用的结构体，每个指定一个写入关（先用到的那关）；衔接安全屋那个房间先定下来','<b>并行主线</b>：用户决定同时做几关（不超过 kit.local.json 的上限），每关新开一个会话跑主模型；在 <code>PROJECT.md</code> 登记哪关归哪个会话'],
+  tools:['kit game measure ','kit status'],
+  out:['待决定列表的尺度目标和地面类型清单','<code>PROJECT.md</code> 的共享结构体写入关和主线分工'],
+  done:['用户同意尺度目标、地面类型、共享结构体分工、并行数'],
+  pit:['只按“能走过去”的最低值定尺度：做出来局促，整栋重画','各关并行各定一套尺度','两关各画一遍同一个结构体']},
+ {loop:'每关一条主线（可并行），重复 D1–D7'},
+ {id:'D1',t:'关卡准备',o:'结构体分级（含地标）、开放区分段、面数初估、压缩和朝向；建事件表和总图',chips:['gate','own'],
+  in:['本关定稿的规划','项目级尺度目标'],
+  do:['范围内每个结构体分级：可进入、外立面、远景、省略；离路线近的至少外立面；标出地标（告诉搭建线哪个要专用外观）','共享结构体：本关是写入关就设计，不是就只引用并声明用哪些区','把开放区切成首尾相接的段，每段两头接出入口或出口',
+      '<b>压缩</b>：可选项，用不用都写理由和参考；只缩结构体之间的开阔段，不缩结构体；方位不变、视线不挡',
+      '<b>朝向</b>：整关转不转、为什么；斜放的面数代价算进预算',
+      '按分级、开放楼层、朝向粗估面数，超预算就在这里缩范围',
+      '建本关事件表（列全规划事件）和总图文件；之后每写一个结构体或开放区就登记进总图，每次核验顺带跑总图检查'],
+  tools:['kit detail scaffold near / corridor','kit detail estimate','kit detail compress（用了压缩时）','kit detail layout'],
+  out:['关卡 README：分级表、地标、开放区分段、结构体清单（含共享结构体的写入关）、压缩和朝向的决定','<code>events.json</code>（初版：只有规划事件）','<code>layout.json</code>（初版）'],
+  done:['脚本：分级覆盖范围内所有结构体；分段首尾相接；面数初估在预算内','用户拍板：分级、分段、压缩、朝向'],
+  pit:['分段边做边切：跨段接不上，合成时才发现','默认就压缩：真实距离放得下、节奏合适就不压']},
+ {id:'D2',t:'内部结构设计',o:'每个可进入的结构体：先外壳，再竖向通道，再只建需要的内部',chips:['gate','own','agent','loop'],
+  in:['分级表','资料索引和结论','尺度目标'],
+  do:['<b>先查决定路线的结构事实</b>：竖向通道几处、在哪一类位置，公共区在哪，出入口朝哪，有没有挑空。查不到才问，问时附判断。位置、尺寸、编号这类不影响感觉和流程的细节按游戏性定，标“改动”',
+      '<b>外壳</b>：外面看得到的部分和出入口（台阶接上门外地面）',
+      '<b>外壳的表示</b>：规则建筑（平面轮廓 + 楼层）用“轮廓按层拉伸 + 立面规则”，格式已支持；不规则结构体（山洞、溶洞、异形建筑等）格式表达不了：停下，向用户说明需要表达什么、建议怎么表示，由用户决定',
+      '<b>竖向通道</b>：楼梯、坡道、梯子、竖井；约定写全，往上封堵写要建几级',
+      '<b>内部</b>：只写会走进去或看得到的空间；进不去的只是一扇关着的门；跨层空间写挑空',
+      '物件三档跟着写（互动物件精确点位和实体；影响走位的构件写位置和挡不挡、能否看穿、能否翻；氛围按区域写文字）；翻越、视线写成字段；触发接到事件表',
+      '大的结构体可以拆成外壳一个文件、每层一个文件，脚本合并核验；改一层只读那一层'],
+  tools:['kit detail structure（核验 + 搭建数据 + 评审页）','kit detail scaffold facade（只有外壳的结构体）'],
+  out:['<code>structures/&lt;id&gt;.json</code>（或拆分的外壳和各层文件）及生成的 <code>.build.json</code>、<code>.check.json</code>、<code>.html</code>'],
+  done:['<code>structure check</code> 全部通过','一个结构体一拍板：评审页、核验摘要、偏差、问题（每题附判断）、来源统计一起交'],
+  agents:'<b>轻量档</b>：只有外壳的结构体按脚手架批量起稿，必须过 structure check；下一个结构体的事实调研在当前评审期间并行（只交事实清单和资料编号，不做布局判断）',
+  pit:['以证据为准，不按惯例脑补：照片、口述看得出的按看到的写，没证据的标“假设”','改设计前先查规划原文：规划里的决定是用户拍板的','做完一整关才交：错了要全部返工']},
+ {id:'D3',t:'开放区设计',o:'每段开放区：范围、地面、构件、封路、边界、刷怪口、衔接',chips:['gate','own','loop'],
+  in:['分段','结构体文件的出入口','项目的地面类型清单'],
+  do:['<b>先用脚本起稿</b>：从地理数据生成地面分区、封路（路和边界相交处）、沿结构体外墙的边界段；agent 只改脚本猜错的地方',
+      '范围多边形；地面分区铺满，每块有类型和标高（类型从项目的地面类型清单里选）',
+      '影响走位的构件；封路写五件事和翻越字段；边界首尾相接，每段写外面看到什么',
+      '出口写接到哪一段；出入口用衔接引用结构体文件的门；刷怪口写什么时候用；场地物件跟着写，触发接到事件表'],
+  tools:['kit detail scaffold ground / close-roads / boundary','kit detail area'],
+  out:['<code>areas/&lt;段&gt;.json</code> 及生成物'],
+  done:['<code>area check</code> 全部通过：连通、走不到、边界闭合、地面覆盖、封路不压路线、刷怪口位置、衔接点和结构体的门一致','一段一拍板'],
+  pit:['只写边界和封路，没写地面和构件：下游建出来是一块平地','相邻两段之间漏了一截地面（D1 分段和 D5 连通核验兜住）','刷怪口在玩家看得见的地方或离路线太近']},
+ {id:'D4',t:'彩蛋',o:'问用户要不要做；内容不受复刻约束，格式照常严格',chips:['gate','own','loop'],
+  in:['已拍板的结构体和开放区'],
+  do:['先问用户三选一：给点子，一起讨论完善；只给数量和大致位置，agent 构思几个方案给用户挑；不做，跳过',
+      '<b>内容放开</b>：不受复刻约束，不需要真实来源（来源写“彩蛋”），可以不符合现实',
+      '<b>格式收紧</b>：几何、连通、尺度、事件接线照常核验，和其他设计数据一样交给生成',
+      '只能是额外的东西：不改主路线、不改规划条目；要改主线就不是彩蛋，回到对应步骤按正常设计走',
+      '物资和事件单独计数，不进规划统计'],
+  tools:['kit detail structure / area（彩蛋规则）'],
+  out:['带 <code>easter_egg</code> 标记的空间、物件、事件'],
+  done:['<code>structure check</code>、<code>area check</code> 全部通过','一个彩蛋一拍板'],
+  pit:[]},
+ {id:'D5',t:'整关收口与合成',o:'补强度档、定原点；全部跨文件检查；输出 spec.json',chips:['gate'],
+  in:['本关全部结构体、开放区和彩蛋','事件表','总图（D1 建立、随写随登记）'],
+  do:['事件表收口：列全规划事件，结构写精确，手感补齐强度档（档的数值在待决定列表）；物资是游戏原名和数量；普通特感交给导演',
+      '定 Hammer 原点（整关在范围内，边距用 P3 的值）；压缩和朝向已在 D1 拍板，这里照做',
+      '合成 <code>spec.json</code>，跑全部跨文件检查：每个片段自己通过；规划条目全部落地；出入口和出口都有着落；起点一路通到终点；事件都有触发、引用都找得到；实体名存在；不重叠；标高衔接；面数在预算内；衔接安全屋和相邻关完全一致'],
+  tools:['kit detail layout','kit spec'],
+  out:['<code>events.json</code>（定稿）','<code>layout.json</code>','<code>spec.json</code>','<code>spec.check.json</code>'],
+  done:['<code>kit spec</code> 全部通过','不单独拍板：只有脚本门槛'],
+  pit:['触发、物资只写一句中文：生成器只能猜','写了游戏里不存在的东西；把普通特感一只只写死','门外地面改了，台阶没跟着改','只核验单块开放区：两段之间接不上没人发现']},
+ {id:'D6',t:'整关评审与盲审',o:'整关评审页；不了解背景的 agent 复述；整关拍板',chips:['own','agent'],
+  in:['spec.json'],
+  do:['生成整关评审页（单文件，给人看）','盲审：派一个只拿到评审页的子 agent 复述路线和每段玩法，复述错的地方就是写得不清的地方','拍板记录：每条意见标“AI 本可避免”或“只有用户知道”'],
+  tools:['kit page '],
+  out:['<code>level.html</code>','<code>REVIEW-LOG.md</code>'],
+  done:['盲审复述无误','用户整关拍板'],
+  agents:'<b>主模型档</b>：盲审子 agent 不给任何上下文，只给评审页和三个问题（路线怎么走、每段玩什么、哪里看不懂）',pit:[]},
+ {id:'D7',t:'交给生成',o:'生成线只读 spec.json；要设计补的缺口回到 D2/D3',chips:['gate'],
+  in:['拍板的 spec.json'],
+  do:['交接说明三样必写：读哪个文件（<code>spec.json</code>、待决定列表）、可用资源清单（<code>kit sources find</code> 按结构体和用途的输出）、哪些已经做过不要重做；写进 <code>PROJECT.md</code> 的交接段','生成线交回缺口清单，按一条规则分：改了它玩家能不能走、能不能翻、看不看得到、会不会触发东西？会，就要设计补；不会，生成线自己定','要设计补的：回到对应的 D2、D3 改设计文件，重新核验、拍板，再合成'],
+  tools:[],out:['生成线的缺口清单'],done:['缺口清单为空或已分类'],pit:[]},
+ {endloop:true},
+];
+const CH={gate:['c-gate','脚本'],own:['c-own','拍板'],agent:['c-agent','子 agent'],loop:['c-loop','循环']};
+function nodeHtml(s){return '<div class="node" data-id="'+s.id+'"><div class="id">'+s.id+'</div><div><div class="t">'+s.t+'</div><div class="o">'+s.o+'</div></div><div class="chips">'+(s.chips||[]).map(c=>'<span class="chip '+CH[c][0]+'">'+CH[c][1]+'</span>').join('')+'</div></div>';}
+(function(){let h='',inLane=false,inLoop=false;const steps=STEPS;
+ for(let i=0;i<steps.length;i++){const s=steps[i];
+  if(s.lane){if(inLoop){h+='</div>';inLoop=false;}if(inLane)h+='</div>';h+='<div class="lane '+(s.lane==='plan'?'':s.lane)+'"><h2>'+s.title+'</h2>';inLane=true;continue;}
+  if(s.loop){h+='<div class="loop"><span class="tag">'+s.loop+'</span>';inLoop=true;continue;}
+  if(s.endloop){h+='<div class="gate" style="margin:6px 0 8px 14px;color:var(--det)">↺ 每关一条主线各自走完 D1–D7；并行几条由 D0 定</div></div>';inLoop=false;continue;}
+  h+=nodeHtml(s);
+  const nx=steps[i+1];if(nx&&nx.id){h+=(s.chips||[]).includes('gate')?'<div class="gate"><i></i>核验通过'+((s.chips||[]).includes('own')?' + 用户拍板':'')+'</div>':'<div class="arrow"></div>';}
+ }
+ if(inLoop)h+='</div>';if(inLane)h+='</div>';
+ document.getElementById('flowcol').innerHTML=h;
+ document.querySelectorAll('.node').forEach(n=>n.onclick=()=>show(n.dataset.id));})();
+function li(a){return a&&a.length?'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<div class="sub">—</div>';}
+function show(id){const s=STEPS.find(x=>x.id===id);document.querySelectorAll('.node').forEach(n=>n.classList.toggle('sel',n.dataset.id===id));
+ document.getElementById('detail').innerHTML='<h3>'+s.id+' '+s.t+'</h3><div class="sub">'+s.o+'</div>'+
+ '<div class="k">输入</div>'+li(s.in)+'<div class="k">要做的事</div>'+li(s.do)+'<div class="k">脚本和工具</div>'+li(s.tools)+
+ '<div class="k">交付物</div>'+li(s.out)+'<div class="k">怎样算完成</div>'+li(s.done)+
+ (s.agents?'<div class="k">可以派的子 agent</div><div>'+s.agents+'</div>':'')+(s.pit&&s.pit.length?'<div class="k">常见坑（都发生过）</div>'+li(s.pit):'');}
+show('P0');
+
+document.getElementById('tree').textContent=
+'L4D2-AIMapKit/                  ← skill 根目录（公开仓库；未经用户命令不改）\n'+
+'├─ SKILL.md                      入口：开工顺序、硬规则、流程表、参考索引\n'+
+'├─ references/\n'+
+'│  ├─ steps/                     每步一页：P0-init.md … P5-plan-final.md，D0-detail-prep.md … D7-handoff.md\n'+
+'│  ├─ format/                    交付物格式，按对象分页（common、plan、world、structure、area、level、scaffold）\n'+
+'│  ├─ rules.md                   设计规则\n'+
+'│  ├─ review.md                  交评审、拍板、修改和过期\n'+
+'│  ├─ subagents.md               子 agent 档位、派活格式、并行主线\n'+
+'│  ├─ engine-facts.md            引擎写死的事实（带出处）\n'+
+'│  ├─ tools.md                   读游戏文件、编辑器和编译工具在哪\n'+
+'│  └─ project-layout.md          项目目录、资料索引、待决定列表\n'+
+'├─ scripts/\n'+
+'│  ├─ kit.py                     init / doctor / status / approve / sources / check / geo / plan / game / detail / spec / page / selftest\n'+
+'│  ├─ kitlib/                    各子命令的实现\n'+
+'│  └─ check_clean.py             公开仓库防线：提交前扫项目关键词\n'+
+'├─ assets/\n'+
+'│  ├─ project-template/          新项目骨架（PROJECT.md、HUMAN.md、AGENTS.md、资料库、.gitattributes）\n'+
+'│  ├─ decisions-template.json    待决定列表：引擎事实已填，其余为空并标明哪一步定\n'+
+'│  ├─ requirements.json          kit doctor 检查的依赖\n'+
+'│  ├─ review-pages/              评审页模板（结构体、开放区、整关）\n'+
+'│  └─ selftest-project/          虚构样例，只给 kit selftest 用\n'+
+'└─ docs/flow.html                本页';
+const tbl=(id,h,rows)=>document.getElementById(id).innerHTML='<tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('');
+tbl('layers',['层','管什么','什么时候读'],[
+ ['SKILL.md','开工顺序、硬规则、流程表（项目处于哪一步就读哪一页）','每次开工'],
+ ['steps/*.md','这一步的完整做法','走到这一步时只读这一页'],
+ ['format/','字段和取值，按对象分页','写数据时只查用到的那一页'],
+ ['rules / review / subagents / engine-facts / tools','规则、评审、派活、引擎事实、读游戏文件','对应场合'],
+ ['scripts/','判定和生成，不靠 agent 自觉','每步结束跑'],
+ ['assets/','复制到项目的模板','开项目、出评审页时']]);
+tbl('bound',['放在 Kit','放在项目'],[
+ ['流程、格式、规则、脚本、模板','资料库、设计数据、生成物、拍板记录、PROJECT.md'],
+ ['引擎写死的事实','因地图而异的数值（待决定列表）'],
+ ['“待决定列表”的条目和填法','条目的数值和依据'],
+ ['只读；用户明确命令时才改','随时按流程改']]);
+
+tbl('scripts',['子命令','做什么','判定什么','对应步骤'],[
+ ['<code>kit init</code>','建项目骨架、空待决定列表','—','P0'],
+ ['<code>kit status</code>','读项目文件，报告每步状态和下一步；和 PROJECT.md 对比；按依赖列出过期产物','交付物在不在、核验过没过、拍板记了没（按文件指纹判断拍板后是否改过）、产物是否比输入旧、PROJECT.md 是否过期','任何时候'],
+ ['<code>kit sources add / check / find</code>','登记资料、合并子 agent 的候选；按对象 × 用途查可用资料','编号唯一、文件存在、等级和用途合法','P2、交接、任何时候'],
+ ['<code>kit doctor</code>','体检依赖、本机路径、agent 配置；只列清单，不自己装','依赖齐全','P0、换机器'],
+ ['<code>kit check campaign</code>','检查战役目标文件','关数、时长范围、真实度档位齐全','P1'],
+ ['<code>kit geo fetch / check-mirror</code>','下载 OSM；地标像素级防镜像','地标颜色对、镜像位置不对','P2、P3'],
+ ['<code>kit plan build / verify / render</code>','读每关源文件寻路合成 levels.json；规划视图','室内不出楼、事件在路线上、衔接、范围预算、时长、实体名','P4、P5'],
+ ['<code>kit game classes / find / measure / model</code>','查实体名和原版先例；量原版地图的空间和门（读游戏文件，不启动游戏）','实体、物品名存在','P4、D0'],
+ ['<code>kit detail structure</code>','结构体核验、搭建数据、评审页（支持外壳和各层拆分文件）','外壳、轮廓、只建需要的、门在交界上、连通、尺度、竖向通道、挑空、外挑空间、翻越、物件、事件、来源','D2'],
+ ['<code>kit detail area</code>','开放区核验、搭建数据、评审页','连通、走不到、边界、地面、封路、刷怪口、衔接','D3'],
+ ['<code>kit detail scaffold</code>','起稿：地面分区、封路、边界、只有外壳的结构体','—（起稿，结果仍要过核验）','D1–D3'],
+ ['<code>kit detail estimate</code>','按分级、开放楼层、朝向粗估面数','面数初估在预算内','D1'],
+ ['<code>kit detail layout / compress</code>','总图、出入口标高；压缩布局','不重叠、范围、标高、压缩和朝向理由','D1–D5'],
+ ['<code>kit approve</code>','记录用户拍板和当时的文件指纹','—','每次拍板'],
+ ['<code>kit spec</code>','合成整关规格、跨文件核验','规划覆盖、衔接、连通、事件、预算','D5'],
+ ['<code>kit page</code>','整关评审页','—','D6'],
+ ['<code>kit selftest</code>','把样例故意改坏，确认每条核验都抓得到','每类错误都报出来','改脚本后']]);
+
+tbl('agentwhen',['步骤','任务','档','交回什么','怎么保证质量'],[
+ ['P2','按问题搜资料、认照片、初步分级','轻量','<code>sources/_inbox/&lt;agent&gt;.json</code> 候选条目','<code>sources check</code>；主 agent 抽查分级'],
+ ['P4','查玩法的原版先例','轻量','实体名、接线方式、出处','实体名过 <code>game classes</code>'],
+ ['D2','只有外壳的结构体批量起稿','轻量','结构体文件','<code>structure check</code> 全部通过'],
+ ['D2','下一个结构体的结构事实调研','轻量','事实清单、资料编号（不做布局判断）','主 agent 用之前核对来源'],
+ ['D6','盲审','主模型','复述原文（路线、每段玩法、看不懂的地方）','—'],
+ ['任何步','把文字转成固定字段、跑脚本汇总','轻量','改好的字段、核验摘要','脚本通过']]);
+document.getElementById('agentrules').innerHTML=[
+ '<b>为什么派</b>：满足任一条——产出大多会被丢掉，只要结论（保护主 agent 上下文）；和主线独立可以同时跑；需要不知道背景的眼睛；或者能用轻量档省钱省时间',
+ '<b>档由 skill 定</b>：每个派子 agent 的位置在步骤页写明用哪档，不由当时的会话临场决定。档对应的具体模型在 <code>kit.local.json</code>，P0 问用户',
+ '<b>不派的</b>：设计决定、解读用户意见、判断结构事实、写格式和规则——这些由主模型自己做',
+ '<b>升级</b>：轻量 agent 遇到需要判断的问题，停下原样交回；同一任务两次没过核验，改由主 agent 做',
+ '<b>写入</b>：子 agent 只写派活说明里给的那一个输出路径；编号、合并、提交只由主 agent 做',
+ '子 agent 不和用户对话；不支持子 agent 的环境里，这些任务由主 agent 自己做'
+].map(x=>'<li>'+x+'</li>').join('');
+document.getElementById('brief').textContent=
+'任务：<一句话>\n'+
+'档：<轻量 | 主模型>（照步骤页写的）\n'+
+'读：<文件路径列表>（只读）\n'+
+'写：<唯一的输出路径>\n'+
+'交付：<格式；对应 format.md 哪一节>\n'+
+'完成判定：<运行哪个脚本、必须通过>\n'+
+'不要：改其他文件 / 联系用户 / 启动游戏 / 推送\n'+
+'遇到以下情况停下交回：<需要判断的问题>\n'+
+'交回：<一段话：做了什么、没做成什么、需要主 agent 决定的问题>';
+const seq=[['','主 agent（主模型）','子 agent','用户'],
+ ['D1','分级、地标、分段、面数初估、压缩和朝向','—','拍板'],
+ ['D2 第 1 个','起稿 → 核验 → 交图','轻量：调研第 2 个的事实；只有外壳的批量起稿','拍板第 1 个'],
+ ['D2 第 2 个','用调研结果起稿 → 交图','轻量：调研第 3 个','拍板第 2 个'],
+ ['D3 开放区','逐段起稿 → 交图','—','逐段拍板'],
+ ['D4','彩蛋（问用户）','—','拍板每个彩蛋'],
+ ['D5','整关收口与合成','—','—'],
+ ['D6','整关评审页','主模型：盲审复述（先于用户）','整关拍板']];
+document.getElementById('seq').innerHTML=seq.map((r,i)=>r.map((c,j)=>'<div class="'+(i===0?'h':j===0?'r':'')+'">'+c+'</div>').join('')).join('');
+
+tbl('gatetbl',['门槛','谁判','标准'],[
+ ['机器门槛','脚本','退出码 0；失败项清零或写明为什么接受'],
+ ['用户门槛','用户','看评审页拍板；结论写进拍板记录，标“AI 本可避免”或“只有用户知道”'],
+ ['交评审时附','主 agent','评审页、核验摘要、偏差、问题（每题附判断）、来源统计']]);
+document.getElementById('hard').innerHTML=['<b>改动和重做</b>：任何修改只改它所属的那个文件；<code>kit status</code> 按依赖列出过期的产物和“上次拍板后已修改”的单元；过期的先机器重跑，重跑后核验不过的回到那一步改，内容变了的单元再交用户拍板。不要求“后面全部重做”','讨论阶段只读；方案同意后再动手；范围变了重新确认','一张图一拍板；没有明确指示不大幅推进','事实先自己查；查不到才问，问时附依据和判断','流程内不启动游戏；可以用编辑器和编译工具','不推送远端','依赖清单之外的软件要先问；清单本身就是批准范围','未经用户明确命令不改 Kit'].map(x=>'<li>'+x+'</li>').join('');
+tbl('princ',['原则','为什么'],[
+ ['设计和生成是先后两段：一关的生成读那关拍板后的 spec.json；关与关之间可以并行','生成在详设完成前无法开工'],
+ ['只为会走到或看到的地方建模','设计和搭建都不在没人看的地方耗时间'],
+ ['先外壳，再内部；进不去的房间只是一扇门','同上'],
+ ['给下游的是数据，给人看的是评审页；评审页可合成，数据不合成','AI 上下文不随关卡变大'],
+ ['生成器要读的都写成固定取值的字段，用游戏原名','写成句子生成器只能猜'],
+ ['尺度先量原版再定','按最低值做会局促'],
+ ['允许适配化，只查清决定路线的事实','位置、编号这类细节反复调研没有价值'],
+ ['因地图而异的数值进待决定列表','Kit 不写死数字'],
+ ['事件：结构写精确，手感选档位','数字没有试玩依据时集中在一张表里调'],
+ ['面数预算从设计阶段管起','超上限编译直接失败'],
+ ['改设计前先查规划原文','规划里的决定是用户拍板的'],
+ ['压缩、朝向都是可选项，用不用都写理由','—'],
+ ['彩蛋在结构和开放区定稿后、收口前做：内容不受复刻约束，格式照常严格','要交给生成，又不能影响主线']]);
+
+document.getElementById('start').innerHTML=['读 SKILL.md（只有入口，很短）','读项目的 <code>PROJECT.md</code>：现在在哪一步、哪条线归谁、最近一次交接说了什么','跑 <code>kit status</code>：按项目文件算出实际进度，和 PROJECT.md 对不上会报警','要用资料时先跑 <code>kit sources find</code> 看已有的；已有资料不足以判断时再去查或下载，新得到的资料照 P2 的规则入库（编号、来源、等级、用途），不留在临时目录','只读下一步对应的 <code>references/steps/&lt;步&gt;.md</code>','按那一页做；做完跑那一步的脚本，必须通过','交用户评审；拍板后写拍板记录、提交；再跑一次 <code>kit status</code>'].map(x=>'<li>'+x+'</li>').join('');
+document.getElementById('status').textContent=
+'项目：<项目名>   Kit 版本：x.y   格式版本：0.5\n\n'+
+'P0 开项目           完成\n'+
+'P1–P5 规划          完成（6 关定稿）\n'+
+'L01  D1 准备         完成\n'+
+'     D2 结构体       14/14 文件，核验全过；拍板 13/14  ← 待拍板：<id>\n'+
+'     D3 开放区       5/5，核验全过；拍板 5/5\n'+
+'     D4 彩蛋         1 个，已拍板\n'+
+'     D5 收口与合成   spec 未通过：2 个事件没有触发物  ✗\n'+
+'     D6 整关评审     未开始\n\n'+
+'下一步：交 <id> 拍板；然后 D5 修事件触发\n'+
+'读：references/steps/D5-close-and-compose.md';
+document.getElementById('accept').innerHTML=['只给它 Kit 和一句话：“帮我们的战役做第 N 关——<题目>”','通过标准：不论设计好坏，交出完整交付物，并通过全部核验脚本','它看不懂、做错的地方就是 Kit 要改的地方','验收在临时分支上做，结束后丢弃产物'].map(x=>'<li>'+x+'</li>').join('');
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='t-'+b.dataset.t));});
+</script></body></html>

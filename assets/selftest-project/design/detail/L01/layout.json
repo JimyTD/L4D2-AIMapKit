@@ -1,0 +1,40 @@
+{
+ "level": 1,
+ "title": "样例关总图",
+ "origin_m": [
+  23,
+  13
+ ],
+ "origin_why": "范围中心",
+ "level_extent_m": [
+  -10,
+  0,
+  56,
+  26
+ ],
+ "default_ground_m": 0,
+ "compression": {
+  "used": false,
+  "why": "范围很小，不需要压缩",
+  "refs": [
+   "S0001"
+  ]
+ },
+ "orientation": {
+  "rotate_deg": 0,
+  "why": "结构体与坐标轴对齐"
+ },
+ "areas": [
+  {
+   "id": "yard",
+   "file": "design/detail/L01/areas/yard.json"
+  }
+ ],
+ "structures": [
+  {
+   "id": "A",
+   "file": "design/detail/L01/structures/A.json",
+   "z0_m": 0.45
+  }
+ ]
+}

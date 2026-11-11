@@ -1,0 +1,16 @@
+kit.local.json
+.venv/
+__pycache__/
+sources/_inbox/
+sources/geodata/tiles/
+
+# Generated and rebuildable
+design/plan/views/img/
+build/
+*.bsp
+*.prt
+*.lin
+*.vmx
+*.log
+*.vpk
+

@@ -1,0 +1,15 @@
+{
+ "title": "自测样例",
+ "subtitle": "虚构地点",
+ "realism": "fictional",
+ "levels": 1,
+ "minutes_per_level": [
+  1,
+  30
+ ],
+ "pitch": "一栋两层小楼加一个院子",
+ "non_goals": [
+  "无"
+ ],
+ "label_prefixes": []
+}

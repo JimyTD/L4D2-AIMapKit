@@ -1,0 +1,165 @@
+{
+ "note": "自测样例的待决定列表（数值是为测试编的，不是建议）",
+ "items": [
+  {
+   "id": "unit_cm",
+   "value": 2.54,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "step_max",
+   "value": 18,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "jump_h",
+   "value": 21,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "brushside_cap",
+   "value": 65536,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "brush_cap",
+   "value": 8192,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "map_margin_u",
+   "value": 1024,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "plan_route_pad_m",
+   "value": 20,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "compress_max",
+   "value": 0.5,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "compress_bearing_max_deg",
+   "value": 15,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "map_budget_ratio",
+   "value": {
+    "goal": 0.6,
+    "warn": 0.8,
+    "fail": 1
+   },
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "brushside_estimate",
+   "value": {
+    "base": 60,
+    "per_edge": 15,
+    "per_space": 60,
+    "per_door": 60,
+    "per_core": 500,
+    "per_cut_balcony": 17,
+    "per_cut_window": 12,
+    "bevel_ratio": 0.4,
+    "per_site_m2": 0.35
+   },
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "corridor_min",
+   "value": 96,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "squeeze_min",
+   "value": 48,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "route_door_w_min",
+   "value": 56,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "route_door_h_min",
+   "value": 104,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "headroom_min",
+   "value": 104,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "stair_flight_w_min",
+   "value": 48,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "block_min_h_u",
+   "value": 72,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "ground_types",
+   "value": [
+    {
+     "id": "road",
+     "walkable": true,
+     "elev_m": 0
+    },
+    {
+     "id": "grass",
+     "walkable": true,
+     "elev_m": 0
+    },
+    {
+     "id": "pond",
+     "walkable": false,
+     "elev_m": -0.5
+    }
+   ],
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "strength_table",
+   "value": {
+    "small": {
+     "mobs": 1
+    },
+    "medium": {
+     "mobs": 2
+    },
+    "large": {
+     "mobs": 3
+    }
+   },
+   "status": "已定",
+   "why": "自测"
+  }
+ ]
+}

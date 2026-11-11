@@ -1,0 +1,241 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>__TITLE__</title>
+<style>
+body{margin:0;font:14px/1.5 'Microsoft YaHei','PingFang SC',sans-serif;color:#1f2328;background:#f6f8fa}
+header{padding:14px 20px;background:#fff;border-bottom:1px solid #d0d7de;position:sticky;top:0;z-index:5}
+h1{font-size:20px;margin:0 0 4px}.sub{color:#57606a;font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;padding:16px 20px}
+.card{background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:12px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.seg{display:inline-flex}.seg button{border:1px solid #d0d7de;background:#fff;padding:4px 12px;cursor:pointer;font:inherit;margin-left:-1px}
+.seg button.on{background:#0969da;color:#fff;border-color:#0969da}
+.seg button:first-child{border-radius:6px 0 0 6px}.seg button:last-child{border-radius:0 6px 6px 0}
+label.t{font-size:13px;color:#57606a;display:flex;gap:4px;align-items:center}
+#plan{width:100%;height:72vh;background:#fbfbfc;border:1px solid #eaeef2;border-radius:4px;cursor:grab}
+#plan .sp{stroke:#57606a;stroke-width:.06}
+#plan .sp:hover,#plan .dr:hover{filter:brightness(.85);cursor:pointer}
+#plan .sel{stroke:#0969da!important;stroke-width:.3!important}
+#info table{width:100%;border-collapse:collapse;font-size:13px}
+#info td{border-bottom:1px solid #eaeef2;padding:3px 4px;vertical-align:top}
+#info td:first-child{color:#57606a;white-space:nowrap;width:84px}
+.pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:12px;color:#fff}
+h2{font-size:15px;margin:4px 0 8px}
+table.list{width:100%;border-collapse:collapse;font-size:12.5px}
+table.list th,table.list td{border-bottom:1px solid #eaeef2;padding:3px 6px;text-align:left}
+table.list tr[data-id]:hover{background:#f6f8fa;cursor:pointer}
+.legend span{display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:12px}
+.legend i{display:inline-block;width:14px;height:10px;border:1px solid #57606a}
+details{margin-top:8px}summary{cursor:pointer;font-weight:600}
+.fail{color:#cf222e}.ok{color:#1a7f37}
+</style></head><body>
+<header><h1>__TITLE__</h1><div class="sub" id="sub"></div></header>
+<main>
+<section>
+ <div class="card">
+  <div class="bar"><div class="seg" id="levels"></div>
+   <label class="t"><input type="checkbox" id="tSat">卫星底图</label>
+   <label class="t"><input type="checkbox" id="tRoute" checked>路线</label>
+   <label class="t"><input type="checkbox" id="tGrade">按来源着色</label>
+   <label class="t"><input type="checkbox" id="tLabel" checked>标签</label>
+   <label class="t"><input type="checkbox" id="tObj" checked>物件</label>
+   <label class="t"><input type="checkbox" id="tShell" checked>外壳开口</label>
+   <label class="t"><input type="checkbox" id="tFix" checked>家具设备</label></div>
+  <svg id="plan"></svg>
+  <div class="legend" id="legend"></div>
+ </div>
+ <div class="card" style="margin-top:16px"><h2>氛围描述（美术自由发挥）</h2><div id="atmo"></div></div>
+ <div class="card" style="margin-top:16px"><h2>外壳：立面</h2><div class="sub" style="margin-bottom:6px">每段外墙展开，从外面看。灰框 = 窗，蓝框 = 阳台开间，红 = 出入口</div><svg id="facades" width="100%"></svg></div>
+ <div class="card" style="margin-top:16px"><h2>楼梯剖面</h2><svg id="section" width="100%" height="260"></svg></div>
+ <div class="card" style="margin-top:16px"><h2>本层所有元素（点击定位）</h2><div id="list"></div></div>
+</section>
+<aside>
+ <div class="card" style="margin-bottom:16px"><h2>建模量</h2><div id="stats"></div></div>
+ <div class="card" id="info"><h2>点选平面里的房间、门或楼梯</h2><div class="sub">显示编号、尺寸（米 / 单位）和依据</div></div>
+ <div class="card" style="margin-top:16px"><h2>需要拍板：和规划不一致</h2><div id="dev"></div></div>
+ <div class="card" style="margin-top:16px"><h2>需要回答：查不到</h2><div id="qs"></div></div>
+ <div class="card" style="margin-top:16px"><h2>来源统计</h2><div id="grades"></div></div>
+ <div class="card" style="margin-top:16px"><h2>核验</h2><div id="checks"></div></div>
+</aside>
+</main>
+<script>
+const D=__DATA__, CHK=__CHECKS__, SAT=__SAT__, SRC=__SOURCES__;
+const ROOTREL=__ROOT__;
+const U=m=>(m/0.0254).toFixed(0);
+const KF={corridor:'#f3e2a0',room:'#d3e3f4',hall:'#f6d0b4',service:'#d2ead0',stair:'#e3c7f0',balcony:'#fbefc8',void:'#c5f6fa',closed:'#e6e6e6'};
+const KN={corridor:'走廊',room:'房间',hall:'大厅',service:'公共房间',stair:'楼梯间',balcony:'阳台',void:'挑空',closed:'不开放'};
+const GC={'实测':'#1a7f37','确认':'#1a7f37','推断':'#0969da','假设':'#bf8700','改动':'#8250df'};
+const DC={open:'#22a06b',event_open:'#2b7fd9',locked:'#f08c00',blocked:'#e03131'};
+const DN={open:'开着',event_open:'事件后打开',locked:'锁着',blocked:'封死'};
+const f=D.frame,a=f.u_angle_deg*Math.PI/180,ux=[Math.cos(a),Math.sin(a)],vx=[-Math.sin(a),Math.cos(a)];
+const W=(u,v)=>[f.origin[0]+ux[0]*u+vx[0]*v,f.origin[1]+ux[1]*u+vx[1]*v];
+const ext=D.shell.edges.map(s=>W(...s.from_m));
+const xs=ext.map(p=>p[0]),ys=ext.map(p=>p[1]);
+const pad=6,minx=Math.min(...xs)-pad,maxx=Math.max(...xs)+pad,miny=Math.min(...ys)-pad,maxy=Math.max(...ys)+pad;
+const P=(x,y)=>[x-minx,maxy-y];
+const svg=document.getElementById('plan');
+svg.setAttribute('viewBox',`0 0 ${maxx-minx} ${maxy-miny}`);
+const NS='http://www.w3.org/2000/svg';
+const el=(t,at,par)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);(par||svg).appendChild(e);return e};
+const poly=pts=>pts.map(p=>P(...p).map(v=>v.toFixed(2)).join(',')).join(' ');
+const rectPts=r=>[[r[0],r[1]],[r[2],r[1]],[r[2],r[3]],[r[0],r[3]]].map(q=>W(...q));
+let level=(D.floors.find(x=>x.spaces.some(s=>s.highlight))||D.floors.find(x=>!x.core_only)||D.floors[0]||{level:1}).level, sel=null;
+const g=k=>(k&&k.grade)||'—';
+function srcHtml(s){if(!s)return '<span class="sub">（随所属空间）</span>';
+ let h=`<span class="pill" style="background:${GC[s.grade]||'#57606a'}">${s.grade}</span> `;
+ if(s.why)h+=s.why+'<br>';
+ if(s.refs)h+=s.refs.map(r=>SRC[r]?`<a href="${SRC[r].url||(ROOTREL+SRC[r].path)}" target="_blank" title="${SRC[r].note}">${r}</a>（${SRC[r].grade}）`:r).join('、');
+ if(s.question)h+=` 待问 <b>${s.question}</b>`;
+ return h;}
+function show(kind,o){
+ sel=o.id;draw();
+ const fl=D.floors.find(x=>x.level===level);
+ const rows=[['编号',o.id]];
+ if(kind==='space'){rows.push(['类型',KN[o.kind]],['用途',o.use||'—']);
+  (o.rects_m||[]).forEach((r,i)=>{const w=Math.abs(r[2]-r[0]),d=Math.abs(r[3]-r[1]);rows.push(['矩形'+(o.rects_m.length>1?i+1:''),`u ${r[0]}–${r[2]}，v ${r[1]}–${r[3]} m<br>${w.toFixed(2)} × ${d.toFixed(2)} m = ${U(w)} × ${U(d)} 单位`]);});
+  rows.push(['面积',o.area_m2+' m²'],['楼面标高',`${fl.elevation_m} m（${fl.elevation_u} 单位）`]);
+  if(o.squeeze)rows.push(['窄通道','是：按一人通道核验']);
+  if(o.void){const v=o.void;rows.push(['挑空','从本层通到 '+v.to_level+'F；上面各层边缘：'+({rail:'栏杆',parapet:'实心栏板',wall:'墙'}[v.edge]||v.edge)+(v.rail_h_m?' '+v.rail_h_m+' m':'')+'；顶上：'+(v.top==='skylight'?'采光顶 '+(v.roof_box||''):'楼板')]);}
+  if(o.visible_only)rows.push(['只看得到','不在路线上，隔着挑空或从门口看得到；建出来但走不到']);
+  rows.push(['依据',srcHtml(o.src)]);}
+ if(kind==='door'){rows.push(['连接',o.between.join(' ↔ ')],['状态',DN[o.state]],['中心',`u ${o.center_m[0]}，v ${o.center_m[1]} m`],
+  ['洞口',`宽 ${o.width_m} × 高 ${o.height_m} m<br>= ${o.width_u} × ${o.height_u} 单位，底高 0`]);
+  if(o.five)for(const k in o.five)rows.push([k,o.five[k]]);
+  rows.push(['依据',srcHtml(o.src)]);}
+ if(kind==='closed'){rows.push(['类型','关着的门（门后不建）'],['所在走廊',o.on],['门牌',o.label||'—'],['中心',`u ${o.center_m[0]}，v ${o.center_m[1]} m`],['尺寸',`${o.width_m} × ${o.height_m} m = ${U(o.width_m)} × ${U(o.height_m)} 单位`],['依据',srcHtml(o.src)]);}
+ if(kind==='obj'){rows.push(['类型',o.kind+(o.easter_egg?'（彩蛋）':'')],['所在空间',o.level+'F '+o.in],['位置',`u ${o.at[0]}，v ${o.at[1]} m，朝向 ${o.yaw_deg}°`],['尺寸',o.size_m.join(' × ')+' m'],['玩家怎么用',o.what],['刷什么',(o.items||[]).map(i=>i.entity+' × '+i.count+(i.options?'（'+i.options+'）':'')).join('<br>')+(o.pick?'<br>只刷其中 '+o.pick+' 种':'')||'—'],['触发事件',(o.fires||[]).join('、')||(o.opened_by?'由 '+o.opened_by+' 打开':'')||(o.when?'出现时机 '+o.when:'')||'—'],['规划条目',(o.plan||[]).join('、')||'—'],['依据',srcHtml(o.src)]);}
+ if(kind==='fix'){rows.push(['类型','构件·'+o.kind],['所在空间',o.level+'F '+o.in],['位置',`u ${o.at_m[0]}，v ${o.at_m[1]} m，朝向 ${o.yaw_deg}°`],['尺寸',o.size_m.join(' × ')+' m = '+o.size_u.join(' × ')+' 单位'],['挡路',o.blocks?'是':'否'],['看穿',o.see_through?'能':'不能'],['能翻',o.vault?'能':'不能'],['说明',o.what],['依据',srcHtml(o.src)]);}
+ if(kind==='core'){const s=o.stair;rows.push(['类型','楼梯'],['范围',`u ${o.rect_m[0]}–${o.rect_m[2]}，v ${o.rect_m[1]}–${o.rect_m[3]} m`],['楼层',o.levels.join('、')+'F']);
+  rows.push(['建模深度',o.depth==='full'?'完整（会走）':'只建可见段（'+o.levels.join('、')+'F）']);
+  if(s)rows.push(['约定',`梯段沿 ${s.run_axis}；楼层平台在 ${s.start_end} 端；第一跑靠 ${s.first_flight_side} 侧`]);
+  if(s)rows.push(['形式',`双跑，每层 ${s.risers_per_storey} 级 × ${s.riser_u} 单位 = ${s.storey_rise_u} 单位`],['梯段',`宽 ${s.flight_w_u}，踏步深 ${s.tread_u}，平台深 ${s.landing_u}，梯井 ${s.gap_u}（单位）`]);
+  if(o.build_note)rows.push(['建多少',o.build_note]);
+  if(o.above){rows.push(['往上',o.above.label||''],['往上建多少',o.above.build||'']);for(const k in (o.above.five||{}))rows.push([k,o.above.five[k]]);}
+  rows.push(['依据',srcHtml(o.src)]);}
+ document.getElementById('info').innerHTML='<h2>'+o.id+'</h2><table>'+rows.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table>';}
+function draw(){
+ svg.innerHTML='';
+ const fl=D.floors.find(x=>x.level===level),sat=document.getElementById('tSat').checked;
+ if(sat)el('image',{href:SAT,x:0,y:0,width:maxx-minx,height:maxy-miny,preserveAspectRatio:'none'});
+ el('polygon',{points:poly(ext),fill:sat?'none':'#f6f8fa',stroke:sat?'#ff4d4f':'#1f2328','stroke-width':.25});
+ const byGrade=document.getElementById('tGrade').checked,coreIds=new Set(D.cores.map(c=>c.id));
+ for(const s of fl.spaces)for(const shape of (s.poly_m?[s.poly_m.map(q=>W(...q))]:s.rects_m.map(rectPts))){
+   const fill=byGrade?(GC[s.src&&s.src.grade]||'#ccc'):KF[s.kind];
+   const e=el('polygon',{points:poly(shape),fill,'fill-opacity':sat?.55:(byGrade?.5:1),class:'sp'+(sel===s.id?' sel':'')});
+   if(s.visible_only)e.setAttribute('fill-opacity',.45);
+   e.onclick=()=>coreIds.has(s.id)?show('core',D.cores.find(c=>c.id===s.id)):show('space',s);
+   el('title',{},e).textContent=s.id+' '+(s.use||'');}
+ for(const vf of D.floors)for(const vs of vf.spaces){if(!vs.void||vf.level>=level||vs.void.to_level<level)continue;
+   const shp=vs.poly_m?vs.poly_m.map(q=>W(...q)):rectPts(vs.rects_m[0]);
+   const e=el('polygon',{points:poly(shp),fill:'#c5f6fa','fill-opacity':.35,stroke:'#0c8599','stroke-width':.25,'stroke-dasharray':'.8 .5'});
+   el('title',{},e).textContent=vs.id+' 下面的挑空（从 '+vf.level+'F 通到 '+vs.void.to_level+'F）';e.onclick=()=>show('space',vs);}
+ for(const ve of fl.void_edges_m||[]){const pts=ve.line_m.map(x=>P(...W(...x)));el('polyline',{points:pts.map(p=>p.map(v=>v.toFixed(2)).join(',')).join(' '),fill:'none',stroke:'#0c8599','stroke-width':.3}).style.pointerEvents='none';}
+ for(const d of fl.doors){const [p,q]=d.segment_m.map(x=>P(...W(...x))),small=d.state==='locked'&&d.width_m<1;
+   const e=el('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:small?'#8c959f':DC[d.state],'stroke-width':small?.25:.55,class:'dr'+(sel===d.id?' sel':'')});
+   e.onclick=()=>show('door',d);el('title',{},e).textContent=d.id+' '+DN[d.state];}
+ for(const c of fl.closed_doors||[]){const [p,q]=c.segment_m.map(x=>P(...W(...x)));
+   const e=el('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:'#8c959f','stroke-width':.3,class:'dr'+(sel===c.id?' sel':'')});
+   e.onclick=()=>show('closed',c);el('title',{},e).textContent=c.id+' 关着的门（后面不建）';}
+ if(document.getElementById('tShell').checked){for(const o of D.shell.openings.filter(o=>o.level===level)){
+   const c=W(...[0,0]);const x=o.center_m,dx=o.dir;const w=(o.type==='balcony'?o.w_m:(o.w_m||1))/2;
+   const a=[x[0]-dx[0]*w,x[1]-dx[1]*w],b=[x[0]+dx[0]*w,x[1]+dx[1]*w];
+   const [p,q]=[P(...W(...a)),P(...W(...b))];
+   el('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:o.type==='balcony'?'#4dabf7':'#adb5bd','stroke-width':.35}).style.pointerEvents='none';}
+  for(const e of D.shell.entrances.filter(e=>e.level===level)){const ed=D.shell.edges[e.edge],L=ed.len_m,d=[(ed.to_m[0]-ed.from_m[0])/L,(ed.to_m[1]-ed.from_m[1])/L];
+   const m=[ed.from_m[0]+d[0]*e.s,ed.from_m[1]+d[1]*e.s],a=[m[0]-d[0]*e.w_m/2,m[1]-d[1]*e.w_m/2],b=[m[0]+d[0]*e.w_m/2,m[1]+d[1]*e.w_m/2];
+   const [p,q]=[P(...W(...a)),P(...W(...b))];el('line',{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:'#e03131','stroke-width':.6}).style.pointerEvents='none';}}
+ if(document.getElementById('tFix').checked)for(const f of D.fixtures.filter(f=>f.level===level)){const L=f.size_m[0],Wd=f.size_m[1],a=f.yaw_deg*Math.PI/180,[cx,cy]=f.at_m;
+   const cs=[[-L/2,-Wd/2],[L/2,-Wd/2],[L/2,Wd/2],[-L/2,Wd/2]].map(([x,y])=>W(cx+Math.cos(a)*x-Math.sin(a)*y,cy+Math.sin(a)*x+Math.cos(a)*y));
+   const e=el('polygon',{points:poly(cs),fill:f.blocks?'#e8590c':'#fab005','fill-opacity':.5,stroke:'#212529','stroke-width':.06,'stroke-dasharray':f.see_through?'.3 .2':'',class:'dr'+(sel===f.id?' sel':'')});
+   e.onclick=()=>show('fix',f);el('title',{},e).textContent=f.id+' '+f.what;}
+ if(document.getElementById('tObj').checked)for(const o of D.objects.filter(o=>o.level===level)){const c=P(...W(...o.at_m));
+   const col={button:'#e8590c',item_spawn:'#2f9e44',saferoom_door:'#1971c2',alarm:'#c2255c',clutter_block:'#495057',prop:'#7048e8',fire:'#f03e3e',elevator:'#0b7285',mounted_gun:'#212529',infected:'#a61e4d',event_door:'#1864ab'}[o.kind]||'#868e96';
+   if(o.kind==='elevator'&&o.shaft){const r=o.shaft;const sh=[[r[0],r[1]],[r[2],r[1]],[r[2],r[3]],[r[0],r[3]]].map(q=>W(...q));
+     const e2=el('polygon',{points:poly(sh),fill:'#99e9f2','fill-opacity':.6,stroke:'#0b7285','stroke-width':.15});e2.onclick=()=>show('obj',o);el('title',{},e2).textContent=o.id+' '+o.what;}
+   if(o.kind==='infected'&&o.points)for(const q of o.points){const cq=P(...W(...q));const ei=el('circle',{cx:cq[0],cy:cq[1],r:.7,fill:o.type==='Tank'?'#a61e4d':'#e64980',stroke:'#fff','stroke-width':.12});
+     ei.onclick=()=>show('obj',o);el('title',{},ei).textContent=o.type+'（'+o.id+'）';}
+   const e=el('rect',{x:c[0]-.55,y:c[1]-.55,width:1.1,height:1.1,fill:col,stroke:'#fff','stroke-width':.15,transform:`rotate(45 ${c[0]} ${c[1]})`,class:'dr'+(sel===o.id?' sel':'')});
+   e.onclick=()=>show('obj',o);el('title',{},e).textContent=o.id+' '+o.what;}
+ if(document.getElementById('tLabel').checked)for(const s of fl.spaces){if(!s.use||(s.kind==='room'&&!s.label))continue;
+   const pc=s.poly_m||rectPts(s.rects_m[0]).map(q=>q);const cl=s.poly_m?s.poly_m.slice(0,-1):null;
+   const ctr=cl?cl.reduce((a,q)=>[a[0]+q[0]/cl.length,a[1]+q[1]/cl.length],[0,0]):null;
+   const c=ctr?P(...W(...ctr)):(()=>{const r=s.rects_m[0];return P(...W((r[0]+r[2])/2,(r[1]+r[3])/2));})();
+   const t=el('text',{x:c[0],y:c[1]+.4,'font-size':1.1,'text-anchor':'middle',fill:'#1f2328',stroke:'#fff','stroke-width':.25,'paint-order':'stroke'});
+   t.textContent=s.label||s.use.split(/[（，：]/)[0];t.style.pointerEvents='none';}
+ if(document.getElementById('tRoute').checked&&fl.route_m&&fl.route_m.length)
+   el('polyline',{points:poly(fl.route_m.map(p=>W(...p))),fill:'none',stroke:'#d6336c','stroke-width':.35,'stroke-dasharray':'1 .6','stroke-linecap':'round'}).style.pointerEvents='none';
+ const nx=maxx-minx-3;el('path',{d:`M${nx},2 l.8,2.4 l-.8,-.6 l-.8,.6 Z`,fill:'#1f2328'});
+ el('line',{x1:2,y1:maxy-miny-2,x2:12,y2:maxy-miny-2,stroke:'#1f2328','stroke-width':.3});
+ el('text',{x:7,y:maxy-miny-2.6,'font-size':1,'text-anchor':'middle'}).textContent='10 m';
+ let h='<table class="list"><tr><th>编号</th><th>类型</th><th>用途 / 连接</th><th>尺寸</th><th>来源</th></tr>';
+ for(const s of fl.spaces){const r=s.rects_m?s.rects_m[0]:null;h+=`<tr data-k="s" data-id="${s.id}"><td>${s.id}</td><td>${KN[s.kind]}</td><td>${s.use||''}</td><td>${r?Math.abs(r[2]-r[0]).toFixed(2)+'×'+Math.abs(r[3]-r[1]).toFixed(2)+' m':s.area_m2+' m²'}</td><td>${g(s.src)}</td></tr>`;}
+ for(const d of fl.doors)h+=`<tr data-k="d" data-id="${d.id}"><td>${d.id}</td><td>门·${DN[d.state]}</td><td>${d.between.join(' ↔ ')}</td><td>${d.width_m}×${d.height_m} m</td><td>${g(d.src)}</td></tr>`;
+ for(const c of fl.closed_doors||[])h+=`<tr data-k="c" data-id="${c.id}"><td>${c.id}</td><td>关着的门</td><td>${c.on}（门后不建）</td><td>${c.width_m}×${c.height_m} m</td><td>${g(c.src)}</td></tr>`;
+ for(const f of D.fixtures.filter(f=>f.level===level))h+=`<tr data-k="f" data-id="${f.id}"><td>${f.id}</td><td>构件·${f.kind}</td><td>${f.what}</td><td>${f.size_m.join('×')} m</td><td>${g(f.src)}</td></tr>`;
+ for(const o of D.objects.filter(o=>o.level===level))h+=`<tr data-k="o" data-id="${o.id}"><td>${o.id}</td><td>物件·${o.kind}</td><td>${o.what}</td><td>${o.size_m.join('×')} m</td><td>${g(o.src)}</td></tr>`;
+ document.getElementById('list').innerHTML=h+'</table>';
+ document.querySelectorAll('#list tr[data-id]').forEach(tr=>tr.onclick=()=>{const id=tr.dataset.id;
+   const k=tr.dataset.k;if(k==='s')coreIds.has(id)?show('core',D.cores.find(c=>c.id===id)):show('space',fl.spaces.find(x=>x.id===id));
+   else if(k==='c')show('closed',fl.closed_doors.find(x=>x.id===id));else if(k==='o')show('obj',D.objects.find(x=>x.id===id));else if(k==='f')show('fix',D.fixtures.find(x=>x.id===id));else show('door',fl.doors.find(x=>x.id===id));});
+ document.querySelectorAll('#levels button').forEach(b=>b.classList.toggle('on',+b.dataset.l===level));}
+const lv=document.getElementById('levels');
+for(const fl of [...D.floors].sort((x,y)=>y.level-x.level)){const b=document.createElement('button');b.textContent=fl.level+'F'+(fl.core_only?'（楼梯）':'');b.dataset.l=fl.level;b.onclick=()=>{level=fl.level;sel=null;draw();};lv.appendChild(b);}
+['tSat','tRoute','tGrade','tLabel','tObj','tShell','tFix'].forEach(i=>document.getElementById(i).onchange=draw);
+document.getElementById('legend').innerHTML=Object.keys(KN).map(k=>`<span><i style="background:${KF[k]}"></i>${KN[k]}</span>`).join('')+Object.keys(DN).map(k=>`<span><i style="background:${DC[k]};height:4px"></i>门·${DN[k]}</span>`).join('')+'<span><i style="background:#8c959f;height:2px"></i>关着的门（门后不建）</span><span><i style="background:#4dabf7;height:3px"></i>阳台开间</span><span><i style="background:#adb5bd;height:3px"></i>窗</span><span><i style="background:#e8590c;transform:rotate(45deg);width:8px;height:8px"></i>物件</span><span><i style="background:#d6336c;height:3px"></i>路线</span>';
+const vb=svg.viewBox.baseVal;
+svg.onwheel=e=>{e.preventDefault();const k=e.deltaY>0?1.15:1/1.15,r=svg.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height,mx=vb.x+fx*vb.width,my=vb.y+fy*vb.height;vb.width*=k;vb.height*=k;vb.x=mx-fx*vb.width;vb.y=my-fy*vb.height;};
+let drag=null;svg.onmousedown=e=>drag=[e.clientX,e.clientY,vb.x,vb.y];window.onmouseup=()=>drag=null;
+window.onmousemove=e=>{if(!drag)return;const r=svg.getBoundingClientRect();vb.x=drag[2]-(e.clientX-drag[0])/r.width*vb.width;vb.y=drag[3]-(e.clientY-drag[1])/r.height*vb.height;};
+document.getElementById('dev').innerHTML=D.plan_deviations.map(d=>`<p><b>${d.id}</b> ${d.problem}<br><b>提议：</b>${d.proposal}${d.decision?'<br><b class="ok">结论：</b>'+d.decision:'<br><b class="fail">待拍板</b>'}</p>`).join('')||'无';
+document.getElementById('qs').innerHTML=D.questions.map(q=>`<p><b>${q.id}</b> ${q.text}<br><span class="sub">AI 判断：${q.judgment}</span></p>`).join('')||'无';
+const items=[];D.floors.forEach(fl=>{fl.spaces.forEach(s=>items.push(s));fl.doors.forEach(d=>items.push(d));(fl.closed_doors||[]).forEach(c=>items.push(c));});D.objects.forEach(o=>items.push(o));D.fixtures.forEach(o=>items.push(o));
+const byG={};items.forEach(o=>{if(o.src&&o.src.grade)byG[o.src.grade]=(byG[o.src.grade]||0)+1;});
+const assume=items.filter(o=>o.src&&o.src.grade==='假设').map(o=>o.id);
+document.getElementById('grades').innerHTML=Object.entries(byG).map(([k,v])=>`<span class="pill" style="background:${GC[k]}">${k}</span> ${v} 个元素`).join('<br>')+(assume.length?'<details><summary>“假设”逐条</summary>'+assume.join('、')+'</details>':'');
+const fails=CHK.results.filter(r=>!r.pass),groups={};
+CHK.results.forEach(r=>{groups[r.group]=groups[r.group]||[0,0];groups[r.group][r.pass?0:1]++;});
+document.getElementById('checks').innerHTML=`<p class="${fails.length?'fail':'ok'}"><b>${CHK.passed}/${CHK.results.length} 通过</b></p>`+
+ Object.entries(groups).map(([k,[p,q]])=>`<div>${k}：<span class="ok">${p}</span>${q?' / <span class="fail">'+q+' 失败</span>':''}</div>`).join('')+
+ (fails.length?'<details open><summary>失败项</summary>'+fails.map(r=>'<div class="fail">'+r.check+' '+r.detail+'</div>').join('')+'</details>':'')+
+ '<details><summary>全部检查</summary>'+CHK.results.map(r=>'<div class="'+(r.pass?'':'fail')+'">'+(r.pass?'✓':'✗')+' ['+r.group+'] '+r.check+' '+(r.detail||'')+'</div>').join('')+'</details>';
+document.getElementById('sub').textContent=D.name+' · 轮廓 '+D.outline+' · 搭建数据：'+D.id+'.build.json（生成读这个文件，不读本页） · 北向朝上，滚轮缩放、拖动平移';
+(function(){const c=D.cores.find(x=>x.section);if(!c)return;const s=c.stair,lv=c.section_levels||c.levels,st=Object.fromEntries(D.storeys.map(x=>[x.level,x]));
+ const sv=document.getElementById('section'),Wd=sv.clientWidth||700,H=260,top=st[lv[lv.length-1]].elevation_m;
+ const run=(s.risers_per_storey/2-1)*s.tread_u*0.0254,land=s.landing_u*0.0254,L=run+2*land;
+ const kz=(H-40)/(top+1),kx=Math.min(kz,(Wd-300)/L),x0=150,y0=H-20,Q=(x,z)=>[x0+x*kx,y0-z*kz];
+ const add=(t,at)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);sv.appendChild(e);return e};
+ lv.forEach((l,i)=>{const z=st[l].elevation_m,[a,b]=Q(0,z);add('line',{x1:a-10,y1:b,x2:Q(L,z)[0]+10,y2:b,stroke:'#57606a'});
+  add('text',{x:a-14,y:b+4,'text-anchor':'end','font-size':12}).textContent=l+'F  '+z.toFixed(1)+' m / '+(z/0.0254).toFixed(0)+' 单位';
+  if(i===lv.length-1)return;const h=st[l].height_m,n=s.risers_per_storey/2;
+  [[land,land+run,z],[land+run,land,z+h/2]].forEach(([xa,xb,za],k)=>{let d='';for(let j=0;j<n;j++){const fx=xa+(xb-xa)*j/(n-1),p1=Q(fx,za+h/2*j/n),p2=Q(fx,za+h/2*(j+1)/n);d+=(d?'L':'M')+p1+' L'+p2;}
+   add('path',{d,fill:'none',stroke:'#7048e8','stroke-width':1.6,'stroke-dasharray':k?'4 3':''});});
+  const [m1,m2]=Q(land+run,z+h/2);add('line',{x1:m1,y1:m2,x2:Q(L,z+h/2)[0],y2:m2,stroke:'#7048e8','stroke-width':3});});
+ add('text',{x:Wd-10,y:20,'text-anchor':'end','font-size':12}).textContent=c.id+'：每层 '+s.risers_per_storey+' 级 × '+s.riser_u+' = '+s.storey_rise_u+' 单位；梯段宽 '+s.flight_w_u+'，踏步深 '+s.tread_u+'，平台深 '+s.landing_u+'（单位）';
+ if(c.above)add('text',{x:Wd-10,y:38,'text-anchor':'end','font-size':12,fill:'#b42318'}).textContent=c.above.label||'';})();
+(function(){const s=D.stats;const st=Object.fromEntries(D.storeys.map(x=>[x.level,x]));
+ document.getElementById('stats').innerHTML=`<table class="list">
+ <tr><td>外壳</td><td>${D.shell.edges.length} 段外墙，${D.storeys.length} 层，${s.facade_openings} 个窗/阳台开间，${D.shell.roof_boxes.length} 个出屋面，${D.shell.entrances.length} 个出入口</td></tr>
+ <tr><td>有内部的楼层</td><td>${s.floors_with_interior.map(x=>x+'F').join('、')}</td></tr>
+ <tr><td>只有楼梯的楼层</td><td>${s.floors_stair_only.map(x=>x+'F').join('、')||'—'}</td></tr>
+ <tr><td>不建的楼层</td><td>${D.storeys.map(x=>x.level).filter(l=>!s.floors_with_interior.includes(l)&&!s.floors_stair_only.includes(l)).map(x=>x+'F').join('、')||'—'}</td></tr>
+ <tr><td>内部空间</td><td>${s.interior_spaces} 个（会走进去的）</td></tr>
+ <tr><td>门</td><td>${s.doors} 扇可通过或有意封住；${s.closed_doors} 扇关着的门（门后不建）</td></tr>
+ <tr><td>楼梯</td><td>完整 ${s.stairs_full} 部，只建可见段 ${s.stairs_visible} 部</td></tr>
+ <tr><td>物件</td><td>${s.objects} 个互动物件，${s.fixtures} 个家具设备</td></tr></table>`;
+ document.getElementById('atmo').innerHTML=D.atmosphere.map(a=>'<p><b>'+a.id+'</b> '+a.text+'<br><span class="sub">范围：'+a.scope.map(x=>x==='shell'?'外壳':x[0]+'F '+x[1]).join('、')+'；参考图：'+(a.refs||[]).map(r=>SRC[r]?'<a target="_blank" href="'+(SRC[r].url||(ROOTREL+SRC[r].path))+'">'+r+'</a>':r).join('、')+'</span></p>').join('');
+ const fs=document.getElementById('facades');const levels=D.storeys.map(x=>x.level);const H=st[levels[levels.length-1]].elevation_m+st[levels[levels.length-1]].height_m;
+ const k=6,rowH=(H+D.shell.parapet_m)*k+34;let y=10;fs.setAttribute('height',D.shell.edges.length*rowH+10);
+ const add=(t,a)=>{const e=document.createElementNS(NS,t);for(const q in a)e.setAttribute(q,a[q]);fs.appendChild(e);return e};
+ for(const ed of D.shell.edges){const L=ed.len_m;add('text',{x:4,y:y+12,'font-size':12,'font-weight':600}).textContent=`外墙 ${ed.index} · ${ed.side} · ${L} m`;
+  const top=y+18,base=top+(H+D.shell.parapet_m)*k;
+  add('rect',{x:4,y:top,width:L*k,height:(H+D.shell.parapet_m)*k,fill:'#f6f8fa',stroke:'#57606a'});
+  for(const l of levels){const z=st[l].elevation_m;add('line',{x1:4,y1:base-(z+D.shell.parapet_m*0)*k-D.shell.parapet_m*k,x2:4+L*k,y2:base-z*k-D.shell.parapet_m*k,stroke:'#d0d7de'});}
+  for(const o of D.shell.openings.filter(o=>o.edge===ed.index)){const z=st[o.level].elevation_m,w=o.type==='balcony'?o.w_m:o.w_m,h=o.type==='balcony'?st[o.level].height_m-0.3:o.h_m,sill=o.type==='balcony'?0:o.sill_m;
+   add('rect',{x:4+(o.s_m-w/2)*k,y:base-D.shell.parapet_m*k-(z+sill+h)*k,width:w*k,height:h*k,fill:o.type==='balcony'?'#d0ebff':'#e9ecef',stroke:o.type==='balcony'?'#4dabf7':'#868e96','stroke-width':1});
+   if(o.type==='balcony')add('rect',{x:4+(o.s_m-w/2)*k,y:base-D.shell.parapet_m*k-(z+o.rail_h_m)*k,width:w*k,height:o.rail_h_m*k,fill:'#a5d8ff'});}
+  for(const e of D.shell.entrances.filter(e=>e.edge===ed.index))add('rect',{x:4+(e.s-e.w_m/2)*k,y:base-D.shell.parapet_m*k-e.h_m*k,width:e.w_m*k,height:e.h_m*k,fill:'#ffc9c9',stroke:'#e03131'});
+  y+=rowH;}
+ fs.setAttribute('viewBox',`0 0 ${Math.max(...D.shell.edges.map(e=>e.len_m))*k+10} ${D.shell.edges.length*rowH+10}`);})();
+draw();
+</script></body></html>
+
+
+

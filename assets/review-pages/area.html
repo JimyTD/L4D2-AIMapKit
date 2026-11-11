@@ -1,0 +1,153 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>__TITLE__</title>
+<style>
+body{margin:0;font:14px/1.5 'Microsoft YaHei','PingFang SC',sans-serif;color:#1f2328;background:#f6f8fa}
+header{padding:14px 20px;background:#fff;border-bottom:1px solid #d0d7de;position:sticky;top:0;z-index:5}
+h1{font-size:20px;margin:0 0 4px}.sub{color:#57606a;font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;padding:16px 20px}
+.card{background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:12px}
+.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+label.t{font-size:13px;color:#57606a;display:flex;gap:4px;align-items:center}
+#map{width:100%;height:74vh;background:#fbfbfc;border:1px solid #eaeef2;border-radius:4px;cursor:grab}
+#map .hit:hover{filter:brightness(.8);cursor:pointer}
+#map .sel{stroke:#0969da!important;stroke-width:1.2!important}
+#info table{width:100%;border-collapse:collapse;font-size:13px}
+#info td{border-bottom:1px solid #eaeef2;padding:3px 4px;vertical-align:top}
+#info td:first-child{color:#57606a;white-space:nowrap;width:84px}
+.pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:12px;color:#fff}
+h2{font-size:15px;margin:4px 0 8px}
+table.list{width:100%;border-collapse:collapse;font-size:12.5px}
+table.list th,table.list td{border-bottom:1px solid #eaeef2;padding:3px 6px;text-align:left;vertical-align:top}
+table.list tr[data-id]:hover{background:#f6f8fa;cursor:pointer}
+.legend span{display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px}
+.legend i{display:inline-block;width:16px;height:10px;border:1px solid #57606a}
+details{margin-top:8px}summary{cursor:pointer;font-weight:600}
+.fail{color:#cf222e}.ok{color:#1a7f37}
+</style></head><body>
+<header><h1>__TITLE__</h1><div class="sub" id="sub"></div></header>
+<main>
+<section>
+ <div class="card">
+  <div class="bar">
+   <label class="t"><input type="checkbox" id="tSat" checked>卫星底图</label>
+   <label class="t"><input type="checkbox" id="tRoute" checked>路线</label>
+   <label class="t"><input type="checkbox" id="tTest" checked>连通测试点</label>
+   <label class="t"><input type="checkbox" id="tLabel" checked>标签</label>
+   <label class="t"><input type="checkbox" id="tGround" checked>地面</label>
+   <label class="t"><input type="checkbox" id="tFix" checked>构件</label>
+   <label class="t"><input type="checkbox" id="tEnt" checked>出入口标高</label></div>
+  <svg id="map"></svg>
+  <div class="legend" id="legend"></div>
+ </div>
+ <div class="card" style="margin-top:16px"><h2>氛围描述（美术自由发挥）</h2><div id="atmo"></div></div>
+ <div class="card" style="margin-top:16px"><h2>全部元素（点击定位）</h2><div id="list"></div></div>
+</section>
+<aside>
+ <div class="card" style="margin-bottom:16px"><h2>概况</h2><div id="stats"></div></div>
+ <div class="card" style="margin-bottom:16px" id="layoutCard"><h2>总图：压缩、坐标、摆放、出入口标高</h2><div id="layout"></div></div>
+ <div class="card" id="info"><h2>点选图上的楼、边界、封路、通道、物件或刷怪口</h2><div class="sub">显示编号、尺寸（米 / 单位）、五件事和依据</div></div>
+ <div class="card" style="margin-top:16px"><h2>需要拍板：和规划不一致</h2><div id="dev"></div></div>
+ <div class="card" style="margin-top:16px"><h2>需要回答：查不到</h2><div id="qs"></div></div>
+ <div class="card" style="margin-top:16px"><h2>核验</h2><div id="checks"></div></div>
+</aside>
+</main>
+<script>
+const D=__DATA__,OTH=__OTHERS__,BOX=__BOX__,CHK=__CHECKS__,SAT=__SAT__,SRC=__SOURCES__,LAY=__LAYOUT__;
+const ROOTREL=__ROOT__;
+const U=m=>(m/0.0254).toFixed(0);
+const GC={'实测':'#1a7f37','确认':'#1a7f37','推断':'#0969da','假设':'#bf8700','改动':'#8250df'};
+const BG={'可进入':'#12b886','外立面':'#fd7e14','远景':'#74c0fc','省略':'#adb5bd'};
+const SK={building:'#495057',blocker:'#e03131',barrier:'#f08c00',exit:'#2f9e44'};
+const SN={building:'楼的外墙',blocker:'封路',barrier:'围挡/栅栏',exit:'出口'};
+const OK={button:'#e8590c',item_spawn:'#2f9e44',alarm:'#c2255c',clutter_block:'#495057',prop:'#7048e8',event_door:'#1971c2'};
+const GS={road:'#868e96',paving:'#ced4da',grass:'#8ce99a',planting:'#2b8a3e',water:'#4dabf7'};
+const GN={road:'车行路',paving:'铺装',grass:'草地',planting:'树池/灌木',water:'水面'};
+const ring=r=>Array.isArray(r)?[r]:[r.shell,...(r.holes||[])];
+const [minx,miny,maxx,maxy]=BOX,P=(x,y)=>[x-minx,maxy-y];
+const svg=document.getElementById('map');svg.setAttribute('viewBox',`0 0 ${maxx-minx} ${maxy-miny}`);
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a,par)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(par||svg).appendChild(e);return e};
+const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(2)).join(',')).join(' ');
+let sel=null;
+function srcHtml(s){if(!s)return '—';let h=`<span class="pill" style="background:${GC[s.grade]||'#57606a'}">${s.grade}</span> `;if(s.why)h+=s.why+'<br>';
+ if(s.refs)h+=s.refs.map(r=>SRC[r]?`<a href="${SRC[r].url||(ROOTREL+SRC[r].path)}" target="_blank" title="${SRC[r].note}">${r}</a>（${SRC[r].grade}）`:r).join('、');
+ if(s.question)h+=` 待问 <b>${s.question}</b>`;return h;}
+const five=f=>f?Object.entries(f).map(([k,v])=>[k,v]):[];
+function show(kind,o){sel=o.id||o.outline;draw();const R=[['编号',o.id||o.outline]];
+ if(kind==='bld')R.push(['名称',o.name],['级别',o.grade],['层数',o.levels||'—'],['说明',o.note||'—'],['结构体文件',o.file||o.pending||'—'],['依据',srcHtml(o.src)]);
+ if(kind==='seg')R.push(['类型',SN[o.kind]],['长度',`${o.len_m} m（${o.len_u} 单位）`],['依附',o.ref||'—'],['高',o.h_m?`${o.h_m} m（${U(o.h_m)} 单位）`:'—'],['外面看到',o.view||'—'],...five(o.five),['依据',srcHtml(o.src)]);
+ if(kind==='blk')R.push(['类型','封路'],['长度',`${o.len_m} m`],['宽 × 高',`${o.width_m} × ${o.h_m} m（高 ${U(o.h_m)} 单位）`],...five(o.five),['依据',srcHtml(o.src)]);
+ if(kind==='pas')R.push(['类型','通道'],['宽',`${o.len_m} m（${o.len_u} 单位）`],['通过方式',o.crossing==='trigger'?'穿过会触发：'+o.trigger:'直接走过'],['说明',o.note||'—'],['依据',srcHtml(o.src)]);
+ if(kind==='obj')R.push(['类型',o.kind],['位置',`x ${o.at[0]}，y ${o.at[1]} m，朝向 ${o.yaw_deg}°`],['尺寸',o.size_m.join(' × ')+' m'],['玩家怎么用',o.what],['规划条目',(o.plan||[]).join('、')||'—'],['依据',srcHtml(o.src)]);
+ if(kind==='spn')R.push(['类型','刷怪口'],['位置',`x ${o.at[0]}，y ${o.at[1]}`],['说明',o.note],['依据',srcHtml(o.src)]);
+ if(kind==='gnd')R.push(['类型','地面·'+GN[o.surface]],['面积',o.area_m2+' m²'],['标高',o.elev_m+' m'],['依据',srcHtml(o.src)]);
+ if(kind==='fix')R.push(['类型','构件·'+o.kind],['位置',`x ${o.at[0]}，y ${o.at[1]}，朝向 ${o.yaw_deg}°`],['尺寸',o.size_m.join(' × ')+' m = '+o.size_u.join(' × ')+' 单位'],['挡路',o.blocks?'是':'否'],['看穿',o.see_through?'能':'不能'],['能翻',o.vault?'能':'不能'],['说明',o.what],['依据',srcHtml(o.src)]);
+ if(kind==='lnk')R.push(['类型','衔接结构体'],['门点',`x ${o.at[0]}，y ${o.at[1]}`],['结构体文件',o.file||'—'],['门',o.door||'—'],['待做',o.pending||'—']);
+ document.getElementById('info').innerHTML='<h2>'+(o.name||o.id||o.outline)+'</h2><table>'+R.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table>';}
+function draw(){svg.innerHTML='';const sat=document.getElementById('tSat').checked,lab=document.getElementById('tLabel').checked;
+ if(sat)el('image',{href:SAT,x:0,y:0,width:maxx-minx,height:maxy-miny,preserveAspectRatio:'none',opacity:.85});
+ el('polygon',{points:pts(D.area),fill:'#fff','fill-opacity':sat?.12:.6,stroke:'none'});
+ if(document.getElementById('tGround').checked)for(const g of D.ground)for(const p of g.polys){const d=ring(p).map(r=>'M'+r.map(q=>P(...q).map(v=>v.toFixed(2)).join(',')).join(' L')+'Z').join(' ');
+   const e=el('path',{d,'fill-rule':'evenodd',fill:GS[g.surface],'fill-opacity':sat?.45:.8,stroke:'none',class:'hit'+(sel===g.id?' sel':'')});e.onclick=()=>show('gnd',g);}
+ for(const o of OTH)el('polygon',{points:pts(o.pts),fill:'#dee2e6','fill-opacity':.6,stroke:'#868e96','stroke-width':.3});
+ for(const b of D.structures){const e=el('polygon',{points:pts(b.footprint_m),fill:BG[b.grade],'fill-opacity':.75,stroke:'#212529','stroke-width':.4,class:'hit'+(sel===b.outline?' sel':'')});e.onclick=()=>show('bld',b);
+  if(lab){const c=b.footprint_m.reduce((a,p)=>[a[0]+p[0],a[1]+p[1]],[0,0]).map(v=>v/b.footprint_m.length),q=P(...c);
+   const t=el('text',{x:q[0],y:q[1]+1,'font-size':3.2,'text-anchor':'middle',fill:'#212529',stroke:'#fff','stroke-width':.6,'paint-order':'stroke'});t.textContent=b.name+'（'+b.grade+'）';t.style.pointerEvents='none';}}
+ for(const s of D.boundary){const [a,c]=[P(...s.from),P(...s.to)];const e=el('line',{x1:a[0],y1:a[1],x2:c[0],y2:c[1],stroke:SK[s.kind],'stroke-width':s.kind==='building'?.8:1.6,'stroke-dasharray':s.kind==='building'?'2 1':'',class:'hit'+(sel===s.id?' sel':'')});e.onclick=()=>show('seg',s);}
+ for(const b of D.blockers){const e=el('polyline',{points:pts(b.line),fill:'none',stroke:'#e03131','stroke-width':Math.max(b.width_m,1.2),'stroke-opacity':.85,class:'hit'+(sel===b.id?' sel':'')});e.onclick=()=>show('blk',b);
+  if(lab){const m=b.line[0],q=P(...m);const t=el('text',{x:q[0]+2,y:q[1]-2,'font-size':3,fill:'#c92a2a',stroke:'#fff','stroke-width':.6,'paint-order':'stroke'});t.textContent=b.label||b.id;t.style.pointerEvents='none';}}
+ for(const p of D.passages){const e=el('polyline',{points:pts(p.line),fill:'none',stroke:'#2f9e44','stroke-width':1.8,class:'hit'+(sel===p.id?' sel':'')});e.onclick=()=>show('pas',p);}
+ if(document.getElementById('tRoute').checked){el('polyline',{points:pts(D.route.main),fill:'none',stroke:'#d6336c','stroke-width':1,'stroke-dasharray':'3 1.6','stroke-linecap':'round'}).style.pointerEvents='none';
+  for(const a of D.route.alts||[])el('polyline',{points:pts(a.path),fill:'none',stroke:'#fff','stroke-width':.9,'stroke-dasharray':'1.2 1.2'}).style.pointerEvents='none';
+  const s=P(...D.route.main[0]);el('circle',{cx:s[0],cy:s[1],r:1.6,fill:'#d6336c'});}
+ if(document.getElementById('tTest').checked){for(const [n,p] of Object.entries(D.route.must_reach||{})){const q=P(...p);el('circle',{cx:q[0],cy:q[1],r:1.2,fill:'#2f9e44',stroke:'#fff','stroke-width':.3});el('title',{},svg.lastChild).textContent='能走到：'+n;}
+  for(const [n,p] of Object.entries(D.route.must_not_reach||{})){const q=P(...p);el('path',{d:`M${q[0]-1.3},${q[1]-1.3} l2.6,2.6 m0,-2.6 l-2.6,2.6`,stroke:'#e03131','stroke-width':.6});el('title',{},svg.lastChild).textContent='走不到：'+n;}}
+ if(document.getElementById('tFix').checked)for(const f of D.fixtures){const L=f.size_m[0],Wd=f.size_m[1],a=f.yaw_deg*Math.PI/180,[cx,cy]=f.at;
+   const cs=[[-L/2,-Wd/2],[L/2,-Wd/2],[L/2,Wd/2],[-L/2,Wd/2]].map(([x,y])=>[cx+Math.cos(a)*x-Math.sin(a)*y,cy+Math.sin(a)*x+Math.cos(a)*y]);
+   const e=el('polygon',{points:pts(cs),fill:f.blocks?'#e8590c':'#fab005','fill-opacity':.55,stroke:'#212529','stroke-width':.25,'stroke-dasharray':f.see_through?'1 .6':'',class:'hit'+(sel===f.id?' sel':'')});e.onclick=()=>show('fix',f);
+   if(lab){const q=P(cx,cy);const tx=el('text',{x:q[0],y:q[1]+1,'font-size':2.6,'text-anchor':'middle',fill:'#212529',stroke:'#fff','stroke-width':.5,'paint-order':'stroke'});tx.textContent=f.what.split(/[，,]/)[0].slice(0,10);tx.style.pointerEvents='none';}}
+ for(const s of D.spawns){const q=P(...s.at);const e=el('circle',{cx:q[0],cy:q[1],r:1.8,fill:'#c2255c','fill-opacity':.25,stroke:'#c2255c','stroke-width':.5,class:'hit'+(sel===s.id?' sel':'')});e.onclick=()=>show('spn',s);}
+ for(const o of D.objects){const q=P(...o.at);const e=el('rect',{x:q[0]-1.3,y:q[1]-1.3,width:2.6,height:2.6,fill:OK[o.kind],stroke:'#fff','stroke-width':.3,transform:`rotate(45 ${q[0]} ${q[1]})`,class:'hit'+(sel===o.id?' sel':'')});e.onclick=()=>show('obj',o);
+  if(lab){const t=el('text',{x:q[0]+2.2,y:q[1]+1,'font-size':3,fill:'#212529',stroke:'#fff','stroke-width':.6,'paint-order':'stroke'});t.textContent=o.label||o.id;t.style.pointerEvents='none';}}
+ if(LAY.data&&document.getElementById('tEnt').checked)for(const e of LAY.data.entrances){const q=P(...e.at_m);
+   el('circle',{cx:q[0],cy:q[1],r:1.4,fill:e.ok?'#1971c2':'#e03131',stroke:'#fff','stroke-width':.4});
+   const t=el('text',{x:q[0]+2,y:q[1]-2,'font-size':2.8,fill:'#1864ab',stroke:'#fff','stroke-width':.6,'paint-order':'stroke'});
+   t.textContent=e.building+'·'+e.entrance+'：地面 '+e.ground_m+' m + '+e.steps.count+' 级 = 1F '+e.floor_m+' m';t.style.pointerEvents='none';}
+ for(const l of D.links){const q=P(...l.at);const e=el('circle',{cx:q[0],cy:q[1],r:1.3,fill:'#1971c2',stroke:'#fff','stroke-width':.4,class:'hit'+(sel===l.id?' sel':'')});e.onclick=()=>show('lnk',l);}
+ const nx=maxx-minx-6;el('path',{d:`M${nx},3 l1.6,4.8 l-1.6,-1.2 l-1.6,1.2 Z`,fill:'#212529'});
+ el('line',{x1:4,y1:maxy-miny-4,x2:24,y2:maxy-miny-4,stroke:'#212529','stroke-width':.8});
+ el('text',{x:14,y:maxy-miny-5.5,'font-size':2.8,'text-anchor':'middle'}).textContent='20 m';}
+['tSat','tRoute','tTest','tLabel','tGround','tFix','tEnt'].forEach(i=>document.getElementById(i).onchange=draw);
+document.getElementById('legend').innerHTML=Object.keys(BG).map(k=>`<span><i style="background:${BG[k]}"></i>${k}</span>`).join('')
+ +Object.keys(SK).map(k=>`<span><i style="background:${SK[k]};height:4px"></i>边界·${SN[k]}</span>`).join('')
+ +Object.keys(GN).map(k=>`<span><i style="background:${GS[k]}"></i>${GN[k]}</span>`).join('')+'<span><i style="background:#e8590c"></i>构件·挡路</span><span><i style="background:#fab005"></i>构件·不挡路</span><span><i style="background:#2f9e44;height:4px"></i>通道</span><span><i style="background:#d6336c;height:3px"></i>主路线</span><span><i style="background:#fff;height:3px"></i>分支</span><span><i style="background:#c2255c;border-radius:50%"></i>刷怪口</span><span><i style="background:#1971c2;border-radius:50%"></i>出入口衔接</span><span>绿点 = 能走到；红叉 = 走不到</span>';
+const vb=svg.viewBox.baseVal;svg.onwheel=e=>{e.preventDefault();const k=e.deltaY>0?1.15:1/1.15,r=svg.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height,mx=vb.x+fx*vb.width,my=vb.y+fy*vb.height;vb.width*=k;vb.height*=k;vb.x=mx-fx*vb.width;vb.y=my-fy*vb.height;};
+let drag=null;svg.onmousedown=e=>drag=[e.clientX,e.clientY,vb.x,vb.y];window.onmouseup=()=>drag=null;
+window.onmousemove=e=>{if(!drag)return;const r=svg.getBoundingClientRect();vb.x=drag[2]-(e.clientX-drag[0])/r.width*vb.width;vb.y=drag[3]-(e.clientY-drag[1])/r.height*vb.height;};
+const st=D.stats;document.getElementById('stats').innerHTML=`<table class="list"><tr><td>范围</td><td>${st.area_m2} m²</td></tr><tr><td>楼</td><td>${Object.entries(st.buildings).filter(x=>x[1]).map(([k,v])=>k+' '+v).join('，')}</td></tr><tr><td>边界</td><td>${st.boundary_segments} 段</td></tr><tr><td>封路 / 通道</td><td>${st.blockers} / ${st.passages}</td></tr><tr><td>地面</td><td>${Object.entries(st.ground).filter(x=>x[1]).map(([k,v])=>GN[k]+' '+v+' m²').join('，')}</td></tr><tr><td>构件</td><td>${st.fixtures}</td></tr><tr><td>刷怪口</td><td>${st.spawns}</td></tr><tr><td>物件</td><td>${st.objects}</td></tr><tr><td>主路线</td><td>${st.main_route_m} m</td></tr></table>`;
+let h='<table class="list"><tr><th>编号</th><th>类型</th><th>说明</th></tr>';
+const rows=[...D.structures.map(b=>['bld',b.outline,'结构体·'+b.grade,b.name]),...D.boundary.map(s=>['seg',s.id,'边界·'+SN[s.kind],(s.view||'')]),...D.blockers.map(b=>['blk',b.id,'封路',b.five['挡什么']]),
+ ...D.passages.map(p=>['pas',p.id,'通道',p.note||'']),...D.objects.map(o=>['obj',o.id,'物件·'+o.kind,o.what]),...D.spawns.map(s=>['spn',s.id,'刷怪口',s.note]),...D.links.map(l=>['lnk',l.id,'出入口衔接',l.file||l.pending]),...D.ground.map(g=>['gnd',g.id,'地面·'+GN[g.surface],g.area_m2+' m²']),...D.fixtures.map(f=>['fix',f.id,'构件·'+f.kind,f.what])];
+for(const r of rows)h+=`<tr data-k="${r[0]}" data-id="${r[1]}"><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]||''}</td></tr>`;
+document.getElementById('list').innerHTML=h+'</table>';
+const find={bld:id=>D.structures.find(x=>x.outline===id),seg:id=>D.boundary.find(x=>x.id===id),blk:id=>D.blockers.find(x=>x.id===id),pas:id=>D.passages.find(x=>x.id===id),obj:id=>D.objects.find(x=>x.id===id),spn:id=>D.spawns.find(x=>x.id===id),lnk:id=>D.links.find(x=>x.id===id),gnd:id=>D.ground.find(x=>x.id===id),fix:id=>D.fixtures.find(x=>x.id===id)};
+document.querySelectorAll('#list tr[data-id]').forEach(tr=>tr.onclick=()=>show(tr.dataset.k,find[tr.dataset.k](tr.dataset.id)));
+document.getElementById('dev').innerHTML=D.plan_deviations.map(d=>`<p><b>${d.id}</b> ${d.problem}<br><b>提议：</b>${d.proposal}${d.decision?'<br><b class="ok">结论：</b>'+d.decision:'<br><b class="fail">待拍板</b>'}</p>`).join('')||'无';
+document.getElementById('qs').innerHTML=D.questions.map(q=>`<p><b>${q.id}</b> ${q.text}<br><span class="sub">AI 判断：${q.judgment}</span></p>`).join('')||'无';
+const fails=CHK.results.filter(r=>!r.pass),groups={};CHK.results.forEach(r=>{groups[r.group]=groups[r.group]||[0,0];groups[r.group][r.pass?0:1]++;});
+document.getElementById('checks').innerHTML=`<p class="${fails.length?'fail':'ok'}"><b>${CHK.passed}/${CHK.results.length} 通过</b></p>`+Object.entries(groups).map(([k,[p,q]])=>`<div>${k}：<span class="ok">${p}</span>${q?' / <span class="fail">'+q+' 失败</span>':''}</div>`).join('')
+ +(fails.length?'<details open><summary>失败项</summary>'+fails.map(r=>'<div class="fail">'+r.check+' '+r.detail+'</div>').join('')+'</details>':'')
+ +'<details><summary>全部检查</summary>'+CHK.results.map(r=>'<div class="'+(r.pass?'':'fail')+'">'+(r.pass?'✓':'✗')+' ['+r.group+'] '+r.check+' '+(r.detail||'')+'</div>').join('')+'</details>';
+document.getElementById('sub').textContent=D.id+' · 搭建数据：'+D.id+'.build.json（下游读这个文件，不读本页） · 规划坐标（米），北向朝上，滚轮缩放、拖动平移';
+document.getElementById('atmo').innerHTML=D.atmosphere.map(a=>'<p><b>'+a.id+'</b> '+a.text+'<br><span class="sub">参考图：'+(a.refs||[]).map(r=>SRC[r]?'<a target="_blank" href="'+(SRC[r].url||(ROOTREL+SRC[r].path))+'">'+r+'</a>':r).join('、')+'</span></p>').join('');
+(function(){const c=document.getElementById('layout');if(!LAY.data){document.getElementById('layoutCard').style.display='none';return;}
+ const L=LAY.data,K=LAY.check,cp=L.compression;
+ let h='<p><b>压缩：</b>'+(cp.used?'压缩':'不压缩')+'<br>'+cp.why+'<br><span class="sub">参考：'+cp.refs.join('、')+'</span></p>';
+ h+='<p><b>Hammer 原点：</b>规划坐标 ('+L.origin_m.join(', ')+') m<br><span class="sub">'+(L.origin_why||'')+'</span></p>';
+ h+='<table class="list"><tr><th>楼</th><th>级别</th><th>模块原点（单位）</th><th>转角</th></tr>'+L.instances.map(i=>'<tr><td>'+i.id+'</td><td>'+i.grade+'</td><td>'+i.origin_hammer.join(', ')+'</td><td>'+i.angles_hammer[1]+'°</td></tr>').join('')+'</table>';
+ h+='<table class="list" style="margin-top:8px"><tr><th>出入口</th><th>门外地面</th><th>台阶</th><th>1F</th></tr>'+L.entrances.map(e=>'<tr><td>'+e.building+'·'+e.entrance+'</td><td>'+e.ground_m+' m<br><span class="sub">'+e.ground_from+'</span></td><td>'+e.steps.count+' × '+e.steps.riser_m+' m</td><td class="'+(e.ok?'ok':'fail')+'">'+e.floor_m+' m</td></tr>').join('')+'</table>';
+ if(K){const f=K.results.filter(r=>!r.pass);h+='<p class="'+(f.length?'fail':'ok')+'"><b>总图核验 '+K.passed+'/'+K.results.length+' 通过</b></p>'+(f.length?f.map(r=>'<div class="fail">'+r.check+' '+r.detail+'</div>').join(''):'');}
+ c.innerHTML=h;})();
+draw();
+</script></body></html>
+
+

@@ -1,0 +1,14 @@
+[
+ {
+  "id": "S0001",
+  "type": "oral",
+  "path": "oral/S0001.md",
+  "subject": "block-a",
+  "grade": "确认",
+  "use": [
+   "structure"
+  ],
+  "date": "2026-01-01",
+  "note": "虚构：A 楼两层，楼梯在东端"
+ }
+]

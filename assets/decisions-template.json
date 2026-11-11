@@ -1,0 +1,165 @@
+{
+ "note": "待决定列表。脚本从这里读数值，不写死。status：引擎事实（Kit 预填，不讨论）| 暂定 | 已定。value 为 null 的项由 step 那一步定：写 value、why，改 status；暂定项写 verify（什么时候、怎么验证）。hint 是填法提示，不是答案。单位 u = Hammer 单位。",
+ "items": [
+  {
+   "id": "unit_cm",
+   "value": 2.54,
+   "unit": "cm/u",
+   "status": "引擎事实",
+   "step": "P0",
+   "why": "1 单位 = 1 英寸。依据见 Kit references/engine-facts.md"
+  },
+  {
+   "id": "step_max",
+   "value": 18,
+   "unit": "u",
+   "status": "引擎事实",
+   "step": "P0",
+   "why": "能直接走上去的台阶高（sv_stepsize）"
+  },
+  {
+   "id": "jump_h",
+   "value": 21,
+   "unit": "u",
+   "status": "引擎事实",
+   "step": "P0",
+   "why": "跳跃高度（GAMEMOVEMENT_JUMP_HEIGHT）"
+  },
+  {
+   "id": "brushside_cap",
+   "value": 65536,
+   "unit": "个",
+   "status": "引擎事实",
+   "step": "P0",
+   "why": "MAX_MAP_BRUSHSIDES，超了 vbsp 直接失败"
+  },
+  {
+   "id": "brush_cap",
+   "value": 8192,
+   "unit": "个",
+   "status": "引擎事实",
+   "step": "P0",
+   "why": "MAX_MAP_BRUSHES"
+  },
+  {
+   "id": "map_margin_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "P3",
+   "hint": "坐标 ±16384 里每边留给天空盒和边界外远景的余量。可用边长 = 2 ×（16384 − 余量）单位"
+  },
+  {
+   "id": "plan_route_pad_m",
+   "value": null,
+   "unit": "m",
+   "status": "暂定",
+   "step": "P3",
+   "hint": "规划时路线两侧算进范围的宽度（估范围框用）"
+  },
+  {
+   "id": "compress_max",
+   "value": null,
+   "unit": "比例",
+   "status": "暂定",
+   "step": "P3",
+   "hint": "一段可压缩路最多能缩掉的比例；压缩是可选项，用不用都要写理由"
+  },
+  {
+   "id": "compress_bearing_max_deg",
+   "value": null,
+   "unit": "°",
+   "status": "暂定",
+   "step": "P3",
+   "hint": "压缩后结构体之间方位最多偏多少度，超过玩家会觉得方向不对"
+  },
+  {
+   "id": "map_budget_ratio",
+   "value": null,
+   "unit": "占上限比例",
+   "status": "暂定",
+   "step": "P3",
+   "hint": "{\"goal\": 设计估算目标, \"warn\": 警告线, \"fail\": 失败线}，都是 brushside_cap 的比例。目标要给后续修改和手工调整留余量"
+  },
+  {
+   "id": "brushside_estimate",
+   "value": null,
+   "unit": "面",
+   "status": "暂定",
+   "step": "P3",
+   "hint": "设计阶段估面数的系数 {base, per_edge, per_space, per_door, per_core, per_cut_balcony, per_cut_window, bevel_ratio, per_site_m2}。取决于生成器怎么出笔刷：有生成线实测后用实测拟合，之前先填一组初值并标暂定"
+  },
+  {
+   "id": "corridor_min",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "路线上走廊的最低净宽。只给有意做窄的地方用；常规走廊按 kit game measure 量到的原版同类空间定目标"
+  },
+  {
+   "id": "squeeze_min",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "有意做窄的一人通道最低净宽（站立碰撞体宽 32 加余量）"
+  },
+  {
+   "id": "route_door_w_min",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "路线上门的最低宽度，量原版门定"
+  },
+  {
+   "id": "route_door_h_min",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "路线上门的最低高度，量原版门定"
+  },
+  {
+   "id": "headroom_min",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "路线上的最低净高"
+  },
+  {
+   "id": "stair_flight_w_min",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "楼梯梯段最低宽度，量原版楼梯定"
+  },
+  {
+   "id": "block_min_h_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "幸存者翻不过的封路最低高度，量原版封路定"
+  },
+  {
+   "id": "ground_types",
+   "value": null,
+   "unit": "",
+   "status": "暂定",
+   "step": "D0",
+   "hint": "本项目的地面类型清单 [{\"id\", \"name\", \"walkable\": true|false, \"elev_m\"}]。例：城市有车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石"
+  },
+  {
+   "id": "strength_table",
+   "value": null,
+   "unit": "",
+   "status": "暂定",
+   "step": "D5",
+   "hint": "导演脚本尸潮的强度档 {\"small\": {...}, \"medium\": {...}, \"large\": {...}}，每档几波、每波多少只、额外几只特感；没有试玩依据时标暂定，交给用户试玩后调"
+  }
+ ]
+}

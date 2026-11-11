@@ -1,0 +1,109 @@
+<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>__TITLE__</title>
+<style>
+body{margin:0;font:14px/1.5 'Microsoft YaHei','PingFang SC',sans-serif;color:#1f2328;background:#f6f8fa}
+header{padding:12px 20px;background:#fff;border-bottom:1px solid #d0d7de;position:sticky;top:0;z-index:5;display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap}
+h1{font-size:20px;margin:0}.sub{color:#57606a;font-size:13px}
+nav{display:inline-flex}nav button{border:1px solid #d0d7de;background:#fff;padding:5px 14px;cursor:pointer;font:inherit;margin-left:-1px}
+nav button.on{background:#0969da;color:#fff;border-color:#0969da}nav button:first-child{border-radius:6px 0 0 6px}nav button:last-child{border-radius:0 6px 6px 0}
+main{padding:14px 20px}.tab{display:none}.tab.on{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px}
+.card{background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:12px}
+#map{width:100%;height:calc(100vh - 170px);min-height:480px;background:#fbfbfc;border:1px solid #eaeef2;border-radius:4px;cursor:grab}
+#map .hit{cursor:pointer}#map .hit:hover{filter:brightness(.85)}#map .sel{stroke:#0969da!important;stroke-width:2.2!important}
+.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+label.t{font-size:13px;color:#57606a;display:flex;gap:4px;align-items:center}
+#detail{height:calc(100vh - 140px);min-height:480px;display:flex;flex-direction:column}
+#detail iframe{flex:1;border:1px solid #eaeef2;border-radius:4px;width:100%;background:#fff}
+#detail .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px}
+h2{font-size:15px;margin:2px 0 8px}
+table.list{width:100%;border-collapse:collapse;font-size:12.5px}
+table.list th,table.list td{border-bottom:1px solid #eaeef2;padding:4px 6px;text-align:left;vertical-align:top}
+table.list tr[data-go]:hover{background:#f6f8fa;cursor:pointer}
+.pill{display:inline-block;border-radius:10px;padding:0 8px;font-size:12px;color:#fff;white-space:nowrap}
+.legend span{display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px}
+.legend i{display:inline-block;width:16px;height:10px;border:1px solid #57606a}
+.fail{color:#cf222e}.ok{color:#1a7f37}.muted{color:#8c959f}
+.grid.wide{grid-template-columns:0 minmax(0,1fr)}.grid.wide>.card:first-child{display:none}
+.kpi{display:flex;gap:18px;flex-wrap:wrap}.kpi div{font-size:13px}.kpi b{font-size:18px;display:block}
+</style></head><body>
+<header><div><h1>__TITLE__</h1><div class="sub" id="sub"></div></div>
+<nav id="tabs"><button data-t="map" class="on">总图</button><button data-t="events">事件</button><button data-t="items">物资</button><button data-t="review">拍板与问题</button><button data-t="checks">核验</button><button data-t="std">待决定标准</button></nav></header>
+<main>
+<section class="tab on" id="t-map"><div class="grid">
+ <div class="card">
+  <div class="bar"><label class="t"><input type="checkbox" id="oSat" checked>卫星底图</label><label class="t"><input type="checkbox" id="oRoute" checked>路线</label>
+   <label class="t"><input type="checkbox" id="oObj" checked>物件</label><label class="t"><input type="checkbox" id="oSpawn" checked>刷怪口</label>
+   <label class="t"><input type="checkbox" id="oEgg">彩蛋</label><label class="t"><input type="checkbox" id="oLabel" checked>标签</label></div>
+  <svg id="map"></svg><div class="legend" id="legend"></div>
+ </div>
+ <div class="card" id="detail"><div class="head"><h2 id="dTitle">点选总图上的楼或开放区</h2><span><span class="sub" id="dSub"></span> <button id="wide" title="放大详图（隐藏总图）" style="border:1px solid #d0d7de;background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer">⤢</button></span></div>
+  <div id="dEmpty"><div class="kpi" id="kpi"></div></div>
+  <iframe id="frame" style="display:none"></iframe></div>
+</div></section>
+<section class="tab" id="t-events"><div class="card"><h2>事件表（events.json）</h2><div class="sub" style="margin-bottom:8px">每个事件由谁触发、做什么。点一行在总图上定位触发物件。强度档的数字见“待决定标准”。</div><div id="evList"></div></div></section>
+<section class="tab" id="t-items"><div class="card"><h2>物资刷新点</h2><div id="itList"></div></div></section>
+<section class="tab" id="t-review"><div class="card"><h2>和规划不一致（偏差）</h2><div id="devList"></div></div><div class="card" style="margin-top:14px"><h2>查不到、需要回答的问题</h2><div id="qList"></div></div></section>
+<section class="tab" id="t-checks"><div class="card"><h2>核验</h2><div id="ckList"></div></div></section>
+<section class="tab" id="t-std"><div class="card"><h2>待决定标准（standards/decisions.json）</h2><div class="sub" style="margin-bottom:8px">因地图而异的数值。“暂定”的项等用户试玩后确认。</div><div id="stdList"></div></div></section>
+</main>
+<script>
+const D=__DATA__;const PAGES=__PAGES__;
+const NS='http://www.w3.org/2000/svg',svg=document.getElementById('map');
+const [minx,miny,maxx,maxy]=D.box,P=(x,y)=>[x-minx,maxy-y];
+svg.setAttribute('viewBox',`0 0 ${maxx-minx} ${maxy-miny}`);
+const el=(t,a,par)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(par||svg).appendChild(e);return e};
+const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(2)).join(',')).join(' ');
+const BG={'可进入':'#12b886','外立面':'#fd7e14','远景':'#74c0fc','省略':'#adb5bd'};
+const OK={button:'#e8590c',item_spawn:'#2f9e44',alarm:'#c2255c',clutter_block:'#495057',prop:'#7048e8',event_door:'#1971c2',saferoom_door:'#1864ab',fire:'#f03e3e',elevator:'#0b7285',mounted_gun:'#212529',infected:'#a61e4d'};
+const ON=__OBJNAMES__;
+let sel=null,hl=null;
+function draw(){svg.innerHTML='';const g=k=>document.getElementById(k).checked;
+ if(g('oSat'))el('image',{href:D.sat,x:0,y:0,width:maxx-minx,height:maxy-miny,preserveAspectRatio:'none',opacity:.8});
+ for(const s of D.sites){const e=el('polygon',{points:pts(s.area),fill:'#fff3bf','fill-opacity':.45,stroke:'#e67700','stroke-width':.6,class:'hit'+(sel===s.id?' sel':'')});
+  e.onclick=()=>open(s.id);el('title',{},e).textContent=s.title;
+  for(const b of s.blockers)el('polyline',{points:pts(b),fill:'none',stroke:'#e03131','stroke-width':1.6}).style.pointerEvents='none';}
+ for(const b of D.buildings){const e=el('polygon',{points:pts(b.poly),fill:BG[b.grade]||'#ccc','fill-opacity':b.grade==='远景'?.35:.6,stroke:'#212529','stroke-width':.4,class:(b.page?'hit':'')+(sel===b.id?' sel':'')});
+  if(b.page)e.onclick=()=>open(b.id);el('title',{},e).textContent=b.name+'（'+b.grade+'）';}
+ if(g('oRoute'))for(const r of D.routes){el('polyline',{points:pts(r.pts),fill:'none',stroke:r.alt?'#ae3ec9':'#d6336c','stroke-width':r.alt?1.0:1.5,'stroke-dasharray':r.indoor?'3 1.5':'','stroke-linecap':'round','stroke-linejoin':'round'}).style.pointerEvents='none';}
+ if(g('oSpawn'))for(const s of D.spawns){const c=P(...s.at);const e=el('path',{d:`M${c[0]},${c[1]-2.2} l2,3.6 h-4 z`,fill:'#5f3dc4',stroke:'#fff','stroke-width':.4,class:'hit'});el('title',{},e).textContent=s.id+' 刷怪口：'+s.note+'（'+(s.when||'')+'）';}
+ if(g('oObj'))for(const o of D.objects){if(o.egg&&!g('oEgg'))continue;const c=P(...o.at);
+  const e=el('rect',{x:c[0]-1.4,y:c[1]-1.4,width:2.8,height:2.8,fill:OK[o.kind]||'#868e96',stroke:hl===o.key?'#0969da':'#fff','stroke-width':hl===o.key?1.2:.4,transform:`rotate(45 ${c[0]} ${c[1]})`,class:'hit'});
+  e.onclick=()=>open(o.owner);el('title',{},e).textContent=o.label;}
+ if(g('oLabel'))for(const b of D.buildings.filter(b=>b.grade!=='远景')){const c=P(...b.c);const t=el('text',{x:c[0],y:c[1],'font-size':4,'text-anchor':'middle',fill:'#1f2328',stroke:'#fff','stroke-width':1,'paint-order':'stroke'});t.textContent=b.short;t.style.pointerEvents='none';}
+ const nx=maxx-minx-12;el('path',{d:`M${nx},6 l3,9 l-3,-2 l-3,2 Z`,fill:'#1f2328'});
+ el('line',{x1:8,y1:maxy-miny-8,x2:58,y2:maxy-miny-8,stroke:'#1f2328','stroke-width':1});el('text',{x:33,y:maxy-miny-11,'font-size':5,'text-anchor':'middle'}).textContent='50 m';}
+function open(id){const pg=PAGES[id];sel=id;draw();if(location.hash.slice(1)!==id)history.replaceState(null,'','#'+id);const fr=document.getElementById('frame');
+ const it=D.buildings.find(b=>b.id===id)||D.sites.find(s=>s.id===id);
+ document.getElementById('dTitle').textContent=it?(it.name||it.title):id;
+ document.getElementById('dSub').innerHTML=it&&it.check?ckHtml(it.check):'';
+ if(!pg){fr.style.display='none';document.getElementById('dEmpty').style.display='';return;}
+ document.getElementById('dEmpty').style.display='none';fr.style.display='';fr.srcdoc=pg;}
+function ckHtml(c){return c.failed?`<span class="fail">核验 ${c.passed}/${c.total}</span>`:`<span class="ok">核验 ${c.passed}/${c.total} 通过</span>`;}
+const vb=svg.viewBox.baseVal;
+svg.onwheel=e=>{e.preventDefault();const k=e.deltaY>0?1.15:1/1.15,r=svg.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height,mx=vb.x+fx*vb.width,my=vb.y+fy*vb.height;vb.width*=k;vb.height*=k;vb.x=mx-fx*vb.width;vb.y=my-fy*vb.height;};
+let drag=null;svg.onmousedown=e=>drag=[e.clientX,e.clientY,vb.x,vb.y];window.onmouseup=()=>drag=null;
+window.onmousemove=e=>{if(!drag)return;const r=svg.getBoundingClientRect();vb.x=drag[2]-(e.clientX-drag[0])/r.width*vb.width;vb.y=drag[3]-(e.clientY-drag[1])/r.height*vb.height;};
+['oSat','oRoute','oObj','oSpawn','oEgg','oLabel'].forEach(i=>document.getElementById(i).onchange=draw);
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+ document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='t-'+b.dataset.t));});
+function go(key,owner){hl=key;document.querySelector('#tabs button[data-t=map]').click();open(owner);}
+document.getElementById('legend').innerHTML=Object.entries(BG).map(([k,v])=>`<span><i style="background:${v}"></i>${k}</span>`).join('')+
+ '<span><i style="background:#fff3bf;border-color:#e67700"></i>开放区</span><span><i style="background:#e03131;height:3px"></i>封路</span><span><i style="background:#d6336c;height:3px"></i>路线（虚线：楼内）</span><span><i style="background:#ae3ec9;height:3px"></i>分支</span><span><i style="background:#5f3dc4"></i>刷怪口</span><span><i style="background:#2f9e44;transform:rotate(45deg);width:8px;height:8px"></i>物件</span>';
+const S=D.summary;
+document.getElementById('sub').textContent=D.subtitle;
+document.getElementById('kpi').innerHTML=[['结构体（可进入 / 外壳 / 远景）',S.grades],['开放区',S.sites],['路线长度（室外 + 室内）',S.route],['事件',S.events],['物资点（不含彩蛋）',S.items],['核验',S.checks],['待拍板偏差',S.devs_open],['面数预算（设计估算）',S.budget]].map(([k,v])=>`<div>${k}<b>${v}</b></div>`).join('');
+const t=(h,rows)=>'<table class="list"><tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.join('')+'</table>';
+document.getElementById('evList').innerHTML=t(['事件','类型','强度 / 数量 / 结束','触发它的','规划条目','说明'],D.events.map(e=>`<tr ${e.trig.length?`data-go="${e.trig[0].key}|${e.trig[0].owner}"`:''}><td><b>${e.id}</b><br>${e.name||''}${e.egg?' <span class="pill" style="background:#ae3ec9">彩蛋</span>':''}</td><td>${e.type}</td><td>${[e.strength,e.count?e.count+' 只':'',e.until,e.then?'→ '+e.then:''].filter(Boolean).join('<br>')}</td><td>${e.trig.map(x=>x.label).join('<br>')||'<span class="fail">没有触发物</span>'}</td><td>${(e.plan||[]).join('、')}</td><td>${e.what||''}</td></tr>`));
+document.getElementById('itList').innerHTML=t(['位置','刷什么','规划条目','说明'],D.items.map(i=>`<tr data-go="${i.key}|${i.owner}"><td>${i.where}${i.egg?' <span class="pill" style="background:#ae3ec9">彩蛋</span>':''}</td><td>${i.items}</td><td>${(i.plan||[]).join('、')}</td><td>${i.what}</td></tr>`));
+document.getElementById('devList').innerHTML=t(['编号','文件','问题','提议','结论'],D.devs.map(d=>`<tr data-go="|${d.owner}"><td><b>${d.id}</b></td><td>${d.owner}</td><td>${d.problem}</td><td>${d.proposal}</td><td>${d.decision?'<span class="ok">'+d.decision+'</span>':'<span class="fail">待拍板</span>'}</td></tr>`));
+document.getElementById('qList').innerHTML=D.questions.length?t(['编号','文件','问题','AI 判断'],D.questions.map(q=>`<tr data-go="|${q.owner}"><td>${q.id}</td><td>${q.owner}</td><td>${q.text}</td><td>${q.judgment}</td></tr>`)):'<span class="muted">无</span>';
+document.getElementById('ckList').innerHTML=t(['文件','结果','失败项'],D.checks.map(c=>`<tr data-go="|${c.id}"><td>${c.id}</td><td>${ckHtml(c)}</td><td>${c.fails.join('<br>')}</td></tr>`));
+document.getElementById('stdList').innerHTML=t(['项','值','状态','为什么'],D.std.map(s=>`<tr><td>${s.id}</td><td>${typeof s.value==='object'?'<code>'+JSON.stringify(s.value)+'</code>':s.value} ${s.unit||''}</td><td>${s.status==='暂定'?'<span class="pill" style="background:#bf8700">暂定</span>':s.status}</td><td>${s.why||''}${s.verify?'<br><span class="muted">验证：'+s.verify+'</span>':''}</td></tr>`));
+document.querySelectorAll('tr[data-go]').forEach(tr=>tr.onclick=()=>{const [k,o]=tr.dataset.go.split('|');go(k,o);});
+draw();
+function fromHash(){const h=decodeURIComponent(location.hash.slice(1));if(!h)return;
+ const tb=document.querySelector('#tabs button[data-t="'+h+'"]');if(tb){tb.click();return;}
+ if(PAGES[h])open(h);}
+window.onhashchange=fromHash;fromHash();
+document.getElementById('wide').onclick=()=>document.querySelector('#t-map .grid').classList.toggle('wide');
+</script></body></html>

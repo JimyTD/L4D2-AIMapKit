@@ -1,0 +1,382 @@
+{
+ "id": "yard",
+ "level": 1,
+ "title": "院子",
+ "src_defs": {
+  "made": {
+   "grade": "改动",
+   "why": "自测样例：虚构"
+  }
+ },
+ "area": [
+  [
+   0,
+   4
+  ],
+  [
+   0,
+   12
+  ],
+  [
+   30,
+   12
+  ],
+  [
+   56,
+   12
+  ],
+  [
+   56,
+   26
+  ],
+  [
+   -10,
+   26
+  ],
+  [
+   -10,
+   4
+  ],
+  [
+   0,
+   4
+  ]
+ ],
+ "structures": [
+  {
+   "outline": "A",
+   "name": "A 楼",
+   "grade": "可进入",
+   "file": "design/detail/L01/structures/A.json",
+   "src": "@made"
+  },
+  {
+   "outline": "B",
+   "name": "B 楼",
+   "grade": "外立面",
+   "pending": "D2 待做",
+   "src": "@made"
+  }
+ ],
+ "ground": [
+  {
+   "id": "G1",
+   "surface": "grass",
+   "polys": [
+    [
+     [
+      0,
+      4
+     ],
+     [
+      0,
+      12
+     ],
+     [
+      30,
+      12
+     ],
+     [
+      56,
+      12
+     ],
+     [
+      56,
+      26
+     ],
+     [
+      -10,
+      26
+     ],
+     [
+      -10,
+      4
+     ],
+     [
+      0,
+      4
+     ]
+    ]
+   ],
+   "elev_m": 0,
+   "src": "@made"
+  }
+ ],
+ "fixtures": [],
+ "atmosphere": [
+  {
+   "id": "a_yard",
+   "scope": [
+    "area"
+   ],
+   "text": "杂草丛生的院子",
+   "refs": []
+  }
+ ],
+ "blockers": [],
+ "passages": [],
+ "boundary": [
+  {
+   "id": "s1",
+   "kind": "building",
+   "ref": "A",
+   "from": [
+    0,
+    4
+   ],
+   "to": [
+    0,
+    12
+   ],
+   "view": "A 楼外墙",
+   "src": "@made"
+  },
+  {
+   "id": "s2",
+   "kind": "building",
+   "ref": "A",
+   "from": [
+    0,
+    12
+   ],
+   "to": [
+    30,
+    12
+   ],
+   "view": "A 楼外墙",
+   "src": "@made"
+  },
+  {
+   "id": "s3",
+   "kind": "barrier",
+   "from": [
+    30,
+    12
+   ],
+   "to": [
+    56,
+    12
+   ],
+   "h_m": 2,
+   "view": "栅栏外是空地",
+   "five": {
+    "挡什么": "2 m 铁栅栏",
+    "玩家翻越": "不能",
+    "感染者翻越": "能",
+    "视线": "能看穿",
+    "理由": "围住院子"
+   },
+   "cross": {
+    "survivor": false,
+    "infected": "ai",
+    "sight": "through",
+    "method": "fence"
+   },
+   "src": "@made"
+  },
+  {
+   "id": "s4",
+   "kind": "exit",
+   "from": [
+    56,
+    12
+   ],
+   "to": [
+    56,
+    26
+   ],
+   "view": "出口外是路",
+   "beyond": [
+    60,
+    20
+   ],
+   "leads_to": "end"
+  },
+  {
+   "id": "s5",
+   "kind": "barrier",
+   "from": [
+    56,
+    26
+   ],
+   "to": [
+    -10,
+    26
+   ],
+   "h_m": 2,
+   "view": "栅栏外是空地",
+   "five": {
+    "挡什么": "2 m 铁栅栏",
+    "玩家翻越": "不能",
+    "感染者翻越": "能",
+    "视线": "能看穿",
+    "理由": "围住院子"
+   },
+   "cross": {
+    "survivor": false,
+    "infected": "ai",
+    "sight": "through",
+    "method": "fence"
+   },
+   "src": "@made"
+  },
+  {
+   "id": "s6",
+   "kind": "barrier",
+   "from": [
+    -10,
+    26
+   ],
+   "to": [
+    -10,
+    4
+   ],
+   "h_m": 2,
+   "view": "栅栏外是空地",
+   "five": {
+    "挡什么": "2 m 铁栅栏",
+    "玩家翻越": "不能",
+    "感染者翻越": "能",
+    "视线": "能看穿",
+    "理由": "围住院子"
+   },
+   "cross": {
+    "survivor": false,
+    "infected": "ai",
+    "sight": "through",
+    "method": "fence"
+   },
+   "src": "@made"
+  },
+  {
+   "id": "s7",
+   "kind": "barrier",
+   "from": [
+    -10,
+    4
+   ],
+   "to": [
+    0,
+    4
+   ],
+   "h_m": 2,
+   "view": "栅栏外是空地",
+   "five": {
+    "挡什么": "2 m 铁栅栏",
+    "玩家翻越": "不能",
+    "感染者翻越": "能",
+    "视线": "能看穿",
+    "理由": "围住院子"
+   },
+   "cross": {
+    "survivor": false,
+    "infected": "ai",
+    "sight": "through",
+    "method": "fence"
+   },
+   "src": "@made"
+  }
+ ],
+ "spawns": [
+  {
+   "id": "SP1",
+   "at": [
+    35,
+    34
+   ],
+   "note": "北侧栅栏外",
+   "when": "event:0",
+   "src": "@made"
+  }
+ ],
+ "objects": [
+  {
+   "id": "o_cart",
+   "at": [
+    10,
+    18
+   ],
+   "yaw_deg": 0,
+   "size_m": [
+    1.2,
+    0.7,
+    1
+   ],
+   "kind": "prop",
+   "fires": [
+    "event:0"
+   ],
+   "plan": [
+    "event:0"
+   ],
+   "what": "碰倒推车引来尸潮",
+   "src": "@made",
+   "blocks": false,
+   "see_through": true,
+   "vault": true
+  }
+ ],
+ "links": [
+  {
+   "id": "Lout",
+   "at": [
+    0.12,
+    8
+   ],
+   "file": "design/detail/L01/structures/A.json",
+   "door": "d_out"
+  }
+ ],
+ "route": {
+  "main": [
+   [
+    -0.6,
+    8
+   ],
+   [
+    -4,
+    14
+   ],
+   [
+    20,
+    20
+   ],
+   [
+    57,
+    20
+   ]
+  ],
+  "alts": [],
+  "must_reach": {},
+  "must_not_reach": {
+   "北边栅栏外": [
+    40,
+    30
+   ]
+  }
+ },
+ "plan_refs": [
+  {
+   "ref": "room:R1",
+   "at": "s4",
+   "how": "出口即终点"
+  },
+  {
+   "ref": "event:0",
+   "at": "o_cart",
+   "how": "推车"
+  },
+  {
+   "ref": "block:0",
+   "at": "s5",
+   "how": "北侧栅栏"
+  },
+  {
+   "ref": "spawn:0",
+   "at": "SP1",
+   "how": "北侧"
+  }
+ ],
+ "plan_deviations": [],
+ "questions": []
+}

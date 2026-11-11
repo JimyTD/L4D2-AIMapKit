@@ -1,0 +1,497 @@
+{
+ "title": "A 楼",
+ "id": "A",
+ "level": 1,
+ "name": "A 楼",
+ "outline": "A",
+ "grade": "可进入",
+ "frame": {
+  "origin": [
+   0,
+   0
+  ],
+  "u_angle_deg": 0,
+  "corner": "西南外角，u 向东，v 向北"
+ },
+ "module": {
+  "type": "func_instance",
+  "origin": "frame.origin",
+  "z0": "1F 楼面",
+  "x_axis": "u",
+  "y_axis": "v"
+ },
+ "storeys": [
+  {
+   "level": 1,
+   "elevation_m": 0,
+   "height_m": 4
+  },
+  {
+   "level": 2,
+   "elevation_m": 4,
+   "height_m": 4
+  }
+ ],
+ "storeys_src": "@oral",
+ "slab_m": 0.15,
+ "src_defs": {
+  "oral": {
+   "grade": "确认",
+   "refs": [
+    "S0001"
+   ]
+  },
+  "made": {
+   "grade": "改动",
+   "why": "自测样例：虚构"
+  }
+ },
+ "shell": {
+  "wall_m": 0.24,
+  "parapet_m": 1.2,
+  "units": {
+   "win": {
+    "type": "window",
+    "w_m": 1.5,
+    "h_m": 1.5,
+    "sill_m": 0.9
+   }
+  },
+  "facades": [
+   {
+    "edge": 0,
+    "side": "西面",
+    "len_m": 12,
+    "src": "@made",
+    "runs": []
+   },
+   {
+    "edge": 1,
+    "side": "北面",
+    "len_m": 30,
+    "src": "@made",
+    "runs": [
+     {
+      "s": [
+       1,
+       29
+      ],
+      "unit": "win",
+      "count": 7,
+      "levels": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   {
+    "edge": 2,
+    "side": "东面",
+    "len_m": 12,
+    "src": "@made",
+    "runs": []
+   },
+   {
+    "edge": 3,
+    "side": "南面",
+    "len_m": 30,
+    "src": "@made",
+    "runs": [
+     {
+      "s": [
+       1,
+       23
+      ],
+      "unit": "win",
+      "count": 5,
+      "levels": [
+       1,
+       2
+      ]
+     }
+    ]
+   }
+  ],
+  "roof_boxes": [],
+  "entrances": [
+   {
+    "id": "west",
+    "edge": 0,
+    "level": 1,
+    "s": 8,
+    "w_m": 1.8,
+    "h_m": 2.7,
+    "steps": {
+     "count": 3,
+     "riser_m": 0.15
+    },
+    "door": "d_out",
+    "to": "院子",
+    "src": "@made"
+   }
+  ]
+ },
+ "cores": [
+  {
+   "id": "st",
+   "kind": "stair",
+   "depth": "full",
+   "levels": [
+    1,
+    2
+   ],
+   "rect": [
+    24,
+    0.24,
+    29.76,
+    3.6
+   ],
+   "src": "@oral",
+   "use": "东端楼梯",
+   "stair": {
+    "run_axis": "u",
+    "start_end": "min",
+    "first_flight_side": "min",
+    "flight_w_u": 56,
+    "gap_u": 8,
+    "riser_u": 6.5617,
+    "risers_per_storey": 24,
+    "tread_u": 9,
+    "landing_u": 63.77,
+    "floor_landing_u": 64,
+    "mid_landing_u": 63.77
+   },
+   "doors": [
+    {
+     "id": "st1",
+     "level": 1,
+     "to": "c1",
+     "at": [
+      24.9,
+      3.7
+     ],
+     "axis": "u",
+     "width": 1.45,
+     "height": 2.7,
+     "state": "open",
+     "kind": "door"
+    },
+    {
+     "id": "st2",
+     "level": 2,
+     "to": "c2",
+     "at": [
+      24.9,
+      3.7
+     ],
+     "axis": "u",
+     "width": 1.45,
+     "height": 2.7,
+     "state": "open",
+     "kind": "door"
+    }
+   ]
+  }
+ ],
+ "floors": [
+  {
+   "level": 1,
+   "walls": {
+    "interior_m": 0.2
+   },
+   "spaces": [
+    {
+     "id": "h1",
+     "kind": "hall",
+     "rects": [
+      [
+       0.24,
+       3.8,
+       19.8,
+       11.76
+      ]
+     ],
+     "use": "门厅",
+     "src": "@oral"
+    },
+    {
+     "id": "c1",
+     "kind": "corridor",
+     "rects": [
+      [
+       20,
+       3.8,
+       29.76,
+       7
+      ]
+     ],
+     "use": "一楼走廊",
+     "src": "@made"
+    }
+   ],
+   "doors": [
+    {
+     "id": "d_h",
+     "between": [
+      "c1",
+      "h1"
+     ],
+     "at": [
+      19.9,
+      5.4
+     ],
+     "axis": "v",
+     "width": 3,
+     "height": 2.7,
+     "state": "open",
+     "kind": "opening",
+     "src": "@made"
+    },
+    {
+     "id": "d_out",
+     "between": [
+      "h1",
+      "outside"
+     ],
+     "at": [
+      0.12,
+      8
+     ],
+     "axis": "v",
+     "width": 1.8,
+     "height": 2.7,
+     "state": "open",
+     "kind": "door",
+     "src": "@made"
+    }
+   ],
+   "closed_doors": []
+  },
+  {
+   "level": 2,
+   "walls": {
+    "interior_m": 0.2
+   },
+   "spaces": [
+    {
+     "id": "c2",
+     "kind": "corridor",
+     "rects": [
+      [
+       20,
+       3.8,
+       29.76,
+       7
+      ]
+     ],
+     "use": "二楼走廊",
+     "src": "@made"
+    },
+    {
+     "id": "r_start",
+     "kind": "room",
+     "rects": [
+      [
+       24,
+       7.2,
+       29.76,
+       11.76
+      ]
+     ],
+     "use": "起点房",
+     "src": "@made",
+     "highlight": true,
+     "label": "起点"
+    }
+   ],
+   "doors": [
+    {
+     "id": "d_r",
+     "between": [
+      "r_start",
+      "c2"
+     ],
+     "at": [
+      26.9,
+      7.1
+     ],
+     "axis": "u",
+     "width": 1.45,
+     "height": 2.7,
+     "state": "open",
+     "kind": "door",
+     "src": "@made"
+    }
+   ],
+   "closed_doors": [
+    {
+     "id": "cd1",
+     "on": "c2",
+     "axis": "u",
+     "at": [
+      21.5,
+      3.8
+     ],
+     "width": 1,
+     "height": 2.2,
+     "label": "房间",
+     "src": "@made"
+    }
+   ]
+  }
+ ],
+ "objects": [
+  {
+   "id": "o_med",
+   "level": 2,
+   "in": "r_start",
+   "at": [
+    27,
+    10
+   ],
+   "yaw_deg": 0,
+   "size_m": [
+    0.4,
+    0.3,
+    0.2
+   ],
+   "kind": "item_spawn",
+   "items": [
+    {
+     "entity": "weapon_first_aid_kit_spawn",
+     "count": 1
+    }
+   ],
+   "plan": [
+    "item:0",
+    "room:R0"
+   ],
+   "what": "桌上的医疗包",
+   "src": "@made",
+   "blocks": false,
+   "see_through": true,
+   "vault": false
+  },
+  {
+   "id": "o_btn",
+   "level": 1,
+   "in": "c1",
+   "at": [
+    22,
+    5.4
+   ],
+   "yaw_deg": 0,
+   "size_m": [
+    0.2,
+    0.1,
+    0.2
+   ],
+   "kind": "button",
+   "fires": [
+    "ev_btn"
+   ],
+   "plan": [
+    "play:1"
+   ],
+   "what": "按下推开柜子",
+   "src": "@made",
+   "blocks": false,
+   "see_through": true,
+   "vault": false
+  }
+ ],
+ "fixtures": [],
+ "atmosphere": [
+  {
+   "id": "a_shell",
+   "scope": [
+    "shell"
+   ],
+   "text": "灰色两层小楼",
+   "refs": []
+  },
+  {
+   "id": "a_in",
+   "scope": [
+    [
+     1,
+     "h1"
+    ],
+    [
+     1,
+     "c1"
+    ],
+    [
+     2,
+     "c2"
+    ],
+    [
+     2,
+     "r_start"
+    ],
+    [
+     1,
+     "st"
+    ],
+    [
+     2,
+     "st"
+    ]
+   ],
+   "text": "昏暗的走廊",
+   "refs": []
+  }
+ ],
+ "route": {
+  "path": [
+   [
+    2,
+    "r_start"
+   ],
+   [
+    2,
+    "c2"
+   ],
+   [
+    "core",
+    "st"
+   ],
+   [
+    1,
+    "c1"
+   ],
+   [
+    1,
+    "h1"
+   ],
+   "outside"
+  ],
+  "must_reach": [],
+  "must_not_reach": []
+ },
+ "plan_refs": [
+  {
+   "ref": "room:R0",
+   "at": "o_med",
+   "how": "起点房"
+  },
+  {
+   "ref": "item:0",
+   "at": "o_med",
+   "how": "医疗包"
+  },
+  {
+   "ref": "play:1",
+   "at": "o_btn",
+   "how": "按钮"
+  },
+  {
+   "ref": "section:A",
+   "at": "c2",
+   "how": "下楼"
+  }
+ ],
+ "plan_deviations": [],
+ "questions": []
+}

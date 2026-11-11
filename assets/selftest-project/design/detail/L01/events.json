@@ -1,0 +1,25 @@
+{
+ "events": [
+  {
+   "id": "event:0",
+   "name": "院子尸潮",
+   "type": "PanicEvent",
+   "until": "",
+   "plan": [
+    "event:0"
+   ],
+   "src": "plan:events[0]"
+  },
+  {
+   "id": "ev_btn",
+   "name": "柜子",
+   "type": "Effect",
+   "what": "推开柜子",
+   "until": "",
+   "plan": [
+    "play:1"
+   ],
+   "src": "plan:plays[1]"
+  }
+ ]
+}

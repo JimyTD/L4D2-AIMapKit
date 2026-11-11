@@ -1,0 +1,28 @@
+{
+ "R0": {
+  "name": "A 楼二楼起点房",
+  "outline": "A",
+  "room": [
+   26,
+   6
+  ],
+  "entry": null,
+  "exit": [
+   28,
+   6
+  ]
+ },
+ "R1": {
+  "name": "院子东侧终点",
+  "outline": null,
+  "room": [
+   50,
+   20
+  ],
+  "entry": [
+   50,
+   20
+  ],
+  "exit": null
+ }
+}

@@ -1,6 +1,7 @@
+# Local only
 vendor/
+_legacy/
+kit.local.json
+scripts/forbidden.local.txt
 .venv/
-mapkit.local.json
-tools/forbidden.local.txt
 __pycache__/
-samples/*/build/
