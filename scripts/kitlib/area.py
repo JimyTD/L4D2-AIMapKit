@@ -437,7 +437,7 @@ def write_page(spec, world, res, exp, out_html):
     lvl = level_dir(spec["level"])
     lay = json.loads((lvl / "layout.build.json").read_text(encoding="utf-8")) if (lvl / "layout.build.json").exists() else None
     laychk = json.loads((lvl / "layout.check.json").read_text(encoding="utf-8")) if (lvl / "layout.check.json").exists() else None
-    if lay and spec["id"] not in {s["id"] for s in lay["areas"]}:
+    if lay and spec["id"] not in {s["id"] for s in lay.get("areas", [])}:
         lay = laychk = None
     tpl = (KIT / "assets" / "review-pages" / "area.html").read_text(encoding="utf-8")
     page = (tpl.replace("__TITLE__", html.escape(spec["title"]))
