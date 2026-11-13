@@ -9,6 +9,7 @@
 | `levels` | 关数 |
 | `minutes_per_level` | `[下限, 上限]` 分钟 |
 | `pitch`、`non_goals` | 卖点；非目标列表 |
+| `curve`、`curve_why` | 体验曲线：每关 `{"level", "tension": 1–5, "line": 一句话体验}`；起伏理由（P1 起草） |
 | `geo.bbox` | `[南, 西, 北, 东]`，`kit geo fetch` 按它下载（真实地点） |
 | `geo.origin` | `[纬度, 经度]`，项目坐标原点（P3） |
 | `geo.boundary` | 可选：场地边界的轮廓 id。寻路时边界不可穿越，只有门口能过 |

@@ -376,6 +376,17 @@ def check_campaign() -> int:
         bad.append("minutes_per_level 应为 [下限, 上限]")
     if not isinstance(c.get("levels"), int) or c["levels"] < 1:
         bad.append("levels 应为正整数")
+    curve = c.get("curve")
+    if not isinstance(curve, list) or not curve:
+        bad.append("缺 curve（体验曲线：每关 level、tension 1–5、line 一句话体验）")
+    else:
+        for x in curve:
+            if not (isinstance(x.get("tension"), int) and 1 <= x["tension"] <= 5 and x.get("line")):
+                bad.append(f"curve 第 {x.get('level')} 关要写 tension（1–5）和 line")
+        if isinstance(c.get("levels"), int) and len(curve) != c["levels"]:
+            bad.append(f"curve 有 {len(curve)} 关，和 levels={c['levels']} 对不上")
+        if not c.get("curve_why"):
+            bad.append("缺 curve_why（为什么这样起伏）")
     if c.get("realism") in ("replica", "inspired") and not c.get("geo", {}).get("bbox"):
         bad.append("真实地点要写 geo.bbox（P2 采地理数据用）")
     for b in bad:

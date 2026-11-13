@@ -11,5 +11,13 @@
  "non_goals": [
   "无"
  ],
- "label_prefixes": []
+ "label_prefixes": [],
+ "curve": [
+  {
+   "level": 1,
+   "tension": 3,
+   "line": "下楼、穿门厅、过院子"
+  }
+ ],
+ "curve_why": "自测样例只有一关"
 }
