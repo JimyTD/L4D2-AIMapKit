@@ -119,6 +119,7 @@ def units() -> dict:
     """unit name -> source files (what the user approves). Generated files are not part of a unit."""
     r = root()
     u = {"P1": [r / "design" / "plan" / "campaign.json", r / "design" / "plan" / "DESIGN.md"]}
+    u["P3"] = [r / "design" / "plan" / "rooms.json"]
     for f in sorted((r / "design" / "plan" / "levels").glob("L*.json")):
         u[f"P3/{f.stem}"] = [f]
     u["P4"] = [r / "design" / "plan" / "rooms.json"] + sorted((r / "design" / "plan" / "levels").glob("L*.json"))
@@ -214,6 +215,9 @@ def status() -> int:
     if not base_ok:
         miss = ", ".join(open_) or "geo.origin / geo.landmarks"
         add("P3 坐标与地基", f"待定：{miss}", "先定坐标和地基数值（只过脚本，不问用户）", "P3-levels")
+    st_split = approval_state("P3", units()["P3"])
+    if base_ok and st_split != "已拍板":
+        add("P3 切关", st_split, "全战役切关和安全屋，用总览页交用户拍板", "P3-levels")
     add("P3 切关与关卡", f"{len(levels)}/{want} 关有源文件，{done3} 关已拍板；plan verify {'通过' if plan_ok else '未通过或未跑'}",
         None if done3 == want and want and plan_ok else "下一关的关卡设计（一关一拍板）", "P3-levels")
     for k, s in lv_states.items():
