@@ -118,11 +118,10 @@ def _sha(paths) -> str:
 def units() -> dict:
     """unit name -> source files (what the user approves). Generated files are not part of a unit."""
     r = root()
-    u = {"P1": [r / "design" / "plan" / "campaign.json", r / "design" / "plan" / "DESIGN.md"],
-         "P3": [r / "standards" / "decisions.json"]}
+    u = {"P1": [r / "design" / "plan" / "campaign.json", r / "design" / "plan" / "DESIGN.md"]}
     for f in sorted((r / "design" / "plan" / "levels").glob("L*.json")):
-        u[f"P4/{f.stem}"] = [f]
-    u["P5"] = [r / "design" / "plan" / "rooms.json"] + sorted((r / "design" / "plan" / "levels").glob("L*.json"))
+        u[f"P3/{f.stem}"] = [f]
+    u["P4"] = [r / "design" / "plan" / "rooms.json"] + sorted((r / "design" / "plan" / "levels").glob("L*.json"))
     u["D0"] = [r / "standards" / "decisions.json", r / "PROJECT.md"]
     for ld in sorted((r / "design" / "detail").glob("L[0-9]*")):
         L = ld.name
@@ -203,17 +202,20 @@ def status() -> int:
     gd = (r / "sources" / "geodata" / "osm_raw.json").exists() or (r / "sources" / "geodata" / "world.json").exists()
     add("P2 资料", f"{n} 条资料；地理数据{'有' if gd else '没有'}", None if gd and n else "先采底：地理数据和每个地点的概况", "P2-sources")
     dec = rd(r / "standards" / "decisions.json")["items"]
-    open_ = [i["id"] for i in dec if i.get("value") is None and i.get("step") in ("P3",)]
-    st = approval_state("P3", units()["P3"])
-    add("P3 坐标与地基", "完成" if not open_ and st != "待拍板" else f"待定：{', '.join(open_) or '拍板'}",
-        None if not open_ and st != "待拍板" else "定坐标和地基数值", "P3-coords")
+    open_ = [i["id"] for i in dec if i.get("value") is None and i.get("step") == "P3"]
+    gconf = rd(camp).get("geo", {}) if camp.exists() else {}
+    real = (rd(camp).get("realism") if camp.exists() else None) != "fictional"
+    base_ok = not open_ and (not real or bool(gconf.get("origin") and gconf.get("landmarks")))
     levels = sorted((r / "design" / "plan" / "levels").glob("L*.json"))
     want = rd(camp).get("levels", 0) if camp.exists() else 0
     plan_ok = _check_ok(r / "design" / "plan" / "reports" / "plan.check.json")
-    lv_states = {f.stem: approval_state(f"P4/{f.stem}", [f]) for f in levels}
-    done4 = sum(1 for s in lv_states.values() if s == "已拍板")
-    add("P4 切关与关卡", f"{len(levels)}/{want} 关有源文件，{done4} 关已拍板；plan verify {'通过' if plan_ok else '未通过或未跑'}",
-        None if done4 == want and want and plan_ok else "下一关的关卡设计（一关一拍板）", "P4-levels")
+    lv_states = {f.stem: approval_state(f"P3/{f.stem}", [f]) for f in levels}
+    done3 = sum(1 for s in lv_states.values() if s == "已拍板")
+    if not base_ok:
+        miss = ", ".join(open_) or "geo.origin / geo.landmarks"
+        add("P3 坐标与地基", f"待定：{miss}", "先定坐标和地基数值（只过脚本，不问用户）", "P3-levels")
+    add("P3 切关与关卡", f"{len(levels)}/{want} 关有源文件，{done3} 关已拍板；plan verify {'通过' if plan_ok else '未通过或未跑'}",
+        None if done3 == want and want and plan_ok else "下一关的关卡设计（一关一拍板）", "P3-levels")
     for k, s in lv_states.items():
         if s == "拍板后已修改":
             rows.append((f"    {k}", "拍板后已修改：重跑 plan build / verify，交用户重新拍板"))
@@ -223,8 +225,8 @@ def status() -> int:
     views = r / "design" / "plan" / "views" / "index.html"
     if pdata.exists() and not _newer(views, [pdata]):
         rows.append(("    规划视图", "过期：跑 kit plan render"))
-    st5 = approval_state("P5", units()["P5"])
-    add("P5 规划定稿", st5, None if st5 == "已拍板" else "全部关拍板后重画总览，交用户定稿", "P5-plan-final")
+    st4 = approval_state("P4", units()["P4"])
+    add("P4 规划定稿", st4, None if st4 == "已拍板" else "全部关拍板后重画总览，交用户定稿", "P4-plan-final")
     d0 = [i["id"] for i in dec if i.get("value") is None and i.get("step") == "D0"]
     st0 = approval_state("D0", units()["D0"])
     add("D0 详设准备", "完成" if not d0 and st0 != "待拍板" else f"待定：{', '.join(d0) or '拍板'}",

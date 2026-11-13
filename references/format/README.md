@@ -5,7 +5,7 @@
 | 页 | 内容 | 用在 |
 |---|---|---|
 | [common.md](common.md) | 坐标、来源 `src`、规划条目 `plan_refs`、问题、五件事与翻越 `cross` | 所有设计文件 |
-| [plan.md](plan.md) | `campaign.json`、`rooms.json`、`levels/L<n>.json` | P1、P4 |
+| [plan.md](plan.md) | `campaign.json`、`rooms.json`、`levels/L<n>.json` | P1、P3 |
 | [world.md](world.md) | 虚构地点的手写地理数据 `world.json` | P2（虚构） |
 | [structure.md](structure.md) | 结构体文件：外壳、竖向通道、内部、物件三档 | D2、D4 |
 | [area.md](area.md) | 开放区文件：地面、封路、边界、刷怪口、衔接 | D3、D4 |

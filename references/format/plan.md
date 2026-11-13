@@ -1,6 +1,6 @@
 # 规划数据
 
-## `design/plan/campaign.json`（P1 建，P3 补 `geo`）
+## `design/plan/campaign.json`（P1 建，P3 开头补 `geo`）
 
 | 字段 | 含义 |
 |---|---|
@@ -47,5 +47,5 @@
 
 路段 `mode`：`road` 室外寻路；`offsite` 范围外；`vehicle` 载具（按固定路线移动的平台）；`indoor` 室内，限制在 `refs` 的轮廓里；`upper` 楼上；`underground` 地下；`bridge` 桥（直线，要走在地理数据的桥上）；`open` 直线短路。
 
-`compress: true` 表示这一段可以压缩；`scale` 是已经决定的压缩比例。
+`compress: true` 标出压缩候选，并写 `compress_why`（超预算、空跑或拖慢节奏）；压不压、压多少到 D1 才定。`scale` 是 D1 决定后的压缩比例。
 

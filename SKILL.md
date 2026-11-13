@@ -38,9 +38,8 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [P0](references/steps/P0-init.md) | 开项目：建骨架、体检依赖、请示安装、agent 配置 | 脚本 + 拍板 |
 | [P1](references/steps/P1-goals.md) | 定目标与规模 | 脚本 + 拍板 |
 | [P2](references/steps/P2-sources.md) | 采资料并建索引 | 脚本 |
-| [P3](references/steps/P3-coords.md) | 坐标与地基数值 | 脚本 + 拍板 |
-| [P4](references/steps/P4-levels.md) | 切关与关卡设计，逐关进行 | 脚本 + 拍板 |
-| [P5](references/steps/P5-plan-final.md) | 规划视图与规划定稿 | 脚本 + 拍板 |
+| [P3](references/steps/P3-levels.md) | 坐标与地基（项目一次，只过脚本）；切关与关卡设计，逐关进行 | 脚本 + 拍板 |
+| [P4](references/steps/P4-plan-final.md) | 规划视图与规划定稿 | 脚本 + 拍板 |
 | [D0](references/steps/D0-detail-prep.md) | 详设准备（项目级，只做一次） | 拍板 |
 | [D1](references/steps/D1-level-prep.md) | 关卡准备：分级、分段、面数初估、压缩与朝向 | 脚本 + 拍板 |
 | [D2](references/steps/D2-structures.md) | 内部结构设计，逐个结构体进行 | 脚本 + 拍板 |
@@ -60,7 +59,7 @@ D0 之后每关是一条主线，各自走 D1–D7，可以并行。并行和子
 |---|---|
 | [project-layout.md](references/project-layout.md) | 找项目里的文件；资料索引、待决定列表、拍板记录的字段 |
 | [format/](references/format/README.md) | 写设计数据时，只查用到的那一页 |
-| [rules.md](references/rules.md) | 设计规则：P4、D2、D3、D4 动手前读 |
+| [rules.md](references/rules.md) | 设计规则：P3、D2、D3、D4 动手前读 |
 | [review.md](references/review.md) | 交评审、记拍板、处理修改和过期 |
 | [subagents.md](references/subagents.md) | 派子 agent 或开并行主线前读 |
 | [engine-facts.md](references/engine-facts.md) | 需要引擎数值时 |

@@ -45,7 +45,7 @@ GREEN_TAGS = {
 def origin():
     o = geo_conf().get("origin")
     if not o:
-        raise KitError("campaign.json 的 geo.origin 没有填（真实地点在 P3 定原点）")
+        raise KitError("campaign.json 的 geo.origin 没有填（真实地点在 P3 开头定原点）")
     return tuple(o)
 
 

@@ -155,7 +155,7 @@ def parser():
     ss = x.add_subparsers(dest="sub", required=True)
     ss.add_parser("fetch", help="按 campaign.json geo.bbox 下载 OSM")
     ss.add_parser("check-mirror", help="地标像素级防镜像检查")
-    x = s.add_parser("plan", help="P4/P5 规划数据")
+    x = s.add_parser("plan", help="P3/P4 规划数据")
     ss = x.add_subparsers(dest="sub", required=True)
     ss.add_parser("build")
     y = ss.add_parser("verify")
