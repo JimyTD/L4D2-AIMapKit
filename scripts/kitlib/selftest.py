@@ -122,6 +122,7 @@ def run() -> int:
             bad += 0 if ok else 1
         if not game_dir():
             print("NOTE 本机没找到游戏：实体类名的核验跳过，对应用例不算")
+        bad += status_checks(proj)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     for what, rel, fn, must in CASES:
@@ -144,4 +145,34 @@ def run() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
     print("selftest: " + ("全部通过" if not bad else f"{bad} 项没通过"))
     return 1 if bad else 0
+
+
+def status_checks(proj) -> int:
+    """kit status and kit approve: D1 without compression candidates needs no approval, facade-only
+    structures need none, several units can be approved at once, and an edit shows as changed."""
+    bad = 0
+
+    def expect(what, passed, out=""):
+        nonlocal bad
+        print(("OK   " if passed else "FAIL ") + what + ("" if passed else "\n" + out[-600:]))
+        bad += 0 if passed else 1
+
+    _, out = kit(proj, "status")
+    expect("status：没有压缩候选时 D1 不要求拍板", "完成（无压缩候选" in out, out)
+    shell = proj / L / "structures" / "B.json"
+    shell.write_text(json.dumps({"grade": "外立面"}), encoding="utf-8")
+    _, out = kit(proj, "status")
+    expect("status：只有外壳的结构体不要求拍板", "1 个只有外壳" in out and "待拍板：A；" not in out.replace("待拍板：A\n", ""), out)
+    shell.unlink()
+    code, out = kit(proj, "approve", "L01/structures/A", "L01/areas/yard", "--note", "selftest")
+    expect("approve：一次登记多个单元", code == 0 and out.count("已记录拍板") == 2, out)
+    _, out = kit(proj, "status")
+    expect("status：登记后结构体和开放区显示已拍板", "拍板 1/1" in out and "待拍板：" not in out, out)
+    edit(proj, f"{L}/areas/yard.json", lambda d: d.__setitem__("title", d.get("title", "") + " "))
+    _, out = kit(proj, "status")
+    expect("status：拍板后改了文件显示“拍板后已修改”", "拍板后已修改：yard" in out, out)
+    edit(proj, "design/plan/levels/L1.json", lambda d: d["legs"][0].update({"compress": True, "compress_why": "selftest"}))
+    _, out = kit(proj, "status")
+    expect("status：有压缩候选时 D1 要求拍板", "段压缩候选；待拍板" in out, out)
+    return bad
 

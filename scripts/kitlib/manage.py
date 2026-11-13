@@ -123,7 +123,6 @@ def units() -> dict:
     for f in sorted((r / "design" / "plan" / "levels").glob("L*.json")):
         u[f"P3/{f.stem}"] = [f]
     u["P4"] = [r / "design" / "plan" / "rooms.json"] + sorted((r / "design" / "plan" / "levels").glob("L*.json"))
-    u["D0"] = [r / "standards" / "decisions.json", r / "PROJECT.md"]
     for ld in sorted((r / "design" / "detail").glob("L[0-9]*")):
         L = ld.name
         u[f"{L}/D1"] = [ld / "README.md", ld / "layout.json", ld / "events.json"]
@@ -142,14 +141,18 @@ def approvals() -> dict:
     return rd(p) if p.exists() else {}
 
 
-def approve(unit: str, note: str) -> int:
+def approve(names, note: str) -> int:
     u = units()
-    if unit not in u:
-        raise KitError(f"没有单元 {unit}；kit status 列出全部单元")
+    names = [names] if isinstance(names, str) else list(names)
+    bad = [n for n in names if n not in u]
+    if bad:
+        raise KitError(f"没有单元 {', '.join(bad)}；kit status 列出全部单元")
     a = approvals()
-    a[unit] = {"sha": _sha(u[unit]), "date": datetime.date.today().isoformat(), "note": note}
+    for unit in names:
+        a[unit] = {"sha": _sha(u[unit]), "date": datetime.date.today().isoformat(), "note": note}
+        print(f"已记录拍板：{unit}（{a[unit]['sha']}）")
     wr(root() / "design" / "approvals.json", a)
-    print(f"已记录拍板：{unit}（{a[unit]['sha']}）。记得把用户意见写进 REVIEW-LOG.md 并提交")
+    print("记得把用户意见写进 REVIEW-LOG.md 并提交")
     return 0
 
 
@@ -158,6 +161,50 @@ def approval_state(unit, files):
     if not a:
         return "待拍板"
     return "已拍板" if a["sha"] == _sha(files) else "拍板后已修改"
+
+
+def _level_no(name: str) -> int:
+    return int(re.sub(r"\D", "", name))
+
+
+def compress_candidates(level: int) -> list:
+    """Planned legs flagged as compression candidates (P3); D1 asks the user only when there are any."""
+    f = root() / "design" / "plan" / "levels" / f"L{level}.json"
+    if not f.exists():
+        return []
+    src = rd(f)
+    legs = list(src.get("legs", [])) + [l for a in src.get("alts", []) for l in a.get("legs", [])]
+    return [l for l in legs if l.get("compress")]
+
+
+def shared_structures() -> list:
+    """Outlines used by more than one level: safe rooms on a level boundary and indoor legs.
+    The first level that uses one writes it; later levels only reference it."""
+    p = root() / "design" / "plan" / "data" / "levels.json"
+    if not p.exists():
+        return []
+    pl = rd(p)
+    used = {}
+    for lv in pl["levels"]:
+        outs = set()
+        for rid in (lv.get("start_room"), lv.get("end_room")):
+            o = pl["rooms"].get(rid, {}).get("outline")
+            if o:
+                outs.add(o)
+        for l in lv["legs"] + [l for a in lv.get("alts", []) for l in a["legs"]]:
+            outs.update(l.get("refs") or [])
+        for o in outs:
+            used.setdefault(o, set()).add(lv["id"])
+    names = {}
+    for rid, rm in pl["rooms"].items():
+        if rm.get("outline"):
+            names[rm["outline"]] = rm.get("name") or rm.get("outline_name") or rm["outline"]
+    for lv in pl["levels"]:
+        for l in lv["legs"] + [l for a in lv.get("alts", []) for l in a["legs"]]:
+            for o, n in zip(l.get("refs") or [], l.get("outline_names") or []):
+                names.setdefault(o, n)
+    return [{"outline": o, "name": names.get(o, o), "levels": sorted(ls), "writer": min(ls)}
+            for o, ls in sorted(used.items(), key=lambda x: (min(x[1]), x[0])) if len(ls) > 1]
 
 
 # ---------------------------------------------------------------- status
@@ -232,18 +279,32 @@ def status() -> int:
     st4 = approval_state("P4", units()["P4"])
     add("P4 规划定稿", st4, None if st4 == "已拍板" else "全部关拍板后重画总览，交用户定稿", "P4-plan-final")
     d0 = [i["id"] for i in dec if i.get("value") is None and i.get("step") == "D0"]
-    st0 = approval_state("D0", units()["D0"])
-    add("D0 详设准备", "完成" if not d0 and st0 != "待拍板" else f"待定：{', '.join(d0) or '拍板'}",
-        None if not d0 and st0 != "待拍板" else "量原版定尺度目标、地面类型、共享结构体、并行主线", "D0-detail-prep")
+    add("D0 详设准备", "完成" if not d0 else f"待定：{', '.join(d0)}",
+        None if not d0 else "量原版定尺度目标、地面类型；登记共享结构体和主线分工（只过脚本，不拍板）", "D0-detail-prep")
+    shared = shared_structures()
+    for s in shared:
+        rows.append((f"    共享 {s['name']}", f"第 {'、'.join(map(str, s['levels']))} 关用到；第 {s['writer']} 关写，其他关只引用"))
     for ld in sorted((r / "design" / "detail").glob("L[0-9]*")):
         L = ld.name
         u = units()
-        s1 = approval_state(f"{L}/D1", u[f"{L}/D1"])
-        rows.append((f"{L} D1 关卡准备", s1))
-        if s1 != "已拍板" and nxt is None:
-            nxt = (f"{L} D1", "分级、分段、面数初估、压缩和朝向，交用户拍板", "D1-level-prep")
+        n = _level_no(L)
+        lay = ld / "layout.json"
+        est = ld / "grades.estimate.json"
+        prep = (ld / "grades.json").exists() and lay.exists() and "compression" in rd(lay) and _check_ok(est)
+        cands = compress_candidates(n)
+        if cands:
+            s1 = approval_state(f"{L}/D1", u[f"{L}/D1"])
+            rows.append((f"{L} D1 关卡准备", f"{len(cands)} 段压缩候选；{s1}" if prep else f"未完成；{len(cands)} 段压缩候选"))
+            if (not prep or s1 != "已拍板") and nxt is None:
+                nxt = (f"{L} D1", "分级、分段、面数初估；出压缩对照图交用户拍板压缩", "D1-level-prep")
+        else:
+            rows.append((f"{L} D1 关卡准备", "完成（无压缩候选，不拍板）" if prep else "未完成：grades.json、layout.json 的 compression、kit detail estimate"))
+            if not prep and nxt is None:
+                nxt = (f"{L} D1", "分级、分段、面数初估、朝向（无压缩候选，不拍板）", "D1-level-prep")
+        facade = {k for k in u if k.startswith(f"{L}/structures/") and rd(u[k][0]).get("grade") == "外立面"}
         for kind, step, page in (("structures", "D2", "D2-structures"), ("areas", "D3", "D3-areas")):
             ks = [k for k in u if k.startswith(f"{L}/{kind}/")]
+            need_ok = [k for k in ks if k not in facade]
             stale, failed, todo, changed = [], [], [], []
             for k in ks:
                 f = u[k][0]
@@ -252,16 +313,22 @@ def status() -> int:
                     stale.append(k.split("/")[-1])
                 elif not _check_ok(chk):
                     failed.append(k.split("/")[-1])
+                if k in facade:
+                    continue
                 s = approval_state(k, u[k])
                 if s == "待拍板":
                     todo.append(k.split("/")[-1])
                 elif s == "拍板后已修改":
                     changed.append(k.split("/")[-1])
-            msg = f"{len(ks)} 个文件；拍板 {len(ks) - len(todo) - len(changed)}/{len(ks)}"
+            msg = f"{len(ks)} 个文件；拍板 {len(need_ok) - len(todo) - len(changed)}/{len(need_ok)}"
+            if kind == "structures" and facade:
+                msg += f"（{len(facade)} 个只有外壳，不拍板）"
             for lab, xs in (("核验过期", stale), ("核验未过", failed), ("待拍板", todo), ("拍板后已修改", changed)):
                 if xs:
                     msg += f"；{lab}：{', '.join(xs)}"
             rows.append((f"{L} {step} {'结构体' if kind == 'structures' else '开放区'}", msg))
+            if nxt is None and not ks:
+                nxt = (f"{L} {step}", "按分级表逐个写" + ("结构体：可进入的一个一拍板，只有外壳的只过核验" if kind == "structures" else "开放区，一段一拍板（短过渡段和相邻段合并交）"), page)
             if nxt is None and (stale or failed or changed or todo):
                 nxt = (f"{L} {step}", "先重跑过期的核验、修好未过的，再交待拍板的", page)
         spec = ld / "spec.json"
@@ -396,5 +463,48 @@ def check_campaign() -> int:
     for b in bad:
         print("FAIL " + b)
     print(f"campaign check: {len(bad)} 个问题")
+    if not bad:
+        out = goals_page(c)
+        print(f"P1 概要页：{out.relative_to(root()).as_posix()}")
     return 1 if bad else 0
+
+
+def goals_page(c: dict) -> Path:
+    """One-page P1 overview for the user: the tension curve plus one line per level."""
+    import html
+    e = html.escape
+    curve = sorted(c["curve"], key=lambda x: x["level"])
+    W, H, pad = 760, 260, 50
+    n = len(curve)
+    xs = [pad + (W - 2 * pad) * (i / max(n - 1, 1)) for i in range(n)]
+    ys = [H - pad - (x["tension"] - 1) / 4 * (H - 2 * pad) for x in curve]
+    grid = "".join(f'<path d="M{pad},{H - pad - (t - 1) / 4 * (H - 2 * pad):.1f} H{W - pad}" stroke="#e3e6ea"/>'
+                   f'<text x="{pad - 10}" y="{H - pad - (t - 1) / 4 * (H - 2 * pad) + 4:.1f}" font-size="12" text-anchor="end" fill="#59636e">{t}</text>'
+                   for t in range(1, 6))
+    line = "M" + " L".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+    pts = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="6" fill="#e5484d"/>'
+                  f'<text x="{x:.1f}" y="{H - pad + 22}" font-size="13" text-anchor="middle" fill="#1f2328">第{v["level"]}关</text>'
+                  for x, y, v in zip(xs, ys, curve))
+    svg = (f'<svg viewBox="0 0 {W} {H}" width="100%">{grid}<path d="{line}" fill="none" stroke="#e5484d" stroke-width="3"/>{pts}'
+           f'<text x="{pad - 36}" y="{pad - 18}" font-size="12" fill="#59636e">紧张程度</text></svg>')
+    rows = "".join(f'<tr><td>第{v["level"]}关</td><td>{v["tension"]}</td><td>{e(v["line"])}</td></tr>' for v in curve)
+    real = {"replica": "复刻", "inspired": "借景", "fictional": "虚构"}.get(c.get("realism"), c.get("realism"))
+    m = c["minutes_per_level"]
+    doc = f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>{e(c["title"])} · 目标与规模</title>
+<style>body{{margin:0;background:#f6f8fa;font:14px/1.6 'Microsoft YaHei','PingFang SC',sans-serif;color:#1f2328}}
+main{{max-width:860px;margin:0 auto;padding:24px}}h1{{font-size:22px;margin:0 0 4px}}h2{{font-size:16px;margin:22px 0 8px}}
+.card{{background:#fff;border:1px solid #d0d7de;border-radius:6px;padding:14px 18px}}.sub{{color:#59636e}}
+table{{border-collapse:collapse;width:100%}}td,th{{border-bottom:1px solid #eaeef2;padding:6px 8px;text-align:left;vertical-align:top}}th{{color:#59636e}}
+dl{{display:grid;grid-template-columns:7em 1fr;gap:4px 12px;margin:0}}dt{{color:#59636e}}dd{{margin:0}}</style></head><body><main>
+<h1>{e(c["title"])}</h1><div class="sub">{e(c.get("subtitle", ""))}</div>
+<h2>目标与规模</h2><div class="card"><dl><dt>卖点</dt><dd>{e(c["pitch"])}</dd><dt>真实度</dt><dd>{e(real)}</dd>
+<dt>关数</dt><dd>{c["levels"]} 关</dd><dt>每关时长</dt><dd>{m[0]}–{m[1]} 分钟</dd>
+<dt>不做的</dt><dd>{"；".join(e(x) for x in c["non_goals"])}</dd></dl></div>
+<h2>体验曲线</h2><div class="card">{svg}<p class="sub">{e(c.get("curve_why", ""))}</p></div>
+<h2>每关一句话</h2><div class="card"><table><tr><th>关</th><th>紧张程度</th><th>体验</th></tr>{rows}</table></div>
+</main></body></html>"""
+    out = root() / "design" / "plan" / "views" / "overview-goals.html"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(doc, encoding="utf-8")
+    return out
 

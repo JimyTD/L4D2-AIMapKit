@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 import imagery
@@ -124,6 +124,15 @@ def main(level_dir: Path):
     sat = imagery.data_url(x0, y0, x1, y1, px_per_m=2.0, bright=1.7)
 
     route_len = sum(LineString(r["pts"]).length for r in routes if not r.get("alt") and len(r["pts"]) > 1)
+    # pacing strip: the planned main line unrolled (same drawing as the planning view), items placed by distance along it
+    from plan_render import POSTER_W, STRIP, strip_svg
+    strip = (f'<svg viewBox="0 0 {POSTER_W} {STRIP}" width="100%" style="background:#f3f4f6;border-radius:6px">'
+             f'{strip_svg(lvl, POSTER_W)}</svg>')
+    plan_legs = (lvl["alts"][0]["legs"] if lvl.get("fork") else []) + lvl["legs"]
+    main_line = LineString([p for l in plan_legs for p in l["pts"]])
+    obj_at = {o["key"]: o["at"] for o in objects}
+    pace = sorted(({**i, "d": round(main_line.project(Point(obj_at[i["key"]])))} for i in items if i["key"] in obj_at),
+                  key=lambda i: i["d"])
     indoor_len = sum(LineString(r["pts"]).length for r in routes if r.get("indoor") and len(r["pts"]) > 1)
     gcount = {g: sum(1 for b in buildings if b["grade"] == g) for g in ("可进入", "外立面", "远景")}
     passed = sum(c["passed"] for c in checks)
@@ -131,7 +140,7 @@ def main(level_dir: Path):
     data = {
         "box": [x0, y0, x1, y1], "sat": sat, "sites": sites, "buildings": buildings, "routes": routes, "spawns": spawns,
         "objects": objects, "items": items, "events": ev_rows, "devs": devs, "questions": questions, "checks": checks,
-        "std": dec,
+        "std": dec, "strip": strip, "pace": pace,
         "subtitle": f"第 {level} 关 {lvl['name']}：{lvl['theme']} · 整关评审页（给人看；AI 读各结构体、开放区的源数据）· 北向朝上，滚轮缩放、拖动平移",
         "summary": {
             "grades": f"{gcount['可进入']} / {gcount['外立面']} / {gcount['远景']}", "sites": len(sites),

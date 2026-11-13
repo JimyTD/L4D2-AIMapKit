@@ -40,9 +40,9 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [P2](references/steps/P2-sources.md) | 采资料并建索引 | 脚本 |
 | [P3](references/steps/P3-levels.md) | 坐标与地基（项目一次，只过脚本）；切关与关卡设计，逐关进行 | 脚本 + 拍板 |
 | [P4](references/steps/P4-plan-final.md) | 规划视图与规划定稿 | 脚本 + 拍板 |
-| [D0](references/steps/D0-detail-prep.md) | 详设准备（项目级，只做一次） | 拍板 |
-| [D1](references/steps/D1-level-prep.md) | 关卡准备：分级、分段、面数初估、压缩与朝向 | 脚本 + 拍板 |
-| [D2](references/steps/D2-structures.md) | 内部结构设计，逐个结构体进行 | 脚本 + 拍板 |
+| [D0](references/steps/D0-detail-prep.md) | 详设准备（项目级，只做一次） | 脚本 |
+| [D1](references/steps/D1-level-prep.md) | 关卡准备：分级、分段、面数初估、压缩与朝向 | 脚本；有压缩候选时拍板 |
+| [D2](references/steps/D2-structures.md) | 内部结构设计，逐个结构体进行 | 脚本 + 拍板（只有外壳的不拍） |
 | [D3](references/steps/D3-areas.md) | 开放区设计，逐段进行 | 脚本 + 拍板 |
 | [D4](references/steps/D4-easter-eggs.md) | 彩蛋（先问用户） | 脚本 + 拍板 |
 | [D5](references/steps/D5-compose.md) | 整关收口与合成 `spec.json` | 脚本 |

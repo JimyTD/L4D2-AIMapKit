@@ -37,6 +37,7 @@ from shapely.ops import unary_union
 import imagery
 from geo import load
 from project import need
+from project import RUN_SPEED_U, UNIT_M
 
 FONT = "'Microsoft YaHei','PingFang SC','Noto Sans CJK SC',sans-serif"
 COLORS = ["#2bb3a3", "#ff9d2e", "#b77cff", "#4aa8ff", "#f2b632"]
@@ -168,7 +169,19 @@ def render(spec, world, vec, moved, out_svg: Path):
     def line(pts, ox=0):
         return "M" + " L".join(f"{a:.1f},{b:.1f}" for a, b in (P(*p, ox) for p in pts))
 
-    legend_h = 90
+    run_mps = RUN_SPEED_U * UNIT_M
+    seg_rows = []
+    for i, (src, after_pts) in enumerate(zip(spec["route"], moved)):
+        if not src.get("band"):
+            continue
+        a, b = LineString(src["pts"]).length, LineString(after_pts).length
+        seg_rows.append(f"第 {i + 1} 段（{src['band'][0]} → {src['band'][1]}）：{a:.0f} m → {b:.0f} m，"
+                        f"纯跑 {a / run_mps:.0f} 秒 → {b / run_mps:.0f} 秒")
+    tot0 = sum(LineString(s["pts"]).length for s in spec["route"])
+    tot1 = sum(LineString(m).length for m in moved)
+    seg_rows.append(f"整条路线：{tot0:.0f} m → {tot1:.0f} m，纯跑 {tot0 / run_mps:.0f} 秒 → {tot1 / run_mps:.0f} 秒"
+                    f"（实际游玩约为纯跑的 2–3 倍）")
+    legend_h = 90 + 20 * len(seg_rows)
     svg = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.0f}" height="{H + legend_h:.0f}" viewBox="0 0 {W:.0f} {H + legend_h:.0f}" font-family="{FONT}">',
            '<rect width="100%" height="100%" fill="#ffffff"/>']
     by = {b.id: b for b in world.buildings}
@@ -214,6 +227,9 @@ def render(spec, world, vec, moved, out_svg: Path):
     y += 20
     txt = "；".join(f"{b['label']} 平移 ({vec[b['id']][0]:+.0f}, {vec[b['id']][1]:+.0f}) m" for b in spec["blocks"])
     svg.append(f'<text x="14" y="{y}" font-size="12" fill="#3b434b">{e(txt)}</text>')
+    for row in seg_rows:
+        y += 20
+        svg.append(f'<text x="14" y="{y}" font-size="13" fill="#1f2328">{e(row)}</text>')
     svg.append("</svg>")
     out_svg.write_text("".join(svg), encoding="utf-8")
 

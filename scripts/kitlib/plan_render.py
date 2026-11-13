@@ -705,6 +705,43 @@ def poster(map_body: str, panel: str, strip: str | None) -> str:
     return "".join(s)
 
 
+HIGH = ("高", "中高", "最高", "冲刺")  # event strength tiers counted as high pressure
+
+
+def dots(n: int) -> str:
+    return '<span class="dots">' + "".join(f'<i class="{"on" if i < n else ""}"></i>' for i in range(5)) + "</span>"
+
+
+def expect_table(plan: dict) -> str:
+    """P1 expectations next to what each level actually has. Facts only; whether a level matches is the agent's call."""
+    camp = campaign()
+    curve = {c["level"]: c for c in camp.get("curve", [])}
+    lo, hi = camp.get("minutes_per_level", [0, 999])
+    rows = []
+    for L in plan["levels"]:
+        c = curve.get(L["id"], {})
+        tiers = {}
+        for e in L["events"]:
+            tiers[e["level"]] = tiers.get(e["level"], 0) + 1
+        high = sum(n for k, n in tiers.items() if k in HIGH)
+        ev = "、".join(f"{k} {n}" for k, n in tiers.items()) or "无"
+        hold_s = []
+        for h in L["holds"]:
+            s = h.get("seconds")
+            hold_s.append(f"{s} 秒" if isinstance(s, (int, float)) else ("{}–{} 秒".format(*h["est_s"]) if h.get("est_s") else "按事件"))
+        holds = f'{len(hold_s)} 个（{"、".join(hold_s)}）' if hold_s else "无"
+        m0, m1 = L["minutes"]
+        inside = m1 >= lo and m0 <= hi
+        tm = f'{m0}–{m1} 分钟' + ("" if inside else f' <span class="bad">不在 {lo}–{hi} 内</span>')
+        rows.append(f'<tr><td><b>第{L["id"]}关</b><br>{esc(L["name"])}</td>'
+                    f'<td>{dots(c.get("tension", 0))} {c.get("tension", "—")}<br>{esc(c.get("line", ""))}</td>'
+                    f'<td>{len(L["events"])} 个：{esc(ev)}<br>其中高压 {high} 个</td><td>{esc(holds)}</td><td>{tm}</td></tr>')
+    why = esc(camp.get("curve_why", ""))
+    return ('<div class="expect"><h2>预期和实际</h2><p>左边是目标阶段定的体验曲线，右边是每关实际排进去的尸潮、守点和粗估时长。'
+            f'{why}</p><table><tr><th>关</th><th>预期（紧张程度 1–5 · 一句话体验）</th><th>实际尸潮（按强度档）</th><th>守点</th><th>粗估时长</th></tr>'
+            + "".join(rows) + "</table></div>")
+
+
 def main() -> int:
     global OUTDIR, IMGDIR
     OUTDIR = root() / "design" / "plan" / "views"
@@ -732,17 +769,19 @@ def main() -> int:
 
 
 def write_index(views, plan) -> None:
+    """index.html: tabs per view; the overview tab also carries the expected-versus-actual table (P4)."""
     tabs = "".join(f'<button class="tab" data-v="{v["id"]}" style="--c:{v["color"]}">{esc(v["title"])}</button>' for v in views)
     toggles = "".join(f'<label><input type="checkbox" data-l="{k}" checked><span>{esc(n)}</span></label>' for k, n in LAYERS)
     panes = []
     for v in views:
         strip = (f'<svg class="strip" viewBox="0 0 {POSTER_W} {STRIP}" preserveAspectRatio="xMidYMid meet">{v["strip"]}</svg>'
                  if v["strip"] else "")
+        extra = expect_table(plan) if v["id"] == "overview" else ""
         panes.append(
             f'<section class="view" data-v="{v["id"]}" hidden>'
             f'<div class="mapwrap"><svg class="map" viewBox="0 0 {MAP} {MAP}" preserveAspectRatio="xMidYMid meet">{v["map"]}</svg></div>'
             f'<aside class="panel"><svg viewBox="0 0 {PANEL} {MAP}" preserveAspectRatio="xMidYMin meet">{v["panel"]}</svg></aside>'
-            f'{strip}</section>')
+            f'{strip}{extra}</section>')
     icon = {
         "in": '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M11 8v6M8 11h6"/></svg>',
         "out": '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35M8 11h6"/></svg>',
@@ -779,6 +818,14 @@ main{{display:grid;grid-template-columns:minmax(0,1fr) 200px;height:calc(100% - 
 .panel{{background:#fff;border-radius:6px;overflow:hidden;align-self:start}}
 .panel svg{{width:100%;display:block}}
 .strip{{grid-column:1/-1;width:100%;background:#f3f4f6;border-radius:6px;display:block}}
+.expect{{grid-column:1/-1;background:#fff;border-radius:6px;padding:14px 16px;overflow:auto}}
+.expect h2{{font-size:16px;margin:0 0 4px}}.expect p{{margin:0 0 10px;color:#59636e;font-size:13px}}
+.expect table{{border-collapse:collapse;width:100%;font-size:13.5px}}
+.expect th,.expect td{{border-bottom:1px solid #e3e6ea;padding:7px 8px;text-align:left;vertical-align:top}}
+.expect th{{color:#59636e;font-weight:700;white-space:nowrap}}
+.dots{{white-space:nowrap;letter-spacing:0}}.dots i{{display:inline-block;width:10px;height:10px;border-radius:50%;background:#d8dde2;margin-right:3px}}
+.dots i.on{{background:#e5484d}}
+.bad{{color:#cf222e;font-weight:700}}
 .off-imagery .L-imagery,.off-buildings .L-buildings,.off-labels .L-labels,.off-budget .L-budget,.off-compress .L-compress,
 .off-route .L-route,.off-alts .L-alts,.off-holds .L-holds,.off-blocks .L-blocks,.off-spawns .L-spawns,.off-items .L-items,
 .off-events .L-events,.off-sections .L-sections,.off-rooms .L-rooms{{display:none}}

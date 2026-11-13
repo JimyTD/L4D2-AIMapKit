@@ -27,19 +27,21 @@ table.list tr[data-go]:hover{background:#f6f8fa;cursor:pointer}
 .kpi{display:flex;gap:18px;flex-wrap:wrap}.kpi div{font-size:13px}.kpi b{font-size:18px;display:block}
 </style></head><body>
 <header><div><h1>__TITLE__</h1><div class="sub" id="sub"></div></div>
-<nav id="tabs"><button data-t="map" class="on">总图</button><button data-t="events">事件</button><button data-t="items">物资</button><button data-t="review">拍板与问题</button><button data-t="checks">核验</button><button data-t="std">待决定标准</button></nav></header>
+<nav id="tabs"><button data-t="map" class="on">总图</button><button data-t="pace">路线展开</button><button data-t="events">事件</button><button data-t="items">物资</button><button data-t="review">拍板与问题</button><button data-t="checks">核验</button><button data-t="std">待决定标准</button></nav></header>
 <main>
 <section class="tab on" id="t-map"><div class="grid">
  <div class="card">
   <div class="bar"><label class="t"><input type="checkbox" id="oSat" checked>卫星底图</label><label class="t"><input type="checkbox" id="oRoute" checked>路线</label>
    <label class="t"><input type="checkbox" id="oObj" checked>物件</label><label class="t"><input type="checkbox" id="oSpawn" checked>刷怪口</label>
-   <label class="t"><input type="checkbox" id="oEgg">彩蛋</label><label class="t"><input type="checkbox" id="oLabel" checked>标签</label></div>
+   <label class="t"><input type="checkbox" id="oEgg" checked>彩蛋</label><label class="t"><input type="checkbox" id="oLabel" checked>标签</label></div>
   <svg id="map"></svg><div class="legend" id="legend"></div>
  </div>
  <div class="card" id="detail"><div class="head"><h2 id="dTitle">点选总图上的楼或开放区</h2><span><span class="sub" id="dSub"></span> <button id="wide" title="放大详图（隐藏总图）" style="border:1px solid #d0d7de;background:#fff;border-radius:6px;padding:2px 8px;cursor:pointer">⤢</button></span></div>
   <div id="dEmpty"><div class="kpi" id="kpi"></div></div>
   <iframe id="frame" style="display:none"></iframe></div>
 </div></section>
+<section class="tab" id="t-pace"><div class="card"><h2>路线展开（按距离）</h2><div class="sub" style="margin-bottom:8px">把规划主线拉直：颜色是路段类型，圆点是尸潮事件，横括号是守点，字母是段落。看哪段事太多、哪段空跑。</div>
+ <div id="strip"></div><h2 style="margin-top:14px">沿路物资（按离起点的距离）</h2><div id="paceItems"></div></div></section>
 <section class="tab" id="t-events"><div class="card"><h2>事件表（events.json）</h2><div class="sub" style="margin-bottom:8px">每个事件由谁触发、做什么。点一行在总图上定位触发物件。强度档的数字见“待决定标准”。</div><div id="evList"></div></div></section>
 <section class="tab" id="t-items"><div class="card"><h2>物资刷新点</h2><div id="itList"></div></div></section>
 <section class="tab" id="t-review"><div class="card"><h2>和规划不一致（偏差）</h2><div id="devList"></div></div><div class="card" style="margin-top:14px"><h2>查不到、需要回答的问题</h2><div id="qList"></div></div></section>
@@ -90,9 +92,11 @@ function go(key,owner){hl=key;document.querySelector('#tabs button[data-t=map]')
 document.getElementById('legend').innerHTML=Object.entries(BG).map(([k,v])=>`<span><i style="background:${v}"></i>${k}</span>`).join('')+
  '<span><i style="background:#fff3bf;border-color:#e67700"></i>开放区</span><span><i style="background:#e03131;height:3px"></i>封路</span><span><i style="background:#d6336c;height:3px"></i>路线（虚线：楼内）</span><span><i style="background:#ae3ec9;height:3px"></i>分支</span><span><i style="background:#5f3dc4"></i>刷怪口</span><span><i style="background:#2f9e44;transform:rotate(45deg);width:8px;height:8px"></i>物件</span>';
 const S=D.summary;
+document.getElementById('strip').innerHTML=D.strip||'<span class="muted">没有规划数据</span>';
 document.getElementById('sub').textContent=D.subtitle;
 document.getElementById('kpi').innerHTML=[['结构体（可进入 / 外壳 / 远景）',S.grades],['开放区',S.sites],['路线长度（室外 + 室内）',S.route],['事件',S.events],['物资点（不含彩蛋）',S.items],['核验',S.checks],['待拍板偏差',S.devs_open],['面数预算（设计估算）',S.budget]].map(([k,v])=>`<div>${k}<b>${v}</b></div>`).join('');
 const t=(h,rows)=>'<table class="list"><tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.join('')+'</table>';
+document.getElementById('paceItems').innerHTML=D.pace.length?t(['距离','位置','刷什么','说明'],D.pace.map(i=>`<tr data-go="${i.key}|${i.owner}"><td>${i.d} m</td><td>${i.where}${i.egg?' <span class="pill" style="background:#ae3ec9">彩蛋</span>':''}</td><td>${i.items}</td><td>${i.what}</td></tr>`)):'<span class="muted">无</span>';
 document.getElementById('evList').innerHTML=t(['事件','类型','强度 / 数量 / 结束','触发它的','规划条目','说明'],D.events.map(e=>`<tr ${e.trig.length?`data-go="${e.trig[0].key}|${e.trig[0].owner}"`:''}><td><b>${e.id}</b><br>${e.name||''}${e.egg?' <span class="pill" style="background:#ae3ec9">彩蛋</span>':''}</td><td>${e.type}</td><td>${[e.strength,e.count?e.count+' 只':'',e.until,e.then?'→ '+e.then:''].filter(Boolean).join('<br>')}</td><td>${e.trig.map(x=>x.label).join('<br>')||'<span class="fail">没有触发物</span>'}</td><td>${(e.plan||[]).join('、')}</td><td>${e.what||''}</td></tr>`));
 document.getElementById('itList').innerHTML=t(['位置','刷什么','规划条目','说明'],D.items.map(i=>`<tr data-go="${i.key}|${i.owner}"><td>${i.where}${i.egg?' <span class="pill" style="background:#ae3ec9">彩蛋</span>':''}</td><td>${i.items}</td><td>${(i.plan||[]).join('、')}</td><td>${i.what}</td></tr>`));
 document.getElementById('devList').innerHTML=t(['编号','文件','问题','提议','结论'],D.devs.map(d=>`<tr data-go="|${d.owner}"><td><b>${d.id}</b></td><td>${d.owner}</td><td>${d.problem}</td><td>${d.proposal}</td><td>${d.decision?'<span class="ok">'+d.decision+'</span>':'<span class="fail">待拍板</span>'}</td></tr>`));
