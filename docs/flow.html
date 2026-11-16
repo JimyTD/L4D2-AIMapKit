@@ -32,6 +32,7 @@ main{padding:16px 20px}.tab{display:none}.tab.on{display:block}
 #detail{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto}
 #detail h3{margin:0 0 4px;font-size:17px}#detail .k{font-size:12px;color:var(--mut);font-weight:600;margin:12px 0 4px;text-transform:none}
 #detail ul{margin:0;padding-left:18px}#detail li{margin:2px 0}
+.ownbox{border-left:4px solid var(--own);background:#fff5f5;padding:6px 10px;margin:10px 0 4px;border-radius:4px}.ownbox .k{margin-top:0;color:var(--own)}
 code{font-family:Consolas,'Courier New',monospace;font-size:12.5px;background:#eff2f5;border-radius:4px;padding:0 4px}
 .st{font-size:11px;border-radius:8px;padding:0 6px;margin-left:4px;color:#fff;white-space:nowrap}
 .s-ok{background:#1a7f37}.s-gen{background:#bf8700}.s-new{background:#cf222e}
@@ -52,7 +53,9 @@ h2.sec{font-size:16px;margin:0 0 10px}
 <section class="tab on" id="t-flow">
 <div class="legend"><span><span class="chip c-gate">脚本</span>机器门槛：脚本退出码 0 才能往下</span><span><span class="chip c-own">拍板</span>用户门槛：交评审页，拍板后写进拍板记录</span><span><span class="chip c-agent">子 agent</span>可以并行派出</span><span><span class="chip c-loop">循环</span>逐个重复</span></div>
 <div class="flow"><div id="flowcol"></div>
-<div class="card" id="detail"><div class="sub">点左边任一步，查看：输入、要做的事、用哪些脚本、交什么、怎样算完成、能派什么子 agent、常见坑。</div></div></div>
+<div class="card" id="detail"><div class="sub">点左边任一步，查看：拍板（停不停、要你定什么）、输入、要做的事、用哪些脚本、交什么、怎样算完成、能派什么子 agent、常见坑。</div></div></div>
+
+<div class="card" style="margin-top:16px"><h2 class="sec">各步怎么拍板</h2><div class="sub" style="margin-bottom:8px">用户不是关卡设计师：只在“只有你能定”或“有依据可看、有建议可选”时停下。要你回答的问题一律放在消息最前面；规划里写定的、不在路线上的不问；画的过程中不停。停下来是讨论，可以来回几轮。</div><table id="owntbl"></table><div class="sub" style="margin-top:10px">拍板记在项目里：<code>design/approvals.json</code> 记哪个单元、哪天拍的（<code>kit approve</code> 写，之后文件改了 <code>kit status</code> 会提示“拍板后已修改”）；<code>design/REVIEW-LOG.md</code> 记你说了什么，每条标“AI 本可避免”或“只有用户知道”。agent 照着做的规则在各步骤页的“拍板”和 <code>references/review.md</code>，这张表是给人看的摘要。</div></div>
 </section>
 
 <section class="tab" id="t-skill"><div class="cols">
@@ -72,7 +75,7 @@ h2.sec{font-size:16px;margin:0 0 10px}
 
 <section class="tab" id="t-gates"><div class="cols">
 <div class="card"><h2 class="sec">每一步的两道门槛</h2><table id="gatetbl"></table>
-<h2 class="sec" style="margin-top:16px">各步怎么拍板</h2><div class="sub" style="margin-bottom:8px">用户不是关卡设计师：只在“只有他能定”或“有依据可看、有建议可选”时停下。</div><table id="owntbl"></table></div>
+</div>
 <div class="card"><h2 class="sec">硬规则（违反就停）</h2><ul id="hard"></ul></div>
 <div class="card"><h2 class="sec">设计原则（每条都来自一次返工）</h2><table id="princ"></table></div>
 </div></section>
@@ -86,7 +89,7 @@ h2.sec{font-size:16px;margin:0 0 10px}
 <script>
 const STEPS=[
  {lane:'plan',title:'规划阶段：做几关，每关走哪、玩什么、节奏怎样'},
- {id:'P0',t:'开项目',o:'建骨架、体检依赖、请示并安装、仓库设置',chips:['gate','own'],
+ {id:'P0',t:'开项目',o:'建骨架、体检依赖、请示并安装、仓库设置',own:{chip:'拍：依赖',when:'停一次，文字即可',what:'依赖安装清单批不批；主模型和轻量模型用什么；想同时推进几关'},chips:['gate','own'],
   in:['用户给的主题（真实地点或虚构概念）'],
   do:['<code>kit init</code> 复制项目模板：资料库、标准、设计、工具输出目录、要人做的步骤清单（HUMAN.md）、项目 AGENTS.md（讨论只读、不推送、不启动游戏）',
       '<b>体检</b>：<code>kit doctor</code> 逐项查两条线的依赖（设计线：Python 和虚拟环境、srctools 等库、L4D2 本体、git 和 Git LFS、网络；搭建线：Authoring Tools、Blender 和 Source Tools、中文字体），列出缺什么、版本、装在哪',
@@ -101,14 +104,14 @@ const STEPS=[
   out:['项目目录骨架','<code>PROJECT.md</code>（项目状态和交接）','<code>HUMAN.md</code>（要人做的步骤）','<code>kit.local.json</code>（本机路径，不提交）','<code>standards/decisions.json</code>（只有引擎事实）'],
   done:['用户批准了依赖清单（文字拍板，不需要网页）','<code>kit doctor</code> 全部通过','<code>kit.local.json</code> 写了两档模型和想同时推进几关','<code>kit status</code> 能识别项目，报告“下一步 P1”'],
   pit:['设计做到一半、或交给搭建时才发现缺工具，整条线停下','脚本里写死本机游戏目录，换机器就跑不了']},
- {id:'P1',t:'定目标与规模',o:'真实度档位、关数与时长、体验曲线、卖点与非目标',chips:['own'],
+ {id:'P1',t:'定目标与规模',o:'真实度档位、关数与时长、体验曲线、卖点与非目标',own:{chip:'拍：方向',when:'停一次；看概要页（体验曲线 + 每关一句话）',what:'起草的每关时长、体验曲线、每关一句话对不对'},chips:['own'],
   in:['主题'],
   do:['<b>先问</b>（问卷一次问完）：真实度档位、大概几关和每关大概多久、想要的大致感觉、卖点、非目标；答不上来就给选项','<b>再起草</b>（交用户拍板）：每关时长范围、每关一句话体验、体验曲线（各关紧张程度 1–5）','评审页：一页概要，含体验曲线图和每关一行','现场事实留给 P2；不在这一步切关'],
   tools:['kit check campaign（字段齐全、体验曲线；通过后生成概要页）'],
   out:['<code>design/plan/DESIGN.md</code> 前几章','<code>design/plan/campaign.json</code>（关数、时长范围、真实度档位、体验曲线，供后续脚本读）'],
   done:['<code>kit check campaign</code> 通过','用户看概要页 <code>overview-goals.html</code>（体验曲线图加每关一行）拍板'],
   pit:['目标没定就开始画图','把“包含某地标”当目标，而不是“在那里做什么”','让用户凭空定时长、写体验曲线']},
- {id:'P2',t:'采资料并建索引',o:'先采底（地理数据 + 每个地点的概况），按问题查，按用途索引',chips:['gate','agent'],
+ {id:'P2',t:'采资料并建索引',o:'先采底（地理数据 + 每个地点的概况），按问题查，按用途索引',own:{chip:'',when:'不停；只过脚本',what:'—'},chips:['gate','agent'],
   in:['概要里的地点清单'],
   do:['<b>先采底</b>：地理数据（OSM、卫星影像，一种来源一份缓存，写明缩放级别和范围）；每个候选地点一页结论：是什么、大致结构、有没有室内资料','<b>按问题查</b>：每次调研先写下要回答的问题，答上了就停；照片和结构细节到 D2 做到那个结构体时再按需查','<b>入库</b>：每条有编号、来源地址或口述原话、来源等级、对象、用途 <code>use</code>（地理数据 / 结构依据 / 外观参考 / 游戏资料 / 素材，可多选）；认不出对象的照片不入库；认错的不删，加勘误','口述当场入库','结论写进 <code>findings/&lt;对象&gt;.md</code>，每条引用资料编号；设计数据的 <code>src</code> 也引用编号，从任何元素都能反查依据','下载缓存统一位置，<code>kit geo fetch</code> 先查缓存'],
   tools:['kit geo fetch ','kit sources add / check','kit sources find &lt;对象&gt; --use &lt;用途&gt;'],
@@ -116,7 +119,7 @@ const STEPS=[
   done:['<code>sources check</code>：编号唯一、文件存在、等级和用途合法、每条有来源','软提示：“无关”“存疑”超过一半时警告（调研方式不对）'],
   agents:'<b>轻量档</b>，按问题派：每个子 agent 拿一组问题，只往 <code>sources/_inbox/&lt;agent&gt;.json</code> 交候选条目；主 agent 合并、编号，并抽查分级',
   pit:['按地点批量搜图：大部分无关或存疑','另一条线不知道已有什么，重复下载、重复找图','网络照片标题常错；中文网页搜索常失效，图片搜索更可靠；官方资源防盗链就截图入库']},
- {id:'P3',t:'切关与关卡设计',o:'开头定坐标和地基（只过脚本）；每关一个源文件；玩法核实原版依据；标压缩候选；逐关拍板',chips:['gate','own','agent','loop'],
+ {id:'P3',t:'切关与关卡设计',o:'开头定坐标和地基（只过脚本）；每关一个源文件；玩法核实原版依据；标压缩候选；逐关拍板',own:{chip:'拍：切关、每关玩法',when:'切关停一次（总览页）；之后一关停一次（这一关的规划视图）',what:'切关：分几关、每关在哪、安全屋。每关：玩法、时间和天气、地标'},chips:['gate','own','agent','loop'],
   in:['资料索引和结论','地基数值','campaign.json'],
   do:['<b>先定坐标和地基</b>（项目一次，只过脚本）：原点、防镜像检查、地基数值由 agent 填默认值标暂定，不问用户','<b>切关</b>（全战役拍一次，用总览页）：按“有没有玩法撑得住”选区域，不按名气；相邻两关共用安全屋（坐标一致）；关与关有对比（室内/室外、高压/低压、昼/夜）；每关时间和天气按需要定，写成字段','<b>地标</b>：每关拍板时顺便问这一关哪几处一定要像真的（附建议名单），写进源文件 <code>landmarks</code>，D1 据此标地标',
       '<b>每关一个源文件</b> <code>design/plan/levels/L&lt;n&gt;.json</code>：路线途经点和每段模式（室外、室内、楼上、载具）、段落、玩法、事件、资源、路障、刷怪口、守点、安全屋。<code>kit plan build</code> 寻路后合成 <code>levels.json</code>',
@@ -129,7 +132,7 @@ const STEPS=[
   done:['<code>kit plan verify</code>：室内不出楼、室外不穿楼不下水、事件资源在路线上、刷怪口不在楼内、安全屋衔接、范围预算、时长在区间、实体名存在','切关拍一次（总览页）；之后一关一拍板（规划视图），消息分“要你定的”（玩法、时间天气、地标）和“只是告诉你的”（刷怪、物资、强度、时长、压缩候选）'],
   agents:'<b>轻量档</b>，按玩法派：去原版地图里找先例，返回实体名、接线方式、出处；实体名过脚本',
   pit:['一次出五关：大面积返工','关卡内容写死在脚本里：换项目要重写','文档和数据各写一份：对不上','用广播、影像填空；设计“掩体战斗”；写了游戏里没有的物品；把有名但没玩法的地方放进主线']},
- {id:'P4',t:'规划视图与规划定稿',o:'规划视图从数据生成；全部关定稿后，对照 P1 的预期看每关实际',chips:['gate','own'],
+ {id:'P4',t:'规划视图与规划定稿',o:'规划视图从数据生成；全部关定稿后，对照 P1 的预期看每关实际',own:{chip:'拍：哪关不符',when:'停一次；看总览页的“预期和实际”对照表',what:'哪几关和 P1 的预期不符（AI 先逐关判断，附原因和改法）'},chips:['gate','own'],
   in:['各关已拍板的源文件'],
   do:['规划视图从 <code>levels.json</code> 生成：北向朝上、卫星底图、路线按模式区分、事件资源图标、拥挤处局部放大；一个交互页加每关海报','总览页带“预期和实际”对照表：每关 P1 的紧张程度和一句话体验，对照实际的尸潮（按强度档）、守点、粗估时长','agent 先逐关判断哪几关和预期不符，附原因和改法；用户只回答“哪几关不符”。衔接和总时长由脚本核对，不问','有关要改，回 P3 改那一关、重拍那一关；结论写进拍板记录'],
   tools:['kit plan render ','kit plan verify'],
@@ -137,7 +140,7 @@ const STEPS=[
   done:['校验全部通过；视图比数据新','用户看对照表确认（或指出哪几关不符）'],
   pit:['图是手画或手改的：数据一改就过期']},
  {lane:'det',title:'详设阶段：每关的空间具体长什么样（D0 一次；之后每关一条主线，可并行）'},
- {id:'D0',t:'详设准备（项目级，一次）',o:'项目级尺度目标、地面类型、跨关共享的结构体、并行主线分工；只过脚本，不拍板',chips:['gate'],
+ {id:'D0',t:'详设准备（项目级，一次）',o:'项目级尺度目标、地面类型、跨关共享的结构体、并行主线分工；只过脚本，不拍板',own:{chip:'',when:'不停：尺度、地面类型这些值要等看到白模、试玩之后才判断得了',what:'—'},chips:['gate'],
   in:['定稿的全部关卡规划'],
   do:['<b>尺度目标</b>：<code>kit game measure</code> 量原版地图的同类空间（走廊、层高、房间开间、楼梯），定成目标写进待决定列表，标暂定；最低值只给有意做窄的地方。所有关共用','<b>地面类型清单</b>：这张地图用哪些地面（如车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石），每种写能不能走、默认标高，写进待决定列表','<b>跨关共享的结构体</b>：<code>kit status</code> 按规划数据自动列出（衔接安全屋和多关都进的结构体），先用到的那关写外壳和它用到的部分；后一关不改它的文件，要走得更深就在自己关里写扩展文件；照抄进 <code>PROJECT.md</code>','<b>并行主线</b>：并行数在 P0 已问；每关新开一个会话跑主模型，在 <code>PROJECT.md</code> 登记哪关归哪个会话','<b>为什么不拍板</b>：这些值用户在看到白模、试玩之前无从判断；试玩后有问题由用户提出再改'],
   tools:['kit game measure ','kit status'],
@@ -145,7 +148,7 @@ const STEPS=[
   done:['待决定列表里 D0 的项都有值；<code>PROJECT.md</code> 写了共享结构体和主线分工；<code>kit status</code> 自动显示完成'],
   pit:['只按“能走过去”的最低值定尺度：做出来局促，整栋重画','各关并行各定一套尺度','两关各画一遍同一个结构体']},
  {loop:'每关一条主线（可并行），重复 D1–D7'},
- {id:'D1',t:'关卡准备',o:'结构体分级（含地标）、开放区分段、面数初估、压缩和朝向；建事件表和总图。默认不停，只有压缩候选时拍板',chips:['gate','own'],
+ {id:'D1',t:'关卡准备',o:'结构体分级（含地标）、开放区分段、面数初估、压缩和朝向；建事件表和总图。默认不停，只有压缩候选时拍板',own:{chip:'有压缩候选才拍',when:'默认不停；只有规划标了压缩候选时停一次，看压缩前后对照图',what:'压不压、压多少'},chips:['gate','own'],
   in:['本关定稿的规划','项目级尺度目标'],
   do:['范围内每个结构体分级：可进入、外立面、远景、省略；离路线近的至少外立面；P3 定的地标标 <code>landmark</code>（告诉生成线哪个要专用外观）','共享结构体：看 <code>kit status</code> 列出的写入关；本关是写入关就设计，不是就只引用并声明用哪些区','把开放区按规划段落切成首尾相接的段，每段两头接出入口或出口',
       '<b>压缩</b>：没有候选就不压，写一句理由，不停；有候选就出压缩前后对照图（图下列每段压缩前后的长度和纯跑秒数），附视线检查和建议，交用户拍板',
@@ -156,7 +159,7 @@ const STEPS=[
   out:['关卡 README：分级表、地标、开放区分段、结构体清单（含共享结构体的写入关）、压缩和朝向的决定','<code>events.json</code>（初版：只有规划事件）','<code>layout.json</code>（初版）'],
   done:['脚本：分级覆盖范围内所有结构体；分段首尾相接；面数初估在预算内；<code>layout.json</code> 写了压缩决定','有压缩候选时：用户看对照图拍板压缩；没有候选时 <code>kit status</code> 自动显示完成'],
   pit:['分段边做边切：跨段接不上，合成时才发现','默认就压缩：真实距离放得下、节奏合适就不压','把分级、分段这类按规则推出的东西交用户拍：他看不到空间，判断不了']},
- {id:'D2',t:'内部结构设计',o:'每个可进入的结构体：先外壳，再竖向通道，再只建需要的内部',chips:['gate','own','agent','loop'],
+ {id:'D2',t:'内部结构设计',o:'每个可进入的结构体：先外壳，再竖向通道，再只建需要的内部',own:{chip:'拍：结构事实',when:'画之前停一次，文字消息，不用看文件；画完不单独停，和 D3 一起交整关页',what:'结构事实：只问在规划路线上、资料缺失或矛盾的事，每条“我判断是……对吗？”'},chips:['gate','own','agent','loop'],
   in:['分级表','资料索引和结论','尺度目标'],
   do:['<b>先查这一关所有可进入结构体的结构事实</b>：竖向通道几处、在哪一类位置，公共区在哪，出入口朝哪，有没有挑空，哪些层要进。轻量子 agent 按结构体并行查。位置、尺寸、编号这类不影响感觉和流程的细节按游戏性定，标“改动”','<b>结构事实确认</b>（文字，可以讨论几轮）：底稿写进 <code>FACTS.md</code>（给 agent 用，用户不看）；给用户的消息单独可读，只列要确认的事，每条写成“我判断是……对吗？”，按对路线影响排序。用户答完按口述入库、底稿开头写“确认：日期”，再画',
       '<b>外壳</b>：外面看得到的部分和出入口（台阶接上门外地面）',
@@ -170,7 +173,7 @@ const STEPS=[
   done:['<code>structure check</code> 全部通过','停两次，中途不停：动手前讨论结构事实清单；这一关所有结构体和开放区画完后，用整关页一起交（<code>kit approve L&lt;nn&gt;/detail</code>）','拿不准的先做、标假设、写进 questions，到整关详设时一起问；项目第一次出现的结构类型可以例外先看一眼'],
   agents:'<b>轻量档</b>：动手前按结构体并行调研结构事实（只交事实清单和资料编号，不做布局判断）；只有外壳的结构体按脚手架批量起稿，必须过 structure check',
   pit:['以证据为准，不按惯例脑补：照片、口述看得出的按看到的写，没证据的标“假设”','改设计前先查规划原文：规划里的决定是用户拍板的','一栋楼做完就停下等用户：频繁打断，时间耗在来回上','跳过结构事实清单直接画：结构理解错了，所有楼都要返工']},
- {id:'D3',t:'开放区设计',o:'每段开放区：范围、地面、构件、封路、边界、刷怪口、衔接',chips:['gate','own','loop'],
+ {id:'D3',t:'开放区设计',o:'每段开放区：范围、地面、构件、封路、边界、刷怪口、衔接',own:{chip:'拍：整关详设',when:'画的时候不停；所有结构体和开放区画完、核验全过后，用整关页停一次',what:'路线和分支、房间、封堵、封路和边界、玩法物件；画的过程中攒下的问题'},chips:['gate','own','loop'],
   in:['分段','结构体文件的出入口','项目的地面类型清单'],
   do:['<b>先用脚本起稿</b>：从地理数据生成地面分区、封路（路和边界相交处）、沿结构体外墙的边界段；agent 只改脚本猜错的地方',
       '范围多边形；地面分区铺满，每块有类型和标高（类型从项目的地面类型清单里选）',
@@ -180,7 +183,7 @@ const STEPS=[
   out:['<code>areas/&lt;段&gt;.json</code> 及生成物'],
   done:['<code>area check</code> 全部通过：连通、走不到、边界闭合、地面覆盖、封路不压路线、刷怪口位置、衔接点和结构体的门一致','不逐段停：和 D2 一起，用整关页交一次；要用户定的是路线和分支、封路和边界、玩法物件'],
   pit:['只写边界和封路，没写地面和构件：下游建出来是一块平地','相邻两段之间漏了一截地面（D1 分段和 D5 连通核验兜住）','刷怪口在玩家看得见的地方或离路线太近']},
- {id:'D4',t:'彩蛋',o:'问用户要不要做；内容不受复刻约束，格式照常严格',chips:['gate','own','loop'],
+ {id:'D4',t:'彩蛋',o:'问用户要不要做；内容不受复刻约束，格式照常严格',own:{chip:'拍：彩蛋',when:'整关详设之后问一次；之后一个彩蛋停一次（详图里高亮）',what:'做不做、做哪个方案'},chips:['gate','own','loop'],
   in:['已拍板的结构体和开放区'],
   do:['时机：本关结构体和开放区都拍完后问一次，不要每个结构体都问','先问用户三选一：给点子，一起讨论完善；只给数量和大致位置，agent 构思两三个方案给用户挑；不做，跳过',
       '<b>内容放开</b>：不受复刻约束，不需要真实来源（来源写“彩蛋”），可以不符合现实',
@@ -191,7 +194,7 @@ const STEPS=[
   out:['带 <code>easter_egg</code> 标记的空间、物件、事件'],
   done:['<code>structure check</code>、<code>area check</code> 全部通过','一个彩蛋一拍板：附所在结构体或开放区的详图，彩蛋高亮显示'],
   pit:[]},
- {id:'D5',t:'整关收口与合成',o:'补强度档、定原点；全部跨文件检查；输出 spec.json',chips:['gate'],
+ {id:'D5',t:'整关收口与合成',o:'补强度档、定原点；全部跨文件检查；输出 spec.json',own:{chip:'',when:'不停；只过脚本',what:'—'},chips:['gate'],
   in:['本关全部结构体、开放区和彩蛋','事件表','总图（D1 建立、随写随登记）'],
   do:['事件表收口：列全规划事件，结构写精确，手感补齐强度档（档的数值在待决定列表）；物资是游戏原名和数量；普通特感交给导演',
       '定 Hammer 原点（整关在范围内，边距用待决定列表的 map_margin_u）；压缩和朝向已在 D1 拍板，这里照做',
@@ -200,21 +203,21 @@ const STEPS=[
   out:['<code>events.json</code>（定稿）','<code>layout.json</code>','<code>spec.json</code>','<code>spec.check.json</code>'],
   done:['<code>kit spec</code> 全部通过','不单独拍板：只有脚本门槛'],
   pit:['触发、物资只写一句中文：生成器只能猜','写了游戏里不存在的东西；把普通特感一只只写死','门外地面改了，台阶没跟着改','只核验单块开放区：两段之间接不上没人发现']},
- {id:'D6',t:'整关评审与盲审',o:'整关评审页；不了解背景的 agent 复述；整关拍板',chips:['own','agent'],
+ {id:'D6',t:'整关评审与盲审',o:'整关评审页；不了解背景的 agent 复述；整关拍板',own:{chip:'拍：整关',when:'停一次；看整关评审页（含路线展开）和盲审结论',what:'盲审里的设计问题、整关节奏'},chips:['own','agent'],
   in:['spec.json'],
   do:['生成整关评审页（单文件，给人看），带“路线展开”页：路线按距离拉直，标出事件、守点、段落，下方按距离列物资；彩蛋默认显示','盲审：派一个只拿到评审页的子 agent 复述路线和每段玩法，原话存进 <code>BLIND-REVIEW.md</code>','盲审意见分四类：要用户定的设计问题（附建议）；数据错误（核实后直接改）；细想没问题的（排除并写理由）；评审页表达问题（记为 Kit 问题，不问用户）','交用户整关拍板：要你定的是设计问题和整关节奏（看路线展开）；只是告诉你的是已改的错误和排除的条目','拍板记录：每条意见标“AI 本可避免”或“只有用户知道”'],
   tools:['kit page '],
   out:['<code>level.html</code>','<code>REVIEW-LOG.md</code>'],
   done:['盲审意见都已归类处理','用户整关拍板；改数据时变成“拍板后已修改”的单元一并登记（<code>kit approve</code> 可一次写多个）'],
   agents:'<b>主模型档</b>：盲审子 agent 不给任何上下文，只给评审页和三个问题（路线怎么走、每段玩什么、哪里看不懂）',pit:[]},
- {id:'D7',t:'交给生成',o:'生成线只读 spec.json；要设计补的缺口回到 D2/D3',chips:['gate'],
+ {id:'D7',t:'交给生成',o:'生成线只读 spec.json；要设计补的缺口回到 D2/D3',own:{chip:'',when:'不停；生成线交回的缺口里要设计补的，回到 D2/D3',what:'—'},chips:['gate'],
   in:['拍板的 spec.json'],
   do:['交接说明三样必写：读哪个文件（<code>spec.json</code>、待决定列表）、可用资源清单（<code>kit sources find</code> 按结构体和用途的输出）、哪些已经做过不要重做；写进 <code>PROJECT.md</code> 的交接段','生成线交回缺口清单，按一条规则分：改了它玩家能不能走、能不能翻、看不看得到、会不会触发东西？会，就要设计补；不会，生成线自己定','要设计补的：回到对应的 D2、D3 改设计文件，重新核验、拍板，再合成'],
   tools:[],out:['生成线的缺口清单'],done:['缺口清单为空或已分类'],pit:[]},
  {endloop:true},
 ];
 const CH={gate:['c-gate','脚本'],own:['c-own','拍板'],agent:['c-agent','子 agent'],loop:['c-loop','循环']};
-function nodeHtml(s){return '<div class="node" data-id="'+s.id+'"><div class="id">'+s.id+'</div><div><div class="t">'+s.t+'</div><div class="o">'+s.o+'</div></div><div class="chips">'+(s.chips||[]).map(c=>'<span class="chip '+CH[c][0]+'">'+CH[c][1]+'</span>').join('')+'</div></div>';}
+function nodeHtml(s){return '<div class="node" data-id="'+s.id+'"><div class="id">'+s.id+'</div><div><div class="t">'+s.t+'</div><div class="o">'+s.o+'</div></div><div class="chips">'+(s.chips||[]).map(c=>'<span class="chip '+CH[c][0]+'">'+(c==='own'&&s.own&&s.own.chip?s.own.chip:CH[c][1])+'</span>').join('')+'</div></div>';}
 (function(){let h='',inLane=false,inLoop=false;const steps=STEPS;
  for(let i=0;i<steps.length;i++){const s=steps[i];
   if(s.lane){if(inLoop){h+='</div>';inLoop=false;}if(inLane)h+='</div>';h+='<div class="lane '+(s.lane==='plan'?'':s.lane)+'"><h2>'+s.title+'</h2>';inLane=true;continue;}
@@ -229,7 +232,7 @@ function nodeHtml(s){return '<div class="node" data-id="'+s.id+'"><div class="id
 function li(a){return a&&a.length?'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<div class="sub">—</div>';}
 function show(id){const s=STEPS.find(x=>x.id===id);document.querySelectorAll('.node').forEach(n=>n.classList.toggle('sel',n.dataset.id===id));
  document.getElementById('detail').innerHTML='<h3>'+s.id+' '+s.t+'</h3><div class="sub">'+s.o+'</div>'+
- '<div class="k">输入</div>'+li(s.in)+'<div class="k">要做的事</div>'+li(s.do)+'<div class="k">脚本和工具</div>'+li(s.tools)+
+ (s.own?'<div class="ownbox"><div class="k">拍板</div><div><b>停不停：</b>'+s.own.when+'</div><div><b>要你定的：</b>'+s.own.what+'</div></div>':'')+'<div class="k">输入</div>'+li(s.in)+'<div class="k">要做的事</div>'+li(s.do)+'<div class="k">脚本和工具</div>'+li(s.tools)+
  '<div class="k">交付物</div>'+li(s.out)+'<div class="k">怎样算完成</div>'+li(s.done)+
  (s.agents?'<div class="k">可以派的子 agent</div><div>'+s.agents+'</div>':'')+(s.pit&&s.pit.length?'<div class="k">常见坑（都发生过）</div>'+li(s.pit):'');}
 show('P0');
@@ -329,19 +332,7 @@ tbl('gatetbl',['门槛','谁判','标准'],[
  ['机器门槛','脚本','退出码 0；失败项清零或写明为什么接受'],
  ['用户门槛','用户','看评审页拍板；结论写进拍板记录，标“AI 本可避免”或“只有用户知道”'],
  ['交评审时附','主 agent','评审页；要你定的（每条附建议，有选项列选项）；只是告诉你的；没过的核验']]);
-tbl('owntbl',['步','拍不拍','看什么','要用户定的'],[
- ['P0','拍','文字','依赖安装清单；用几档模型、想同时推进几关'],
- ['P1','拍','概要页（体验曲线 + 每关一行）','agent 起草的时长、体验曲线、每关一句话'],
- ['P3 切关','拍一次','规划总览页','分几关、每关在哪、安全屋'],
- ['P3 每关','一关一次','这一关的规划视图','玩法、时间天气、地标'],
- ['P4','拍','总览页的“预期和实际”对照','哪几关和预期不符'],
- ['D0','不拍','—','—（只过脚本，试玩后再提）'],
- ['D1','只在有压缩候选时','压缩前后对照图','压不压、压多少'],
- ['D2 动手前','一关一次','文字消息（不用看文件）','逐条回答“我判断是……对吗？”'],
- ['D2 + D3 画完','一关一次','整关页（所有楼和开放区）','路线、房间、封堵、封路和边界、玩法物件；中途攒下的问题'],
- ['D4','一个彩蛋一次','详图（彩蛋高亮）','做不做、做哪个方案'],
- ['D5','不拍','—','—（只过脚本）'],
- ['D6','拍','整关评审页（含路线展开）','盲审里的设计问题、整关节奏']]);
+tbl('owntbl',['步','停不停、看什么','要你定的'],STEPS.filter(x=>x.id&&x.own).map(x=>['<b>'+x.id+'</b> '+x.t,x.own.when,x.own.what]));
 document.getElementById('hard').innerHTML=['<b>改动和重做</b>：任何修改只改它所属的那个文件；<code>kit status</code> 按依赖列出过期的产物和“上次拍板后已修改”的单元；过期的先机器重跑，重跑后核验不过的回到那一步改，内容变了的单元再交用户拍板。不要求“后面全部重做”','讨论阶段只读；方案同意后再动手；范围变了重新确认','只在步骤页写明的停顿点停下，中途不停：拿不准的先做、标假设，到停顿点一起问；停下来是讨论，可以几轮；没有明确指示不跨关推进','事实先自己查；查不到才问，问时附依据和判断','流程内不启动游戏；可以用编辑器和编译工具','不推送远端','依赖清单之外的软件要先问；清单本身就是批准范围','未经用户明确命令不改 Kit'].map(x=>'<li>'+x+'</li>').join('');
 tbl('princ',['原则','为什么'],[
  ['设计和生成是先后两段：一关的生成读那关拍板后的 spec.json；关与关之间可以并行','生成在详设完成前无法开工'],
