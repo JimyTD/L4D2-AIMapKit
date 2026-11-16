@@ -122,6 +122,7 @@ def run() -> int:
             bad += 0 if ok else 1
         if not game_dir():
             print("NOTE 本机没找到游戏：实体类名的核验跳过，对应用例不算")
+        bad += facts_checks(proj)
         bad += status_checks(proj)
         bad += extension_checks(proj)
     finally:
@@ -146,6 +147,33 @@ def run() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
     print("selftest: " + ("全部通过" if not bad else f"{bad} 项没通过"))
     return 1 if bad else 0
+
+
+def facts_checks(proj) -> int:
+    """D2 structural facts: kit status asks for them before drawing, waits for the answer, then lets drawing start."""
+    bad = 0
+    tmp = proj.parent / "facts"
+    shutil.copytree(proj, tmp)
+    try:
+        for d in ("structures", "areas"):
+            shutil.rmtree(tmp / L / d, ignore_errors=True)
+            (tmp / L / d).mkdir()
+        steps = []
+        kit(tmp, "approve", "P1", "P3", "P3/L1", "P4", "--note", "selftest")
+        _, out = kit(tmp, "status")
+        steps.append(("没交时提示先交结构事实", "D2 结构事实            还没交" in out and "FACTS.md" in out.split("下一步")[-1]))
+        (tmp / L / "FACTS.md").write_text("# 底稿\n", encoding="utf-8")
+        _, out = kit(tmp, "status")
+        steps.append(("交了没确认时提示等用户回答", "已交，等用户回答" in out and "等用户回答" in out.split("下一步")[-1]))
+        (tmp / L / "FACTS.md").write_text("确认：2000-01-01\n# 底稿\n", encoding="utf-8")
+        _, out = kit(tmp, "status")
+        steps.append(("确认后提示开始画", "已确认" in out and "继续画" in out.split("下一步")[-1]))
+        for what, passed in steps:
+            print(("OK   " if passed else "FAIL ") + "结构事实：" + what + ("" if passed else "\n" + out[-800:]))
+            bad += 0 if passed else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return bad
 
 
 def extension_checks(proj) -> int:

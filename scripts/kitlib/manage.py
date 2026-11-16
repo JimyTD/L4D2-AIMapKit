@@ -459,8 +459,17 @@ def status() -> int:
             lv_fix += stale + failed
             lv_todo += todo + changed
         # whole-level detail review: keep drawing without stopping; hand in once everything is drawn and passes
-        if nxt is None and not any(k.startswith((f"{L}/structures/", f"{L}/areas/")) for k in u):
-            nxt = (f"{L} D2", "先把这一关所有可进入结构体的结构事实合成一份清单交用户（文字），讨论完再画", "D2-structures")
+        facts = ld / "FACTS.md"
+        confirmed = facts.exists() and "确认：" in facts.read_text(encoding="utf-8")[:300]
+        drawn = any(k.startswith((f"{L}/structures/", f"{L}/areas/")) for k in u)
+        if facts.exists() or (want_files["structures"] and not drawn):
+            row = (f"{L} D2 结构事实", "已确认" if confirmed else ("已交，等用户回答" if facts.exists() else "还没交"))
+            at = next(i for i, x in enumerate(rows) if x[0].startswith(f"{L} D2 结构体"))
+            rows.insert(at, row)
+        if nxt is None and want_files["structures"] and not facts.exists() and not drawn:
+            nxt = (f"{L} D2", "写结构事实底稿 FACTS.md，再把要确认的事写成一条条“我判断是……对吗？”直接发给用户（消息里写全，不让用户看文件）", "D2-structures")
+        elif nxt is None and want_files["structures"] and not confirmed and not drawn:
+            nxt = (f"{L} D2", "结构事实已交，等用户回答；答完把回答按口述入库、改底稿、在 FACTS.md 开头写“确认：<日期>”，再开始画", "D2-structures")
         elif nxt is None and (lv_missing or lv_fix):
             nxt = (f"{L} D2/D3", "继续画、修核验，中途不停："
                    + "；".join(x for x in (f"还没写 {', '.join(lv_missing)}" if lv_missing else "",

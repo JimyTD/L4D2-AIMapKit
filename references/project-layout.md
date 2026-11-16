@@ -18,7 +18,7 @@
     approvals.json      拍板记录（kit approve 写）
     REVIEW-LOG.md       用户意见
     plan/               campaign.json、DESIGN.md、rooms.json、levels/L<n>.json、data/、views/、reports/
-    detail/L<nn>/       README.md、grades.json、layout.json、events.json、structures/、areas/、spec.json、level.html
+    detail/L<nn>/       README.md、grades.json、layout.json、events.json、FACTS.md（D2 结构事实底稿，给 agent 用）、structures/、areas/、spec.json、level.html
 ```
 
 ## 资料索引 `sources/index.json`
