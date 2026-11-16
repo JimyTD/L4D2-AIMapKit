@@ -12,7 +12,7 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 ## 开工顺序（每个新会话都照做）
 
 1. 没有项目：读 [P0](references/steps/P0-init.md)，从开项目做起。
-2. 有项目：读项目的 `PROJECT.md`（阶段、各条主线归谁、最近一次交接），再跑 `kit status`。两者对不上时以 `kit status` 为准，并修正 PROJECT.md。
+2. 有项目：读项目的 `PROJECT.md`（阶段、各条主线归谁、最近一次交接），再跑 `kit status`。两者对不上时以 `kit status` 为准，并修正 PROJECT.md。`kit status` 开头说 Kit 更新过、列出改了的页面时，先重读那些页面（已经读过的规则可能变了），再跑 `kit status --ack`。每次开始一轮新工作前都跑一次 `kit status`，不只是开会话时。
 3. 只读 `kit status` 指向的那一步的页面 `references/steps/<步>.md`，不预读其他步骤。
 4. 需要资料时先跑 `kit sources find`。已有资料不足以判断时，再去查或下载；新拿到的资料按 [P2](references/steps/P2-sources.md) 的规则入库。
 5. 做完跑这一步的脚本，必须通过。到了停顿点再交用户评审（[review.md](references/review.md)）。用户说可以后跑 `kit approve`，再提交、更新 PROJECT.md。

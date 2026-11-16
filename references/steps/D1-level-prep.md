@@ -4,7 +4,7 @@
 
 ## 做
 
-1. **分级**：把范围内的每个结构体写进 `design/detail/L<n>/grades.json`（[format/level.md](../format/level.md)），分为可进入、外立面、远景、省略。路线进入的是可进入，离路线近的至少是外立面。P3 定的地标（源文件 `landmarks`）标 `landmark: true`，告诉生成线哪个结构体要专门做外观。共享结构体看 `kit status` 列出的写入关：本关是写入关就由本关设计；不是，只引用，并写明用到它的哪几个区。
+1. **分级**：把范围内的每个结构体写进 `design/detail/L<n>/grades.json`（[format/level.md](../format/level.md)），分为可进入、外立面、远景、省略。路线进入的是可进入，离路线近的至少是外立面。P3 定的地标（源文件 `landmarks`）标 `landmark: true`，告诉生成线哪个结构体要专门做外观。共享结构体看 `kit status` 列出的写入关：本关是写入关就由本关设计；不是，只走写入关已建的部分时只引用，要走得更深就在 D2 写扩展文件（kit status 会列为“扩展”）。
 2. **开放区分段**：把开放区切成首尾相接的几段，每段两头接出入口或出口。按规划的段落切，不交用户。
 3. **压缩**：在这一步决定，规划阶段只标了候选（路段的 `compress: true` 和 `compress_why`）。
    - **没有候选、整关也在预算内**：不压缩，在 `layout.json` 的 `compression` 写一句理由，不单独问用户。

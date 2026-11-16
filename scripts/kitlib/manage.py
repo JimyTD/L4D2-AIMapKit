@@ -219,7 +219,91 @@ def shared_structures() -> list:
             for o, ls in sorted(used.items(), key=lambda x: (min(x[1]), x[0])) if len(ls) > 1]
 
 
+def writer_file(s: dict):
+    """The writer level's structure file for a shared outline (root-relative), or None if not written yet."""
+    d = root() / "design" / "detail" / f"L{s['writer']:02d}" / "structures"
+    for f in sorted(d.glob("*.json")) if d.exists() else []:
+        if f.name.endswith((".build.json", ".check.json")) or "." in f.stem:
+            continue
+        x = rd(f)
+        if x.get("outline") == s["outline"] and "extends" not in x:
+            return f.relative_to(root()).as_posix()
+    return None
+
+
+def writer_floors(rel_path: str) -> set:
+    """Floors the writer's file has an interior for (parts included)."""
+    f = root() / rel_path
+    x = rd(f)
+    fl = {k["level"] for k in x.get("floors", [])}
+    for p in x.get("parts", []):
+        fl |= {k["level"] for k in rd(f.parent / p).get("floors", [])}
+    return fl
+
+
+def indoor_through(level: int, outline: str) -> bool:
+    """True when this level's planned route has an indoor leg inside the outline (it goes further in than a door)."""
+    f = root() / "design" / "plan" / "levels" / f"L{level}.json"
+    if not f.exists():
+        return False
+    src = rd(f)
+    legs = list(src.get("legs", [])) + [l for a in src.get("alts", []) for l in a.get("legs", [])]
+    return any(l.get("mode") in ("indoor", "upper", "underground") and outline in (l.get("refs") or []) for l in legs)
+
+
 # ---------------------------------------------------------------- status
+
+# pages an agent reads to work; a change in any of them means a running session should reread it
+KIT_PAGES = ["SKILL.md", "references"]
+
+
+def _kit_git(*args):
+    try:
+        out = subprocess.run(["git", "-C", str(KIT), *args], capture_output=True, text=True, encoding="utf-8", timeout=10)
+        return out.stdout.strip() if out.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def kit_notice() -> None:
+    """Print the Kit version; when the Kit changed since this project last confirmed it, list the pages to reread.
+    The confirmed version lives in kit.local.json (kit_seen), written by kit status --ack."""
+    head = _kit_git("rev-parse", "--short", "HEAD")
+    if not head:
+        return
+    lp = root() / "kit.local.json"
+    loc = rd(lp) if lp.exists() else {}
+    seen = loc.get("kit_seen")
+    print(f"Kit 版本 {head}" + (f"（本项目上次确认 {seen}）" if seen and seen != head else ""))
+    if not seen:
+        print("本项目还没确认过 Kit 版本：按 SKILL.md 开工后跑 kit status --ack\n")
+        return
+    if seen == head:
+        print()
+        return
+    changed = _kit_git("diff", "--name-only", seen, head, "--", *KIT_PAGES)
+    if changed is None:
+        print(f"读不到 {seen} 以来的改动：重读 SKILL.md 和当前步骤页，再跑 kit status --ack\n")
+        return
+    pages = [x for x in changed.splitlines() if x]
+    if pages:
+        print("Kit 更新过，这些页面改了，重读后跑 kit status --ack：")
+        for x in pages:
+            print(f"  {x}")
+    print()
+
+
+def ack() -> int:
+    head = _kit_git("rev-parse", "--short", "HEAD")
+    if not head:
+        raise KitError("Kit 目录不是 git 仓库，没有版本可记")
+    lp = root() / "kit.local.json"
+    loc = rd(lp) if lp.exists() else {}
+    loc["kit_seen"] = head
+    wr(lp, loc)
+    print(f"已记下：本项目按 Kit {head} 工作")
+    return 0
+
 
 def _check_ok(p):
     p = Path(p)
@@ -240,6 +324,7 @@ def _newer(out, inputs):
 def status() -> int:
     r = root()
     rows, nxt = [], None
+    kit_notice()
 
     def add(step, state, hint=None, read=None):
         nonlocal nxt
@@ -295,7 +380,8 @@ def status() -> int:
         None if not d0 else "量原版定尺度目标、地面类型；登记共享结构体和主线分工（只过脚本，不拍板）", "D0-detail-prep")
     shared = shared_structures()
     for s in shared:
-        rows.append((f"    共享 {s['name']}", f"第 {'、'.join(map(str, s['levels']))} 关用到；第 {s['writer']} 关写，其他关只引用"))
+        rows.append((f"    共享 {s['name']}", f"第 {'、'.join(map(str, s['levels']))} 关用到；第 {s['writer']} 关写外壳和它用到的部分；"
+                     "其他关不改它，要走得更深就在自己关里写扩展文件"))
     for ld in sorted((r / "design" / "detail").glob("L[0-9]*")):
         L = ld.name
         u = units()
@@ -313,12 +399,29 @@ def status() -> int:
             rows.append((f"{L} D1 关卡准备", "完成（无压缩候选，不拍板）" if prep else "未完成：grades.json、layout.json 的 compression、kit detail estimate"))
             if not prep and nxt is None:
                 nxt = (f"{L} D1", "分级、分段、面数初估、朝向（无压缩候选，不拍板）", "D1-level-prep")
-        facade = {k for k in u if k.startswith(f"{L}/structures/") and rd(u[k][0]).get("grade") == "外立面"}
+        facade = {k for k in u if k.startswith(f"{L}/structures/") and rd(u[k][0]).get("grade") == "外立面"
+                  and "extends" not in rd(u[k][0])}
         gfile = ld / "grades.json"
         gr = rd(gfile) if gfile.exists() else {}
-        others = {s["outline"] for s in shared if s["writer"] != n}  # written by another level; this level only references it
-        want_files = {"structures": {g["id"] for g in gr.get("structures", [])
-                                     if g.get("grade") == "可进入" and g.get("outline") not in others},
+        # a shared structure written by another level: this level only needs an extension file when it goes
+        # further in than the writer did (floors the writer has no interior for, or an indoor leg through it)
+        others = {s["outline"]: s for s in shared if s["writer"] != n}
+        ext_rows = []
+        want = set()
+        for g in gr.get("structures", []):
+            if g.get("grade") != "可进入":
+                continue
+            s = others.get(g.get("outline"))
+            if not s:
+                want.add(g["id"])
+                continue
+            wf = writer_file(s)
+            have = writer_floors(wf) if wf else set()
+            indoor = indoor_through(n, g["outline"])
+            if set(g.get("open_floors", [])) - have or indoor:
+                want.add(g["id"])
+                ext_rows.append((g["id"], s, wf))
+        want_files = {"structures": want,
                       "areas": {a["id"] for a in gr.get("areas", [])}}
         lv_missing, lv_fix, lv_todo = [], [], []
         for kind, step, page in (("structures", "D2", "D2-structures"), ("areas", "D3", "D3-areas")):
@@ -347,6 +450,11 @@ def status() -> int:
                 if xs:
                     msg += f"；{lab}：{', '.join(xs)}"
             rows.append((f"{L} {step} {'结构体' if kind == 'structures' else '开放区'}", msg))
+            if kind == "structures":
+                for sid, s, wf in ext_rows:
+                    have = (ld / "structures" / f"{sid}.json").exists()
+                    rows.append((f"    扩展 {sid}", f"共享结构体（第 {s['writer']} 关写入 {wf or '还没写'}）；本关走得更深，"
+                                 f"在本关写扩展文件 structures/{sid}.json（extends 指向写入关的文件）" + ("：已写" if have else "：还没写")))
             lv_missing += missing
             lv_fix += stale + failed
             lv_todo += todo + changed

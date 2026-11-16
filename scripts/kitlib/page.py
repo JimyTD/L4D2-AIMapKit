@@ -18,7 +18,7 @@ from shapely.ops import unary_union
 import imagery
 from geo import load
 from project import KIT, decision_items, plan_level, root
-from structure import Frame
+from structure import Frame, load_spec
 
 BUILD_PATH_KEYS = ("route_m",)
 
@@ -50,7 +50,7 @@ def main(level_dir: Path):
     graded = {}
     for pid, src, kind in files:
         stem = src.with_suffix("")
-        spec = rd(src)
+        spec = load_spec(src) if kind == "structure" else rd(src)
         chk = rd(Path(str(stem) + ".check.json"))
         fails = [f"[{r['group']}] {r['check']} {r['detail']}".strip() for r in chk["results"] if not r["pass"]]
         c = {"id": pid, "passed": chk["passed"], "total": chk["passed"] + chk["failed"], "failed": chk["failed"], "fails": fails[:20]}

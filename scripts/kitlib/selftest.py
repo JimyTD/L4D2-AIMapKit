@@ -123,6 +123,7 @@ def run() -> int:
         if not game_dir():
             print("NOTE 本机没找到游戏：实体类名的核验跳过，对应用例不算")
         bad += status_checks(proj)
+        bad += extension_checks(proj)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     for what, rel, fn, must in CASES:
@@ -147,6 +148,47 @@ def run() -> int:
     return 1 if bad else 0
 
 
+def extension_checks(proj) -> int:
+    """A later level extends a shared structure: inherits the shell, adds and removes by id, may not touch the shell."""
+    bad = 0
+    code = (
+        "import json, sys, os\n"
+        f"sys.path.insert(0, r'{KIT / 'scripts' / 'kitlib'}')\n"
+        "import structure\n"
+        f"d = __import__('pathlib').Path(r'{proj}') / 'design/detail/L02/structures'\n"
+        "d.mkdir(parents=True, exist_ok=True)\n"
+        "ext = {'extends': 'design/detail/L01/structures/A.json', 'level': 2, 'remove': ['cd1'],\n"
+        "       'floors': [{'level': 2, 'spaces': [{'id': 'r_new', 'kind': 'room', 'rects': [[20, 7.2, 23.8, 11.76]], 'use': 'x', 'src': '@made'}],\n"
+        "                   'doors': [{'id': 'd_new', 'between': ['r_new', 'c2'], 'at': [21.9, 7.1], 'axis': 'u', 'width': 1.2, 'height': 2.7, 'state': 'open', 'kind': 'door', 'src': '@made'}]}],\n"
+        "       'objects': [], 'plan_refs': [], 'route': {'path': [[2, 'c2'], [2, 'r_new']], 'must_reach': [], 'must_not_reach': []}}\n"
+        "(d / 'A.json').write_text(json.dumps(ext), encoding='utf-8')\n"
+        "s = structure.load_spec(d / 'A.json')\n"
+        "f2 = next(f for f in s['floors'] if f['level'] == 2)\n"
+        "print('SHELL', s['outline'] == 'A' and bool(s['shell']['facades']))\n"
+        "print('ADDED', any(x['id'] == 'r_new' for x in f2['spaces']) and any(x['id'] == 'r_start' for x in f2['spaces']))\n"
+        "print('REMOVED', not any(x['id'] == 'cd1' for x in f2['closed_doors']))\n"
+        "print('OWN', s['objects'] == [] and s['level'] == 2)\n"
+        "ext['shell'] = {}\n"
+        "(d / 'A.json').write_text(json.dumps(ext), encoding='utf-8')\n"
+        "try:\n"
+        "    structure.load_spec(d / 'A.json'); print('FORBID False')\n"
+        "except Exception as e:\n"
+        "    print('FORBID', '外壳' in str(e))\n"
+    )
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1", "KIT_PROJECT": str(proj)}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", env=env)
+    res = out.stdout + out.stderr
+    for key, what in (("SHELL", "扩展文件继承写入关的外壳"), ("ADDED", "扩展文件新增空间、保留写入关的空间"),
+                      ("REMOVED", "扩展文件用 remove 去掉写入关的元素"), ("OWN", "物件、关号属于扩展所在的关"),
+                      ("FORBID", "扩展文件写外壳字段时报错")):
+        passed = f"{key} True" in res
+        print(("OK   " if passed else "FAIL ") + "extends：" + what + ("" if passed else "\n" + res[-800:]))
+        bad += 0 if passed else 1
+    import shutil as _sh
+    _sh.rmtree(proj / "design" / "detail" / "L02", ignore_errors=True)
+    return bad
+
+
 def status_checks(proj) -> int:
     """kit status and kit approve: D1 without compression candidates needs no approval, facade-only
     structures need none, several units can be approved at once, and an edit shows as changed."""
@@ -159,6 +201,11 @@ def status_checks(proj) -> int:
 
     _, out = kit(proj, "status")
     expect("status：没有压缩候选时 D1 不要求拍板", "完成（无压缩候选" in out, out)
+    if "Kit 版本" in out:
+        expect("status：没确认过 Kit 版本时提示 --ack", "kit status --ack" in out, out)
+        kit(proj, "status", "--ack")
+        _, out2 = kit(proj, "status")
+        expect("status --ack 之后不再提示", "--ack" not in out2.split("\n\n")[0], out2[:400])
     kit(proj, "approve", "P1", "P3", "P3/L1", "P4", "--note", "selftest")
     _, out = kit(proj, "status")
     expect("status：全部画完、核验全过时，下一步是交整关详设", "下一步：L01 整关详设" in out and "kit approve L01/detail" in out, out[-1500:])

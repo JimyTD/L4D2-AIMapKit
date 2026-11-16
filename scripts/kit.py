@@ -43,7 +43,7 @@ def cmd(a) -> int:
     if c == "doctor":
         return manage.doctor(a.write)
     if c == "status":
-        return manage.status()
+        return manage.ack() if a.ack else manage.status()
     if c == "approve":
         return manage.approve(a.unit, a.note)
     if c == "sources":
@@ -137,7 +137,8 @@ def parser():
     x.add_argument("--name", required=True, help="项目名（写进 PROJECT.md）")
     x = s.add_parser("doctor", help="P0 体检依赖")
     x.add_argument("--write", action="store_true", help="把找到的游戏目录和 python 写进 kit.local.json")
-    s.add_parser("status", help="按项目文件算进度、过期和下一步")
+    x = s.add_parser("status", help="按项目文件算进度、过期和下一步；Kit 更新过会列出要重读的页面")
+    x.add_argument("--ack", action="store_true", help="已重读改过的页面：记下当前 Kit 版本")
     x = s.add_parser("approve", help="记录用户拍板（单元名见 kit status，可一次写多个）")
     x.add_argument("unit", nargs="+")
     x.add_argument("--note", default="")

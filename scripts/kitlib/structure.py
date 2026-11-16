@@ -25,7 +25,7 @@ from shapely.ops import unary_union
 import fmt
 import imagery
 from geo import load
-from project import KIT, UNIT_M, decisions, plan_level, rel, root, sources
+from project import KIT, UNIT_M, KitError, decisions, plan_level, rel, root, sources
 
 GRADES = {"实测", "确认", "推断", "假设", "改动"}
 SPACE_KINDS = {"corridor", "room", "hall", "service", "balcony", "void"}
@@ -63,6 +63,72 @@ def merge_parts(spec, path):
             spec.setdefault(k, []).extend(d.get(k, []))
         spec.setdefault("src_defs", {}).update(d.get("src_defs", {}))
     return spec
+
+
+# A later level adds to a shared structure with an extension file in its own folder ("extends": the writer's file).
+# The extension inherits the shell and geometry; it may add floors, spaces, doors, cores, fixtures and atmosphere,
+# replace them by id, or drop them with "remove". Objects, route and plan coverage are the extension's own.
+EXT_FORBIDDEN = ("shell", "frame", "frames", "outline", "storeys", "storeys_src", "slab_m", "module", "grade", "parts")
+EXT_OWN = ("objects", "plan_refs", "route", "questions", "plan_deviations")
+
+
+def _merge_by_id(base, add, drop):
+    out = [x for x in base if x.get("id") not in drop]
+    idx = {x.get("id"): i for i, x in enumerate(out)}
+    for x in add:
+        if x.get("id") in idx:
+            out[idx[x["id"]]] = x
+        else:
+            out.append(x)
+    return out
+
+
+def base_file(rel: str) -> str:
+    """Root-relative path of the writer's file behind a structure file (itself when it is not an extension)."""
+    d = json.loads((root() / rel).read_text(encoding="utf-8"))
+    return d.get("extends", rel).replace("\\", "/")
+
+
+def load_spec(path) -> dict:
+    """Read a structure file ready for checking: parts merged, and an extension merged onto its base."""
+    path = Path(path)
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    if "extends" not in spec:
+        return merge_parts(spec, path)
+    bad = [k for k in EXT_FORBIDDEN if k in spec]
+    if bad:
+        raise KitError(f"{path.name} 是扩展文件，不能写 {', '.join(bad)}：外壳和坐标归写入关，要改就找写入关")
+    bpath = root() / spec["extends"]
+    if not bpath.exists():
+        raise KitError(f"{path.name} 的 extends 指向的文件不存在：{spec['extends']}")
+    base = merge_parts(json.loads(bpath.read_text(encoding="utf-8")), bpath)
+    drop = set(spec.get("remove", []))
+    out = {k: v for k, v in base.items() if k not in EXT_OWN}
+    out.update({k: spec[k] for k in EXT_OWN if k in spec})
+    out["level"] = spec["level"]
+    out["id"] = spec.get("id", base["id"])
+    out["title"] = spec.get("title", base.get("title", "") + f"（第 {spec['level']} 关扩展）")
+    out["extends"] = spec["extends"]
+    out["src_defs"] = {**base.get("src_defs", {}), **spec.get("src_defs", {})}
+    out["own_src_defs"] = list(spec.get("src_defs", {}))
+    for k in ("cores", "fixtures", "atmosphere"):
+        out[k] = _merge_by_id(base.get(k, []), spec.get(k, []), drop)
+    floors = {f["level"]: json.loads(json.dumps(f)) for f in base.get("floors", [])}
+    for f in floors.values():
+        for k in ("spaces", "doors", "closed_doors"):
+            f[k] = [x for x in f.get(k, []) if x.get("id") not in drop]
+    for f in spec.get("floors", []):
+        if f["level"] not in floors:
+            floors[f["level"]] = f
+            continue
+        g = floors[f["level"]]
+        for k in ("spaces", "doors", "closed_doors"):
+            g[k] = _merge_by_id(g.get(k, []), f.get(k, []), drop)
+        for k, v in f.items():
+            if k not in ("spaces", "doors", "closed_doors", "level"):
+                g[k] = v
+    out["floors"] = [floors[k] for k in sorted(floors)]
+    return merge_parts(out, path)
 
 
 class Frame:
@@ -766,7 +832,8 @@ def check(spec, m, dec, srcs, plan_level):
     for qq in spec.get("questions", []):
         ok("问题", f"{qq['id']} 有判断且被引用", bool(qq.get("judgment")) and qq["id"] in used_q)
     raw = json.dumps({k: v for k, v in spec.items() if k != "src_defs"}, ensure_ascii=False)
-    for name in defs:
+    # an extension inherits the writer's definitions; only its own must be used
+    for name in spec.get("own_src_defs", defs):
         ok("来源", f"来源定义 @{name} 有元素引用", f'"@{name}"' in raw)
     return res
 
@@ -925,6 +992,7 @@ def export(spec, m, dec):
     return {
         "schema": "detail.structure/1.0",
         "id": spec["id"], "name": spec["name"], "outline": spec["outline"],
+        "extends": spec.get("extends"),
         "units": {"length": "米；带 _u 后缀的字段是 Hammer 单位", "unit_cm": dec["unit_cm"]},
         "frame": {**spec["frame"], "note": "局部坐标 (u, v)，米。世界坐标 = origin + u·û + v·v̂；û 的方向角 u_angle_deg 自正东逆时针，v̂ 为 û 逆时针转 90°"},
         "module": spec["module"],
@@ -984,7 +1052,7 @@ def root_rel(out_html):
 
 
 def run(p: Path) -> int:
-    spec = merge_parts(json.loads(p.read_text(encoding="utf-8")), p)
+    spec = load_spec(p)
     dec = decisions()
     m = build(spec)
     opening_access(m)

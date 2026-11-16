@@ -139,7 +139,7 @@ const STEPS=[
  {lane:'det',title:'详设阶段：每关的空间具体长什么样（D0 一次；之后每关一条主线，可并行）'},
  {id:'D0',t:'详设准备（项目级，一次）',o:'项目级尺度目标、地面类型、跨关共享的结构体、并行主线分工；只过脚本，不拍板',chips:['gate'],
   in:['定稿的全部关卡规划'],
-  do:['<b>尺度目标</b>：<code>kit game measure</code> 量原版地图的同类空间（走廊、层高、房间开间、楼梯），定成目标写进待决定列表，标暂定；最低值只给有意做窄的地方。所有关共用','<b>地面类型清单</b>：这张地图用哪些地面（如车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石），每种写能不能走、默认标高，写进待决定列表','<b>跨关共享的结构体</b>：<code>kit status</code> 按规划数据自动列出（衔接安全屋和多关都进的结构体），先用到的那关写，其他关只引用；照抄进 <code>PROJECT.md</code>','<b>并行主线</b>：并行数在 P0 已问；每关新开一个会话跑主模型，在 <code>PROJECT.md</code> 登记哪关归哪个会话','<b>为什么不拍板</b>：这些值用户在看到白模、试玩之前无从判断；试玩后有问题由用户提出再改'],
+  do:['<b>尺度目标</b>：<code>kit game measure</code> 量原版地图的同类空间（走廊、层高、房间开间、楼梯），定成目标写进待决定列表，标暂定；最低值只给有意做窄的地方。所有关共用','<b>地面类型清单</b>：这张地图用哪些地面（如车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石），每种写能不能走、默认标高，写进待决定列表','<b>跨关共享的结构体</b>：<code>kit status</code> 按规划数据自动列出（衔接安全屋和多关都进的结构体），先用到的那关写外壳和它用到的部分；后一关不改它的文件，要走得更深就在自己关里写扩展文件；照抄进 <code>PROJECT.md</code>','<b>并行主线</b>：并行数在 P0 已问；每关新开一个会话跑主模型，在 <code>PROJECT.md</code> 登记哪关归哪个会话','<b>为什么不拍板</b>：这些值用户在看到白模、试玩之前无从判断；试玩后有问题由用户提出再改'],
   tools:['kit game measure ','kit status'],
   out:['待决定列表的尺度目标和地面类型清单','<code>PROJECT.md</code> 的共享结构体写入关和主线分工'],
   done:['待决定列表里 D0 的项都有值；<code>PROJECT.md</code> 写了共享结构体和主线分工；<code>kit status</code> 自动显示完成'],
@@ -164,7 +164,7 @@ const STEPS=[
       '<b>竖向通道</b>：楼梯、坡道、梯子、竖井；约定写全，往上封堵写要建几级',
       '<b>内部</b>：只写会走进去或看得到的空间；进不去的只是一扇关着的门；跨层空间写挑空',
       '物件三档跟着写（互动物件精确点位和实体；影响走位的构件写位置和挡不挡、能否看穿、能否翻；氛围按区域写文字）；翻越、视线写成字段；触发接到事件表',
-      '大的结构体可以拆成外壳一个文件、每层一个文件，脚本合并核验；改一层只读那一层'],
+      '大的结构体可以拆成外壳一个文件、每层一个文件，脚本合并核验；改一层只读那一层','<b>共享结构体</b>：本关是写入关就写全外壳；不是写入关又要走得更深（<code>kit status</code> 列为“扩展”），在本关写扩展文件（<code>extends</code> 指向写入关的文件，继承外壳，只加本关的楼层、房间、物件），不改写入关的文件'],
   tools:['kit detail structure（核验 + 搭建数据 + 评审页）','kit detail scaffold facade（只有外壳的结构体）'],
   out:['<code>structures/&lt;id&gt;.json</code>（或拆分的外壳和各层文件）及生成的 <code>.build.json</code>、<code>.check.json</code>、<code>.html</code>'],
   done:['<code>structure check</code> 全部通过','停两次，中途不停：动手前讨论结构事实清单；这一关所有结构体和开放区画完后，用整关页一起交（<code>kit approve L&lt;nn&gt;/detail</code>）','拿不准的先做、标假设、写进 questions，到整关详设时一起问；项目第一次出现的结构类型可以例外先看一眼'],
@@ -358,9 +358,11 @@ tbl('princ',['原则','为什么'],[
  ['压缩、朝向都是可选项，用不用都写理由','—'],
  ['彩蛋在结构和开放区定稿后、收口前做：内容不受复刻约束，格式照常严格','要交给生成，又不能影响主线']]);
 
-document.getElementById('start').innerHTML=['读 SKILL.md（只有入口，很短）','读项目的 <code>PROJECT.md</code>：现在在哪一步、哪条线归谁、最近一次交接说了什么','跑 <code>kit status</code>：按项目文件算出实际进度，和 PROJECT.md 对不上会报警','要用资料时先跑 <code>kit sources find</code> 看已有的；已有资料不足以判断时再去查或下载，新得到的资料照 P2 的规则入库（编号、来源、等级、用途），不留在临时目录','只读下一步对应的 <code>references/steps/&lt;步&gt;.md</code>','按那一页做；做完跑那一步的脚本，必须通过','交用户评审；拍板后写拍板记录、提交；再跑一次 <code>kit status</code>'].map(x=>'<li>'+x+'</li>').join('');
+document.getElementById('start').innerHTML=['读 SKILL.md（只有入口，很短）','读项目的 <code>PROJECT.md</code>：现在在哪一步、哪条线归谁、最近一次交接说了什么','跑 <code>kit status</code>：按项目文件算出实际进度，和 PROJECT.md 对不上会报警；开头说 Kit 更新过就先重读列出的页面，再跑 <code>kit status --ack</code>。每轮新工作前都跑一次','要用资料时先跑 <code>kit sources find</code> 看已有的；已有资料不足以判断时再去查或下载，新得到的资料照 P2 的规则入库（编号、来源、等级、用途），不留在临时目录','只读下一步对应的 <code>references/steps/&lt;步&gt;.md</code>','按那一页做；做完跑那一步的脚本，必须通过','交用户评审；拍板后写拍板记录、提交；再跑一次 <code>kit status</code>'].map(x=>'<li>'+x+'</li>').join('');
 document.getElementById('status').textContent=
-'项目：<项目名>   Kit 版本：x.y   格式版本：0.5\n\n'+
+'Kit 版本 <新>（本项目上次确认 <旧>）\n'+
+'Kit 更新过，这些页面改了，重读后跑 kit status --ack：\n'+
+'  references/steps/D2-structures.md\n\n'+
 'P0 开项目           完成\n'+
 'P1–P4 规划          完成（6 关定稿）\n'+
 'D0 详设准备         完成\n'+

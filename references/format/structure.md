@@ -23,6 +23,22 @@
 | `parts` | 可选：拆分文件名列表。每个文件含 `floors`、`objects`、`fixtures`、`atmosphere` 等，核验时合并 |
 | `plan_refs`、`plan_deviations`、`questions`、`src_defs` | 见 [common.md](common.md) |
 
+## 扩展文件（共享结构体的后一关）
+
+共享结构体的外壳和坐标归写入关。后一关要走得比写入关更深（写入关没建内部的楼层，或规划里有穿过它的室内段），就在**自己的关卡目录**里写一个同名的扩展文件 `structures/<id>.json`，不改写入关的文件：
+
+```json
+{"extends": "design/detail/L<写入关>/structures/<id>.json", "level": <本关>, "remove": ["<写入关里要去掉的元素 id>"],
+ "floors": [...], "cores": [...], "fixtures": [...], "atmosphere": [...],
+ "objects": [...], "route": {...}, "plan_refs": [...], "plan_deviations": [...], "questions": [...], "src_defs": {...}}
+```
+
+- 继承写入关的外壳、坐标、层高和全部内部；不能写 `shell`、`frame`、`frames`、`outline`、`storeys`、`storeys_src`、`slab_m`、`module`、`grade`、`parts`。外壳要改，找写入关。
+- `floors` 按楼层合并：空间、门、关着的门按 `id` 新增或替换；新楼层直接加。`cores`、`fixtures`、`atmosphere` 按 `id` 合并。`remove` 去掉写入关的元素（比如本关要打开的那扇关着的门）。
+- `objects`、`route`、`plan_refs`、`plan_deviations`、`questions` 只写本关的，不继承。
+- 核验和生成都读合并后的结果；扩展文件是本关的拍板单元，不影响写入关的拍板和写入关的 `spec.json`。
+- 写入关的文件以后改了，扩展文件的核验会过期，`kit status` 会提示重跑。
+
 ## 外壳 `shell`
 
 | 字段 | 含义 |

@@ -35,7 +35,7 @@ from shapely.geometry import Point, Polygon
 
 from project import COORD_MAX_U, decision_items, decisions, plan, plan_level, root
 from project import level_dir as ldir
-from structure import Frame, plan_refs_valid
+from structure import Frame, base_file, load_spec, plan_refs_valid
 
 
 def rd(p):
@@ -75,7 +75,7 @@ def run(level_dir: Path):
     pieces = [("structure", b["id"], root() / b["file"]) for b in lay["structures"]] + [("area", s["id"], root() / s["file"]) for s in lay["areas"]]
     src, built = {}, {}
     for kind, pid, p in pieces:
-        src[pid] = rd(p)
+        src[pid] = load_spec(p) if kind == "structure" else rd(p)
         built[pid] = rd(build_path(p))
         chk = rd(check_path(p))
         ok("单个文件", f"{pid} 自己的核验全部通过", chk["failed"] == 0, f"{chk['failed']} 项失败" if chk["failed"] else f"{chk['passed']} 项")
@@ -203,8 +203,13 @@ def run(level_dir: Path):
             ok("衔接", f"安全屋 {lvl[key]} 和第 {other} 关一致", True, "相邻关还没有总图，合成那一关时再查")
             continue
         theirs = next((b["file"] for b in rd(olay)["structures"]
-                       if rd(root() / b["file"]).get("outline") == room["outline"]), None)
-        ok("衔接", f"安全屋 {lvl[key]} 和第 {other} 关用同一个结构体文件", mine is not None and mine == theirs, f"{mine} / {theirs}")
+                       if load_spec(root() / b["file"]).get("outline") == room["outline"]), None)
+        if theirs is None:
+            ok("衔接", f"安全屋 {lvl[key]} 和第 {other} 关一致", True, "相邻关的总图还没登记这个结构体，合成那一关时再查")
+            continue
+        # an extension file counts as the same structure as the writer's file it extends
+        same = mine is not None and theirs is not None and base_file(mine) == base_file(theirs)
+        ok("衔接", f"安全屋 {lvl[key]} 和第 {other} 关用同一个结构体（写入关的文件或它的扩展）", same, f"{mine} / {theirs}")
 
     # ---- events
     fired = {}
