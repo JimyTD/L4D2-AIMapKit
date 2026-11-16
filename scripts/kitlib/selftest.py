@@ -159,13 +159,16 @@ def status_checks(proj) -> int:
 
     _, out = kit(proj, "status")
     expect("status：没有压缩候选时 D1 不要求拍板", "完成（无压缩候选" in out, out)
+    kit(proj, "approve", "P1", "P3", "P3/L1", "P4", "--note", "selftest")
+    _, out = kit(proj, "status")
+    expect("status：全部画完、核验全过时，下一步是交整关详设", "下一步：L01 整关详设" in out and "kit approve L01/detail" in out, out[-1500:])
     shell = proj / L / "structures" / "B.json"
     shell.write_text(json.dumps({"grade": "外立面"}), encoding="utf-8")
     _, out = kit(proj, "status")
     expect("status：只有外壳的结构体不要求拍板", "1 个只有外壳" in out and "待拍板：A；" not in out.replace("待拍板：A\n", ""), out)
     shell.unlink()
-    code, out = kit(proj, "approve", "L01/structures/A", "L01/areas/yard", "--note", "selftest")
-    expect("approve：一次登记多个单元", code == 0 and out.count("已记录拍板") == 2, out)
+    code, out = kit(proj, "approve", "L01/detail", "--note", "selftest")
+    expect("approve：L01/detail 一次登记整关的结构体和开放区", code == 0 and out.count("已记录拍板") == 2, out)
     _, out = kit(proj, "status")
     expect("status：登记后结构体和开放区显示已拍板", "拍板 1/1" in out and "待拍板：" not in out, out)
     edit(proj, f"{L}/areas/yard.json", lambda d: d.__setitem__("title", d.get("title", "") + " "))

@@ -144,6 +144,18 @@ def approvals() -> dict:
 def approve(names, note: str) -> int:
     u = units()
     names = [names] if isinstance(names, str) else list(names)
+    # L<nn>/detail: the whole-level detail review (every structure and area of that level at once)
+    expanded = []
+    for n in names:
+        if re.fullmatch(r"L\d+/detail", n):
+            L = n.split("/")[0]
+            parts = [k for k in u if k.startswith((f"{L}/structures/", f"{L}/areas/"))]
+            if not parts:
+                raise KitError(f"{L} 还没有结构体或开放区文件")
+            expanded += parts
+        else:
+            expanded.append(n)
+    names = list(dict.fromkeys(expanded))
     bad = [n for n in names if n not in u]
     if bad:
         raise KitError(f"没有单元 {', '.join(bad)}；kit status 列出全部单元")
@@ -302,9 +314,17 @@ def status() -> int:
             if not prep and nxt is None:
                 nxt = (f"{L} D1", "分级、分段、面数初估、朝向（无压缩候选，不拍板）", "D1-level-prep")
         facade = {k for k in u if k.startswith(f"{L}/structures/") and rd(u[k][0]).get("grade") == "外立面"}
+        gfile = ld / "grades.json"
+        gr = rd(gfile) if gfile.exists() else {}
+        others = {s["outline"] for s in shared if s["writer"] != n}  # written by another level; this level only references it
+        want_files = {"structures": {g["id"] for g in gr.get("structures", [])
+                                     if g.get("grade") == "可进入" and g.get("outline") not in others},
+                      "areas": {a["id"] for a in gr.get("areas", [])}}
+        lv_missing, lv_fix, lv_todo = [], [], []
         for kind, step, page in (("structures", "D2", "D2-structures"), ("areas", "D3", "D3-areas")):
             ks = [k for k in u if k.startswith(f"{L}/{kind}/")]
             need_ok = [k for k in ks if k not in facade]
+            missing = sorted(want_files[kind] - {k.split("/")[-1] for k in ks})
             stale, failed, todo, changed = [], [], [], []
             for k in ks:
                 f = u[k][0]
@@ -323,14 +343,23 @@ def status() -> int:
             msg = f"{len(ks)} 个文件；拍板 {len(need_ok) - len(todo) - len(changed)}/{len(need_ok)}"
             if kind == "structures" and facade:
                 msg += f"（{len(facade)} 个只有外壳，不拍板）"
-            for lab, xs in (("核验过期", stale), ("核验未过", failed), ("待拍板", todo), ("拍板后已修改", changed)):
+            for lab, xs in (("还没写", missing), ("核验过期", stale), ("核验未过", failed), ("待拍板", todo), ("拍板后已修改", changed)):
                 if xs:
                     msg += f"；{lab}：{', '.join(xs)}"
             rows.append((f"{L} {step} {'结构体' if kind == 'structures' else '开放区'}", msg))
-            if nxt is None and not ks:
-                nxt = (f"{L} {step}", "按分级表逐个写" + ("结构体：可进入的一个一拍板，只有外壳的只过核验" if kind == "structures" else "开放区，一段一拍板（短过渡段和相邻段合并交）"), page)
-            if nxt is None and (stale or failed or changed or todo):
-                nxt = (f"{L} {step}", "先重跑过期的核验、修好未过的，再交待拍板的", page)
+            lv_missing += missing
+            lv_fix += stale + failed
+            lv_todo += todo + changed
+        # whole-level detail review: keep drawing without stopping; hand in once everything is drawn and passes
+        if nxt is None and not any(k.startswith((f"{L}/structures/", f"{L}/areas/")) for k in u):
+            nxt = (f"{L} D2", "先把这一关所有可进入结构体的结构事实合成一份清单交用户（文字），讨论完再画", "D2-structures")
+        elif nxt is None and (lv_missing or lv_fix):
+            nxt = (f"{L} D2/D3", "继续画、修核验，中途不停："
+                   + "；".join(x for x in (f"还没写 {', '.join(lv_missing)}" if lv_missing else "",
+                                           f"核验过期或未过 {', '.join(lv_fix)}" if lv_fix else "") if x),
+                   "D2-structures" if any(m in want_files["structures"] for m in lv_missing) else "D3-areas")
+        elif nxt is None and lv_todo:
+            nxt = (f"{L} 整关详设", f"全部画完、核验全过：跑 kit page {_level_no(L)}，用整关页交用户；说可以后 kit approve {L}/detail", "D2-structures")
         spec = ld / "spec.json"
         ins = [f for k in u if k.startswith(f"{L}/") and "/D" not in k for f in u[k]] + [ld / "layout.json", ld / "events.json"]
         if not spec.exists():

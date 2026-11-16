@@ -15,12 +15,13 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 2. 有项目：读项目的 `PROJECT.md`（阶段、各条主线归谁、最近一次交接），再跑 `kit status`。两者对不上时以 `kit status` 为准，并修正 PROJECT.md。
 3. 只读 `kit status` 指向的那一步的页面 `references/steps/<步>.md`，不预读其他步骤。
 4. 需要资料时先跑 `kit sources find`。已有资料不足以判断时，再去查或下载；新拿到的资料按 [P2](references/steps/P2-sources.md) 的规则入库。
-5. 做完跑这一步的脚本，必须通过。然后交用户评审（[review.md](references/review.md)）。用户拍板后跑 `kit approve`，再提交、更新 PROJECT.md。
+5. 做完跑这一步的脚本，必须通过。到了停顿点再交用户评审（[review.md](references/review.md)）。用户说可以后跑 `kit approve`，再提交、更新 PROJECT.md。
 
 ## 硬规则（违反就停下）
 
 - 讨论和分析阶段只读。方案经用户同意后再动手；范围或关键决策变了，重新确认。
-- 一个单元一拍板：一个结构体、一段开放区、一关的规划。没有用户的明确指示，不大幅推进。
+- 只在步骤页写明的停顿点停下，中途不停。拿不准的先按你的判断做，标“假设”、记进 `questions`，到停顿点一起问；只有挡住后面全部工作的问题才中途停。详设每关只停四次：结构事实清单、整关详设、彩蛋、整关拍板。
+- 停下来是讨论，不是一锤定音：用户可以分几轮提意见，改完再交，直到用户说可以。没有用户的明确指示，不跨关推进。
 - 不启动游戏。可以读游戏目录里的文件，可以用 Hammer 等编辑器和编译工具。需要进游戏验证的，写进项目的 `HUMAN.md` 交给用户。
 - 不推送远端。
 - 依赖清单之外的软件，装之前先问。
@@ -42,8 +43,8 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [P4](references/steps/P4-plan-final.md) | 规划视图与规划定稿 | 脚本 + 拍板 |
 | [D0](references/steps/D0-detail-prep.md) | 详设准备（项目级，只做一次） | 脚本 |
 | [D1](references/steps/D1-level-prep.md) | 关卡准备：分级、分段、面数初估、压缩与朝向 | 脚本；有压缩候选时拍板 |
-| [D2](references/steps/D2-structures.md) | 内部结构设计，逐个结构体进行 | 脚本 + 拍板（只有外壳的不拍） |
-| [D3](references/steps/D3-areas.md) | 开放区设计，逐段进行 | 脚本 + 拍板 |
+| [D2](references/steps/D2-structures.md) | 内部结构设计：先交整关的结构事实清单，再逐个画 | 文字讨论一次；画完和 D3 一起交 |
+| [D3](references/steps/D3-areas.md) | 开放区设计，逐段画 | 和 D2 一起，整关页交一次 |
 | [D4](references/steps/D4-easter-eggs.md) | 彩蛋（先问用户） | 脚本 + 拍板 |
 | [D5](references/steps/D5-compose.md) | 整关收口与合成 `spec.json` | 脚本 |
 | [D6](references/steps/D6-review.md) | 整关评审与盲审 | 拍板 |
