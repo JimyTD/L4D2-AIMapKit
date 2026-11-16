@@ -28,7 +28,7 @@ from shapely.ops import unary_union
 import fmt
 import imagery
 from geo import load
-from project import KIT, decisions, level_dir, need, plan_level, root, sources
+from project import KIT, decisions, decisions_stamp, level_dir, need, plan_level, root, sources
 from structure import FIVE, GRADES, m2u, page_sources, plan_refs_valid, root_rel
 
 BUILDING_GRADES = {"可进入", "外立面", "远景", "省略"}
@@ -453,6 +453,8 @@ def write_page(spec, world, res, exp, out_html):
 
 
 def run(p: Path) -> int:
+    import project
+    project.USED.clear()
     spec = json.loads(p.read_text(encoding="utf-8"))
     world = load()
     res = check(spec, world, decisions(), sources(), plan_level(spec["level"]))
@@ -461,7 +463,7 @@ def run(p: Path) -> int:
     Path(stem + ".build.json").write_text(json.dumps(exp, ensure_ascii=False, indent=1), encoding="utf-8")
     write_page(spec, world, res, exp, Path(stem + ".html"))
     failed = [r for r in res if not r["pass"]]
-    rep = {"spec": p.name, "passed": len(res) - len(failed), "failed": len(failed), "results": res}
+    rep = {"spec": p.name, "passed": len(res) - len(failed), "failed": len(failed), **decisions_stamp(), "results": res}
     p.with_suffix(".check.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
     for r in res:
         if not r["pass"] or "-v" in sys.argv:

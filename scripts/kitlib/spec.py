@@ -33,7 +33,7 @@ from pathlib import Path
 
 from shapely.geometry import Point, Polygon
 
-from project import COORD_MAX_U, decision_items, decisions, plan, plan_level, root
+from project import COORD_MAX_U, KitError, decision_items, decisions, decisions_stamp, plan, plan_level, root
 from project import level_dir as ldir
 from structure import Frame, base_file, load_spec, plan_refs_valid
 
@@ -57,6 +57,8 @@ def door_world(spec, door):
 
 
 def run(level_dir: Path):
+    import project
+    project.USED.clear()
     res = []
 
     def ok(group, name, passed, detail=""):
@@ -276,14 +278,30 @@ def run(level_dir: Path):
         "stats": {"structures": len(blds), "areas": len(sites), "events": len(events), "easter_egg_objects": egg_items,
                   "plan_refs_landed": sum(1 for w in want if w in landed), "plan_refs_total": len(want)},
     }
-    (level_dir / "spec.json").write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
+    import handoff
+    import project
+    project.USED.update(i["id"] for i in decision_items())  # spec.json embeds every standard
+    try:
+        handoff.elements(spec)
+        ok("交接", "设计元素的 key 整关唯一（elements.json）", True)
+    except KitError as e:
+        ok("交接", "设计元素的 key 整关唯一（elements.json）", False, str(e))
+    text = json.dumps(spec, ensure_ascii=False, indent=1)
+    sp = level_dir / "spec.json"
+    if not sp.exists() or sp.read_text(encoding="utf-8") != text:  # unchanged content keeps its time, readers see no change
+        sp.write_text(text, encoding="utf-8")
     failed = [r for r in res if not r["pass"]]
-    (level_dir / "spec.check.json").write_text(json.dumps({"passed": len(res) - len(failed), "failed": len(failed), "results": res},
+    (level_dir / "spec.check.json").write_text(json.dumps({"passed": len(res) - len(failed), "failed": len(failed), **decisions_stamp(), "results": res},
                                                           ensure_ascii=False, indent=1), encoding="utf-8")
     for r in res:
         if not r["pass"] or "-v" in sys.argv:
             print(("PASS " if r["pass"] else "FAIL ") + f"[{r['group']}] {r['check']}" + (f" | {r['detail']}" if r["detail"] else ""))
     print(f"spec.json: {len(res) - len(failed)}/{len(res)} passed; route through {' → '.join(path)}")
+    if failed and any(r["group"] == "交接" for r in failed):
+        print("设计元素 key 重复：交接清单没写，先改重名")
+        return len(failed)
+    h = handoff.write(spec, level_dir, len(failed))
+    print(f"elements.json: {h['elements']} 个设计元素；followups.json: {h['followups_open']} 条待跟进；handoff.json")
     return len(failed)
 
 

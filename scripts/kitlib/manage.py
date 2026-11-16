@@ -318,7 +318,21 @@ def _newer(out, inputs):
     if not out.exists():
         return False
     t = out.stat().st_mtime
-    return all(not Path(i).exists() or Path(i).stat().st_mtime <= t for i in inputs)
+    if not all(not Path(i).exists() or Path(i).stat().st_mtime <= t for i in inputs):
+        return False
+    # a check report records the standards it was checked against; changed values make it stale.
+    # Reports written before this field existed carry no fingerprint and are judged by time only.
+    if out.name.endswith(".check.json"):
+        rep = rd(out)
+        fp = rep.get("decisions_fp")
+        if fp and "decisions_used" in rep and fp != _dec_fp(rep["decisions_used"]):
+            return False
+    return True
+
+
+def _dec_fp(ids):
+    from project import decisions_fp
+    return decisions_fp(ids, rd(root() / "standards" / "decisions.json")["items"])
 
 
 def status() -> int:
@@ -353,7 +367,9 @@ def status() -> int:
     base_ok = not open_ and (not real or bool(gconf.get("origin") and gconf.get("landmarks")))
     levels = sorted((r / "design" / "plan" / "levels").glob("L*.json"))
     want = rd(camp).get("levels", 0) if camp.exists() else 0
-    plan_ok = _check_ok(r / "design" / "plan" / "reports" / "plan.check.json")
+    pchk = r / "design" / "plan" / "reports" / "plan.check.json"
+    plan_ok = _check_ok(pchk)
+    plan_stale = bool(plan_ok) and not _newer(pchk, [])
     lv_states = {f.stem: approval_state(f"P3/{f.stem}", [f]) for f in levels}
     done3 = sum(1 for s in lv_states.values() if s == "已拍板")
     if not base_ok:
@@ -364,6 +380,10 @@ def status() -> int:
         add("P3 切关", st_split, "全战役切关和安全屋，用总览页交用户拍板", "P3-levels")
     add("P3 切关与关卡", f"{len(levels)}/{want} 关有源文件，{done3} 关已拍板；plan verify {'通过' if plan_ok else '未通过或未跑'}",
         None if done3 == want and want and plan_ok else "下一关的关卡设计（一关一拍板）", "P3-levels")
+    if plan_stale:
+        rows.append(("    plan verify", "过期：待决定列表里它用到的值改了"))
+        if nxt is None:
+            nxt = ("P3 plan verify", "跑 kit plan verify --no-render 重新核验（不用改规划）", "P3-levels")
     for k, s in lv_states.items():
         if s == "拍板后已修改":
             rows.append((f"    {k}", "拍板后已修改：重跑 plan build / verify，交用户重新拍板"))
@@ -481,8 +501,13 @@ def status() -> int:
         ins = [f for k in u if k.startswith(f"{L}/") and "/D" not in k for f in u[k]] + [ld / "layout.json", ld / "events.json"]
         if not spec.exists():
             rows.append((f"{L} D5 合成", "未合成"))
-        elif not _newer(spec, ins):
+        elif not _newer(spec, ins) or not _newer(ld / "spec.check.json", ins):
             rows.append((f"{L} D5 合成", "过期：跑 kit spec"))
+        elif not all(_newer(ld / n, [spec, ld / "BLIND-REVIEW.json", ld / "followups.closed.json",
+                                     r / "standards" / "decisions.json", r / "sources" / "index.json",
+                                     r / "design" / "plan" / "levels" / f"L{n_}.json"])
+                     for n_ in [_level_no(L)] for n in ("elements.json", "followups.json", "handoff.json")):
+            rows.append((f"{L} D5 合成", "交接清单过期或缺（elements / followups / handoff）：跑 kit spec"))
         else:
             rows.append((f"{L} D5 合成", "通过" if _check_ok(ld / "spec.check.json") else "spec 核验未通过"))
         s6 = approval_state(f"{L}/D6", u[f"{L}/D6"]) if spec.exists() else "—"

@@ -14,7 +14,7 @@ import fmt
 import imagery
 from geo import load
 from plan_build import INDOOR, block_shape, usable_m
-from project import campaign, plan, root, wr
+from project import campaign, decisions_stamp, plan, root, wr
 from router import footprint_of
 
 INSIDE_TOL = 3.0  # door thresholds may sit on the wall line
@@ -23,6 +23,8 @@ ROOM_DOOR_MAX_M = 25  # a safe-room door is part of the room, not across the map
 
 
 def main(check_render: bool = True) -> int:
+    import project
+    project.USED.clear()
     w = load()
     by = w.by_id()
     pl = plan()
@@ -67,6 +69,10 @@ def main(check_render: bool = True) -> int:
                d >= 20 and not (water and water.contains(p)) and not (solid and solid.contains(p)), f"距路线 {d:.0f} m")
         for pl_ in lv["plays"]:
             ok(f"{tag} 玩法 {pl_['id']}「{pl_['name']}」写了原版依据（实体和先例）", bool(pl_.get("entities")) and bool(pl_.get("precedent")))
+            st = pl_.get("precedent_status")
+            ok(f"{tag} 玩法 {pl_['id']} 的 precedent_status 是 checked 或 pending", st in (None, "checked", "pending"), str(st))
+            ok(f"{tag} 玩法 {pl_['id']} 写了 checked，precedent 文字里就不该还写“待核”",
+               not (st == "checked" and "待核" in (pl_.get("precedent") or "")))
             for ent in pl_.get("entities", []):
                 ok(f"{tag} 玩法 {pl_['id']} 的实体 {ent} 是游戏里的类名", not classes or ent in classes, ent)
         for alt, l in legs:
@@ -151,9 +157,13 @@ def main(check_render: bool = True) -> int:
         ok("规划视图 index.html 存在且比数据新（kit plan render）", idx.exists() and idx.stat().st_mtime >= src_t)
 
     failed = [r for r in res if not r["pass"]]
-    wr(root() / "design" / "plan" / "reports" / "plan.check.json", {"passed": len(res) - len(failed), "failed": len(failed), "results": res})
+    wr(root() / "design" / "plan" / "reports" / "plan.check.json", {"passed": len(res) - len(failed), "failed": len(failed), **decisions_stamp(), "results": res})
     for r in failed:
         print("FAIL " + r["check"] + (" | " + r["detail"] if r["detail"] else ""))
     print(f"plan verify: {len(res) - len(failed)}/{len(res)} passed")
+    pending = [f"L{lv['id']:02d} 玩法 {p['id']}「{p['name']}」" for lv in pl["levels"] for p in lv["plays"]
+               if p.get("precedent_status") == "pending" or (not p.get("precedent_status") and "待核" in (p.get("precedent") or ""))]
+    if pending:
+        print(f"玩法先例待核 {len(pending)} 个（不算失败，kit spec 会列进 followups.json 交给生成线）：" + "、".join(pending))
     return 1 if failed else 0
 

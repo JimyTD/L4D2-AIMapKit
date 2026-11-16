@@ -37,7 +37,7 @@
 | `alts` | 分支：`{"name", "kind": "split", "legs": [...]}`，两端接回主线 |
 | `fork` | 可选：`true` 表示开局就分路，`alts` 在主线起点合流 |
 | `sections` | 段落：`{"key", "name", "at": 标签位置, "to": 路线上的锚点, "text"}` |
-| `plays` | 玩法：`{"id", "name", "entities": [类名], "precedent": "原版地图与做法"}` |
+| `plays` | 玩法：`{"id", "name", "entities": [类名], "precedent": "原版地图与做法", "precedent_status": "checked|pending"}`。只核了实体名、玩法层面的先例还没找到时写 `pending`；`kit spec` 会把它列进 `followups.json` 交给生成线 |
 | `landmarks` | 可选：这一关一定要像真的结构体，轮廓 id 列表（P3 每关拍板时问用户） |
 | `events` | `{"at", "name", "trigger", "level": 低|中|高}` |
 | `items` | `{"kind": medkit|throw|ammo|weapon, "at", "note"}` |

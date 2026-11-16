@@ -54,6 +54,14 @@ def decision_items() -> list:
 class Decisions(dict):
     """id -> value of every decided item. Reading an undecided one stops the script with the step that owns it."""
 
+    def __getitem__(self, key):
+        USED.add(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        USED.add(key)
+        return super().get(key, default)
+
     def __missing__(self, key):
         item = next((i for i in decision_items() if i["id"] == key), None)
         where = "（列表里没有这一项，从 Kit 的 assets/decisions-template.json 补上）" if item is None else (
@@ -64,6 +72,24 @@ class Decisions(dict):
 @lru_cache(None)
 def decisions() -> dict:
     return Decisions({i["id"]: i["value"] for i in decision_items() if i.get("value") is not None})
+
+
+USED: set = set()  # ids of the standards this process actually read (a check report records them)
+
+
+def decisions_fp(ids=None, items=None) -> str:
+    """Fingerprint of the values of the given standards (default: the ones read so far in this process).
+    Only values count, not why/status/notes. kit status recomputes it over the same ids."""
+    import hashlib
+    ids = sorted(USED if ids is None else ids)
+    allv = {i["id"]: i.get("value") for i in (items if items is not None else decision_items())}
+    vals = {k: allv.get(k) for k in ids}
+    return hashlib.sha256(json.dumps(vals, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
+
+
+def decisions_stamp() -> dict:
+    """What a check report stores: the standards it read and the fingerprint of their values."""
+    return {"decisions_used": sorted(USED), "decisions_fp": decisions_fp()}
 
 
 def need(key: str):

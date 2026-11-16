@@ -25,7 +25,7 @@ from shapely.ops import unary_union
 import fmt
 import imagery
 from geo import load
-from project import KIT, UNIT_M, KitError, decisions, plan_level, rel, root, sources
+from project import KIT, UNIT_M, KitError, decisions, decisions_stamp, plan_level, rel, root, sources
 
 GRADES = {"实测", "确认", "推断", "假设", "改动"}
 SPACE_KINDS = {"corridor", "room", "hall", "service", "balcony", "void"}
@@ -1052,6 +1052,8 @@ def root_rel(out_html):
 
 
 def run(p: Path) -> int:
+    import project
+    project.USED.clear()
     spec = load_spec(p)
     dec = decisions()
     m = build(spec)
@@ -1066,7 +1068,7 @@ def run(p: Path) -> int:
     Path(stem + ".build.json").write_text(json.dumps(exp, ensure_ascii=False, indent=1), encoding="utf-8")
     write_page(spec, m, res, exp, Path(stem + ".html"))
     failed = [r for r in res if not r["pass"]]
-    rep = {"spec": p.name, "passed": len(res) - len(failed), "failed": len(failed), "results": res}
+    rep = {"spec": p.name, "passed": len(res) - len(failed), "failed": len(failed), **decisions_stamp(), "results": res}
     p.with_suffix(".check.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
     for r in res:
         if not r["pass"] or "-v" in sys.argv:

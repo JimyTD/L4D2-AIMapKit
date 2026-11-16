@@ -22,7 +22,7 @@ from shapely.ops import unary_union
 
 from area import gpoly
 from geo import load
-from project import COORD_MAX_U, decisions, root, sources
+from project import COORD_MAX_U, decisions, decisions_stamp, root, sources
 from structure import Frame, m2u
 
 
@@ -158,12 +158,14 @@ def export(spec, placed, ents):
 
 
 def run(p: Path) -> int:
+    import project
+    project.USED.clear()
     spec = json.loads(p.read_text(encoding="utf-8"))
     res, placed, ents = check(spec, decisions(), sources())
     out = export(spec, placed, ents)
     p.with_suffix("").with_suffix(".build.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     failed = [r for r in res if not r["pass"]]
-    p.with_suffix("").with_suffix(".check.json").write_text(json.dumps({"spec": p.name, "passed": len(res) - len(failed), "failed": len(failed), "results": res},
+    p.with_suffix("").with_suffix(".check.json").write_text(json.dumps({"spec": p.name, "passed": len(res) - len(failed), "failed": len(failed), **decisions_stamp(), "results": res},
                                                          ensure_ascii=False, indent=1), encoding="utf-8")
     for r in res:
         if not r["pass"] or "-v" in sys.argv:

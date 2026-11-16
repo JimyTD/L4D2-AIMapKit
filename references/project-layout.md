@@ -19,6 +19,8 @@
     REVIEW-LOG.md       用户意见
     plan/               campaign.json、DESIGN.md、rooms.json、levels/L<n>.json、data/、views/、reports/
     detail/L<nn>/       README.md、grades.json、layout.json、events.json、FACTS.md（D2 结构事实底稿，给 agent 用）、structures/、areas/、spec.json、level.html
+                        kit spec 顺手写出：elements.json（设计元素总表）、followups.json（待跟进项）、handoff.json（交接）
+                        followups.closed.json（生成线或试玩关掉的跟进项）、BLIND-REVIEW.json（D6 盲审分类）
 ```
 
 ## 资料索引 `sources/index.json`

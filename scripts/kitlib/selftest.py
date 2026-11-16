@@ -123,6 +123,7 @@ def run() -> int:
         if not game_dir():
             print("NOTE 本机没找到游戏：实体类名的核验跳过，对应用例不算")
         bad += facts_checks(proj)
+        bad += handoff_checks(proj)
         bad += status_checks(proj)
         bad += extension_checks(proj)
     finally:
@@ -147,6 +148,52 @@ def run() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
     print("selftest: " + ("全部通过" if not bad else f"{bad} 项没通过"))
     return 1 if bad else 0
+
+
+def handoff_checks(proj) -> int:
+    """kit spec writes elements / followups / handoff; a changed standard makes check reports stale."""
+    bad = 0
+    tmp = proj.parent / "handoff"
+    shutil.copytree(proj, tmp)
+    try:
+        edit(tmp, "design/plan/levels/L1.json", lambda d: d["plays"][0].update({"precedent_status": "pending"}))
+        kit(tmp, "plan", "build")
+        kit(tmp, "spec", "1")
+        ld = tmp / L
+        res = []
+        names = all((ld / n).exists() for n in ("elements.json", "followups.json", "handoff.json"))
+        res.append(("kit spec 写出 elements / followups / handoff", names))
+        if names:
+            els = json.loads((ld / "elements.json").read_text(encoding="utf-8"))["elements"]
+            res.append(("elements 带结构体的门和物件、开放区的封路", any(e["collection"] == "door" for e in els)
+                        and any(e["collection"] == "object" for e in els) and any(e["collection"] == "boundary" for e in els)))
+            res.append(("elements 的 key 整关唯一", len({e["key"] for e in els}) == len(els)))
+            fu = json.loads((ld / "followups.json").read_text(encoding="utf-8"))["items"]
+            pk = next((f["key"] for f in fu if f["type"] == "play_precedent" and f["to"] == "build" and f["status"] == "open"), None)
+            res.append(("玩法先例 pending 进 followups，交给生成线", bool(pk)))
+            if pk:
+                (ld / "followups.closed.json").write_text(json.dumps({pk: "selftest"}), encoding="utf-8")
+                kit(tmp, "spec", "1")
+                fu = json.loads((ld / "followups.json").read_text(encoding="utf-8"))["items"]
+                res.append(("followups.closed.json 关掉的项显示 closed", any(f["key"] == pk and f["status"] == "closed" for f in fu)))
+        kit(tmp, "approve", "P1", "P3", "P3/L1", "P4", "--note", "selftest")
+        _, before = kit(tmp, "status")
+        edit(tmp, "standards/decisions.json", lambda d: d["items"].append({"id": "zz_unused", "value": 1, "status": "暂定"}))
+        _, mid = kit(tmp, "status")
+        res.append(("改了没被用到的值，核验不过期", "核验过期" not in mid and "过期：跑 kit spec" not in mid))
+        edit(tmp, "standards/decisions.json", lambda d: byid(d["items"], "corridor_min").__setitem__("value", byid(d["items"], "corridor_min")["value"] + 1))
+        _, after = kit(tmp, "status")
+        res.append(("改了待决定列表的值，结构体核验显示过期", "核验过期" not in before and "核验过期：A" in after))
+        edit(tmp, "standards/decisions.json", lambda d: byid(d["items"], "brushside_cap").__setitem__("value", byid(d["items"], "brushside_cap")["value"] + 1))
+        _, after2 = kit(tmp, "status")
+        res.append(("改了 spec 用到的值（面数上限），spec 显示过期", "过期：跑 kit spec" in after2))
+        res.append(("改了值，下一步不会被带回规划阶段", "下一步：P3" not in after))
+        for what, passed in res:
+            print(("OK   " if passed else "FAIL ") + "交接：" + what + ("" if passed else "\n" + after[-800:]))
+            bad += 0 if passed else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return bad
 
 
 def facts_checks(proj) -> int:
