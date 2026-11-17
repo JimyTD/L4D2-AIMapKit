@@ -55,7 +55,7 @@ ol,ul{margin:0;padding-left:20px}li{margin:3px 0}
 <div class="nums">
 <div class="num"><b>1</b><span>主会话（总控）。同一时间只有 1 个；上下文满了就换一个新的接班，状态全在文件里</span></div>
 <div class="num"><b>每关 6 个</b><span>段会话：设计线 3 段 + 生成线 3 段，每段一个会话，在接力点换；另有修订会话，按需</span></div>
-<div class="num"><b>占名额的同时 ≤ 4 个</b><span>总控 1 + 设计侧（含修订）max_parallel_lines 个 + 生成线 1 条，默认 max_parallel_lines = 2。生成③ 等负责人试走时不占名额</span></div>
+<div class="num"><b>占名额的同时 ≤ 4 个</b><span>总控 1 + 设计线 max_parallel_lines 条 + 生成线 1 条，默认 max_parallel_lines = 2。修订会话和等负责人试走的生成③ 不占名额</span></div>
 <div class="num"><b>子 agent 按任务派</b><span>每会话同时几个看环境（P0 写进 agents.max_subagents）。做完就结束，不出现在侧栏，不和负责人说话</span></div>
 <div class="num"><b>一关约 6–7 个</b><span>会话（先后开，不是同时）：段会话 6 + 修订按需。整个项目另有总控 1 个</span></div>
 </div>
@@ -86,7 +86,7 @@ ol,ul{margin:0;padding-left:20px}li{margin:3px 0}
 <div class="cols">
 <div class="card"><h2>排期规则</h2><ol>
 <li>总控做完规划（P0–P4）和 D0 后转入待命，不再做步骤里的活。</li>
-<li>设计侧同时最多 <code>max_parallel_lines</code> 个会话（模拟取 2），修订会话也占这个名额。让出名额的会话先开“待开修订”的条目，没有再开下一关的设计①。</li>
+<li>设计线同时最多 <code>max_parallel_lines</code> 条（模拟取 2），设计③ 结束时开下一关的设计①。修订会话不占名额，同一关同时只有一个，负责人同意后马上开。</li>
 <li>生成线同时只有 1 条：生成器和美术规范各关共用，完整编译也会互相抢 CPU。生成③ 等负责人试走时不占名额：G9 拍板后名额就放给下一关。</li>
 <li>每段结束都是接力点。负责人一次审一个，后到的排队（黄色）。审完由这一段的会话开下一段，自己结束。</li>
 <li>一关设计做完 D7，由设计③开这一关的生成①；生成线有人在跑就在 PROJECT.md 主线分工表的“排队”列登记，由让出名额的会话开。</li>
@@ -177,7 +177,7 @@ const ROLES={
  d2:{n:'设计②',s:'画结构体和开放区',c:'#1a7f37',x:110,y:330,w:150},
  d3:{n:'设计③',s:'彩蛋 → 盲审 → D7',c:'#1a7f37',x:110,y:400,w:150},
  rv:{n:'修订会话',s:'按需',c:'#0e8a9a',x:110,y:490,w:150,dash:1,
-  d:{'负责什么':'设计线结束后，别人交回这一关设计的问题。按 D2、D3 的规则改、核验，重新合成 spec，更新交接','开工读':'SKILL.md、PROJECT.md、kit status；开场白给的条目编号；kit status 指向的步骤页；要改的那几个文件','写':'design/detail/L&lt;nn&gt;/ 里条目涉及的文件；条目状态','只能改':'登记过、负责人在停顿点同意修订的条目','拍板':'负责人已答复过这条取舍、只改了这一处的，直接 kit approve，原话写进 REVIEW-LOG.md；超出原话范围才重新交拍板','谁开它':'发现问题的会话，在它的停顿点、负责人同意后开；没有名额就标“待开修订”，由让出名额的会话开','结束':'条目都改成已修复或已驳回后结束，不开后继；有会话在等这条的，告诉负责人回到那个会话说继续','名额':'占设计侧名额，优先于开下一关的设计'}},
+  d:{'负责什么':'设计线结束后，别人交回这一关设计的问题。按 D2、D3 的规则改、核验，重新合成 spec，更新交接','开工读':'SKILL.md、PROJECT.md、kit status；开场白给的条目编号；kit status 指向的步骤页；要改的那几个文件','写':'design/detail/L&lt;nn&gt;/ 里条目涉及的文件；条目状态','只能改':'登记过、负责人在停顿点同意修订的条目','拍板':'负责人已答复过这条取舍、只改了这一处的，直接 kit approve，原话写进 REVIEW-LOG.md；超出原话范围才重新交拍板','谁开它':'发现问题的会话，在它的停顿点、负责人同意后开；这一关已有修订会话在跑时不另开，条目标“待开修订”，由它结束前接着改','结束':'条目都改成已修复或已驳回后结束，不开后继；有会话在等这条的，告诉负责人回到那个会话说继续','名额':'不占名额；同一关同时只有一个'}},
  g1:{n:'生成①',s:'G0（只第一关）、G1–G4',c:'#bc4c00',x:420,y:260,w:170},
  g2:{n:'生成②',s:'G5–G7 → G9 交付',c:'#bc4c00',x:420,y:330,w:170},
  g3:{n:'生成③',s:'G10 人工任务与反馈',c:'#bc4c00',x:420,y:400,w:170},
@@ -244,8 +244,8 @@ function simulate(){
   const active=k=>lines.filter(l=>(l.k===k)&&(l.st==='run'||l.st==='review'||l.st==='inrev')&&!(k==='g'&&l.seg>=2));
   if(t>=PLAN){
    // revisions first
-   lines.filter(l=>l.k==='r'&&l.st==='ready').forEach(l=>{if(active('d').length+active('r').length<2)start(l)});
-   for(const l of lines.filter(l=>l.k==='d'&&l.st==='wait')){ if(l.lv>1&&L('d'+(l.lv-1)).st==='wait')break; if(lines.some(x=>x.k==='r'&&x.st==='ready'))break; if(active('d').length+active('r').length<2)start(l);else break;}
+   lines.filter(l=>l.k==='r'&&l.st==='ready').forEach(l=>start(l));
+   for(const l of lines.filter(l=>l.k==='d'&&l.st==='wait')){ if(l.lv>1&&L('d'+(l.lv-1)).st==='wait')break; if(active('d').length<2)start(l);else break;}
    for(const l of lines.filter(l=>l.k==='g'&&l.st==='wait')){ if(L('d'+l.lv).st!=='done')break; const gp=L('g'+(l.lv-1)); if(l.lv>1&&!(gp.st==='done'||gp.seg>=2))break; if(active('g').length<1)start(l);break;}
   }
   // user reviews one per tick (FIFO)
@@ -278,13 +278,13 @@ function drawTL(cur){
  });
  const yb=Y0+rows.length*RH+8;
  const B=yb+50;h+='<text x="'+(X0-8)+'" y="'+(yb+12)+'" text-anchor="end" fill="#57606a">同时活着的会话</text>';
- alive.forEach(a=>{const n=a.ctl+a.d+a.g+a.r,m=n+a.h,w=Math.max(1,sx-0.5);if(a.h)h+='<rect x="'+(X0+a.t*sx)+'" y="'+(B-m*9)+'" width="'+w+'" height="'+(a.h*9)+'" fill="#d0d7de"/>';h+='<rect x="'+(X0+a.t*sx)+'" y="'+(B-n*9)+'" width="'+w+'" height="'+(n*9)+'" fill="'+(n>4?'#cf222e':'#8c959f')+'"/>';});
- h+='<line x1="'+X0+'" y1="'+(B-36)+'" x2="'+(X0+W)+'" y2="'+(B-36)+'" stroke="#cf222e" stroke-dasharray="4 3"/><text x="'+(X0+W)+'" y="'+(B-39)+'" text-anchor="end" fill="#cf222e">名额上限 4（浅灰：生成③ 等人工，不占名额）</text>';
+ alive.forEach(a=>{const n=a.ctl+a.d+a.g,m=n+a.r+a.h,w=Math.max(1,sx-0.5);if(a.h||a.r)h+='<rect x="'+(X0+a.t*sx)+'" y="'+(B-m*9)+'" width="'+w+'" height="'+((a.h+a.r)*9)+'" fill="#d0d7de"/>';h+='<rect x="'+(X0+a.t*sx)+'" y="'+(B-n*9)+'" width="'+w+'" height="'+(n*9)+'" fill="'+(n>4?'#cf222e':'#8c959f')+'"/>';});
+ h+='<line x1="'+X0+'" y1="'+(B-36)+'" x2="'+(X0+W)+'" y2="'+(B-36)+'" stroke="#cf222e" stroke-dasharray="4 3"/><text x="'+(X0+W)+'" y="'+(B-39)+'" text-anchor="end" fill="#cf222e">名额上限 4（浅灰：修订会话和等人工的生成③，不占名额）</text>';
  const cx=X0+cur*sx;h+='<line x1="'+cx+'" y1="'+(Y0-6)+'" x2="'+cx+'" y2="'+(B+4)+'" stroke="#1f2328" stroke-width="1.5"/>';
  $('tl').setAttribute('viewBox','0 0 1400 '+(B+12));$('tl').innerHTML=h;
  const a=alive[Math.min(cur,alive.length-1)];const names=[];lines.forEach(l=>{const b=l.bars.find(b=>b.t0<=cur&&cur<(b.t1??SIM.T));if(b)names.push('L'+l.lv+' '+b.lab)});
  $('tnow').textContent='第 '+cur+' / '+(SIM.T-1);
- $('tstat').innerHTML='此刻活着：<b>总控</b>'+(names.length?'、'+names.join('、'):'')+'，共 <b>'+(a.ctl+a.d+a.g+a.r+a.h)+'</b> 个，其中占名额 <b>'+(a.ctl+a.d+a.g+a.r)+'</b> 个；负责人'+(a.user?'正在审一个接力点':'空闲')+(a.queue?'，另有 '+a.queue+' 个在排队':'')+'。全程：一共开过 <b>'+SIM.created+'</b> 个会话，占名额最多同时 <b>'+Math.max(...alive.map(a=>a.ctl+a.d+a.g+a.r))+'</b> 个；负责人一共审 <b>'+SIM.lines.reduce((s,l)=>s+l.bars.length,0)+'</b> 次接力点（每段 1 次，彩蛋另算未画）。';
+ $('tstat').innerHTML='此刻活着：<b>总控</b>'+(names.length?'、'+names.join('、'):'')+'，共 <b>'+(a.ctl+a.d+a.g+a.r+a.h)+'</b> 个，其中占名额 <b>'+(a.ctl+a.d+a.g)+'</b> 个；负责人'+(a.user?'正在审一个接力点':'空闲')+(a.queue?'，另有 '+a.queue+' 个在排队':'')+'。全程：一共开过 <b>'+SIM.created+'</b> 个会话，占名额最多同时 <b>'+Math.max(...alive.map(a=>a.ctl+a.d+a.g))+'</b> 个；负责人一共审 <b>'+SIM.lines.reduce((s,l)=>s+l.bars.length,0)+'</b> 次接力点（每段 1 次，彩蛋另算未画）。';
 }
 $('tslider').max=SIM.T-1;$('tslider').oninput=e=>drawTL(+e.target.value);
 
@@ -302,13 +302,13 @@ const SC=[
  {w:'gen',to:['file'],t:'只影响 G4–G7，不挡路。写进 work/L&lt;nn&gt;/gaps.json：涉及的元素 key；先按“进入就触发”做（假设）；影响 G4 和哪些试走项',at:['G4'],back:1,st:0},
  {w:'gen',to:['own'],t:'G4 之后的停顿：只交问题。“本批要设计修订的问题 1 条”，附建议',at:['G4'],back:1},
  {w:'own',to:['gen'],t:'同意修订，取舍是“进入就触发”',at:['G4'],back:1,m:'hum',st:1},
- {w:'gen',to:['des','file'],t:'原话写进 REVIEW-LOG.md；查 PROJECT.md：设计线已结束、设计侧有名额 → 开修订会话（开场白带条目编号）。没名额就标“待开修订”',at:['G4'],back:1},
+ {w:'gen',to:['des','file'],t:'原话写进 REVIEW-LOG.md；查 PROJECT.md：设计线已结束、这一关没有修订会话在跑 → 开修订会话（开场白带条目编号）',at:['G4'],back:1},
  {w:'gen',t:'写交接 → 开生成② → 结束。生成② 带着假设做 G5–G7，和修订会话同时跑',at:['G5'],back:1},
  {w:'des',to:['file'],t:'修订会话开工：kit status 列出交给本关设计的问题；只读 D3 步骤页和要改的文件',at:['D3'],back:1},
  {w:'des',to:['file'],t:'改开放区文件里的物件触发方式；kit detail area 核验通过',at:['D3'],back:1},
  {w:'des',to:['file'],t:'kit status：这个开放区“拍板后已修改”，D5 过期 → kit spec 重新合成，核验通过',at:['D5'],back:1,fwd:1,stale:['D5','D6']},
  {w:'des',to:['file'],t:'负责人已在 G4 停顿答复过这条取舍，只改了这一处 → 直接 kit approve，原话写进 REVIEW-LOG.md，下次拍板的“只是告诉你的”里带过',at:['D6'],back:1,fwd:1,stale:['D6']},
- {w:'des',to:['file'],t:'更新本关交接（D7）；条目“已修复”；结束，不开后继，让出的名额按“谁开谁”处理',at:['D7'],back:1,fwd:1,st:2},
+ {w:'des',to:['file'],t:'更新本关交接（D7）；条目“已修复”；查有没有标“待开修订”的条目，没有就结束，不开后继',at:['D7'],back:1,fwd:1,st:2},
  {w:'gen',to:['file'],t:'生成② 下一步之前比对 stamps：事件变了、几何没变 → G4 过期，涉及的试走项作废；G3、G5–G7 不动',at:['G4'],back:1,fwd:1,stale:['G4'],void:['C2']},
  {w:'gen',to:['file'],t:'重跑 G4（机器部分整体重跑）；去掉假设；条目“已关闭”；invalidated.json 记下要重走的试走项',at:['G4'],back:1,fwd:1,stale:['G4'],void:['C2'],st:4},
  {w:'gen',t:'重跑时又发现新问题？',at:['G4'],loop:2,end:'没有 → 继续到 G9。同一个 key 第 3 次重开 → 停下交负责人查根子'}]},
@@ -321,7 +321,7 @@ const SC=[
  {w:'gen',to:['file'],t:'写进 gaps.json：哪个开放区、key、坐标、建议加高或换成翻不过去的封堵',at:['C2'],back:1,st:0},
  {w:'gen',to:['own'],t:'本段停顿点：汇报已改的外观问题 + 本批要设计修订的问题',at:['C2'],back:1},
  {w:'own',to:['gen'],t:'同意修订，取舍：加高到翻不过去',at:['C2'],back:1,m:'hum',st:1},
- {w:'gen',to:['des'],t:'设计侧有名额 → 开修订会话。生成③ 不结束，等修订完再重跑',at:['C2'],back:1},
+ {w:'gen',to:['des'],t:'这一关没有修订会话在跑 → 开修订会话。生成③ 不结束，等修订完再重跑',at:['C2'],back:1},
  {w:'des',to:['file'],t:'修订会话改开放区文件的封路高度，核验；kit spec 重新合成',at:['D3','D5'],back:1,fwd:1,stale:['D5','D6']},
  {w:'des',to:['file'],t:'取舍负责人已答复、只改了这一处 → 直接 kit approve，原话写进 REVIEW-LOG.md',at:['D6'],back:1,fwd:1,stale:['D6']},
  {w:'des',to:['own','file'],t:'条目“已修复”；结束前告诉负责人：“L&lt;nn&gt; 的生成③在等这条，回到那个会话说继续即可”',at:['D7'],back:1,fwd:1,st:2},
@@ -473,7 +473,7 @@ const RISK=[
  ['总控上下文爆炸','总控既调度又做具体活，或负责人在总控里长时间讨论','漏事、前后矛盾','总控不做任何 D、G 步骤的活，不读其他会话的对话记录，只读文件；压缩过一次就换新总控','长时间讨论仍会撑大它：放到流程外的会话里谈'],
  ['段会话上下文爆炸','一个会话从头做到尾','后半段质量下降','一段只活在两个接力点之间；建模、搜资料、看日志交子 agent；压缩过一次就提前接力','一段里活特别多（比如几十件自制模型）：靠子 agent 分担'],
  ['交接丢信息','只靠对话记忆；压缩后漏读别的线留下的反馈','重复劳动、问题没人处理','交接写进本线日志和问题清单；新会话只读文件，读完能接着干才算写够','日志写得不全：负责人在接力点能看到交接，可以当场指出'],
- ['问题没人认领','发现问题时，负责那个文件的会话已经结束','一直挂着，或靠负责人转述','发现方在自己的停顿点、负责人同意后开修订会话；没名额标“待开修订”；没有线在跑的文件归总控或下一条生成线','kit status 在每个会话里列出未关闭的缺口'],
+ ['问题没人认领','发现问题时，负责那个文件的会话已经结束','一直挂着，或靠负责人转述','发现方在自己的停顿点、负责人同意后开修订会话（不占名额，不用排队）；没有线在跑的文件归总控或下一条生成线','kit status 在每个会话里列出未关闭的缺口'],
  ['两个会话改同一个文件','并行时都改 PROJECT.md、资料库编号、decisions.json','覆盖对方的改动','一个文件一个主人；PROJECT.md 每线只改一行；共用文件改完立刻提交；只 add 自己改的文件；生成线一次一条','共用一个工作区：提交前看一眼 git status'],
  ['改生成器弄坏已完成的关','生成器各关共用','已交付的地图悄悄变了','在 build/_regress/ 对已完成的关回归比对；退步修到一致，变好了交负责人决定（场景 ⑤）','比对只看实体、面数、接线，外观的细微变化查不出'],
  ['返工乒乓','设计改完，生成又发现新问题，再改','时间和钱耗在来回上','同一个 key 第 3 次重开就停下查根子；问题成批交','根子在格式或 Kit 时，只能告诉负责人，等他在流程外决定'],
@@ -494,12 +494,12 @@ $('risktab').innerHTML=RISK.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'<
    if(i>0&&s.st!==undefined){let p=-1;for(let j=0;j<i;j++)if(S.s[j].st!==undefined)p=S.s[j].st;
     const ok={'-1':[0],0:[1,2,3],1:[2,3],2:[4],3:[4]};if(!(ok[p]||[]).includes(s.st))errs.push('场景'+(si+1)+'第'+(i+1)+'步状态 '+STATES[p]+'→'+STATES[s.st]+' 不合法');}
    try{sc=si;cur=i;drawPipe();drawSeq()}catch(e){errs.push('场景'+(si+1)+'第'+(i+1)+'步渲染出错 '+e.message)}});});
- const mx=Math.max(...SIM.alive.map(a=>a.ctl+a.d+a.g+a.r)),mxAll=Math.max(...SIM.alive.map(a=>a.ctl+a.d+a.g+a.r+a.h));if(mx>4)errs.push('排期占名额的会话 '+mx+' 超过 4');
- if(SIM.alive.some(a=>a.g>1))errs.push('排期出现两条生成线同时占名额');if(SIM.alive.some(a=>a.d+a.r>2))errs.push('排期设计侧超过 2');
+ const mx=Math.max(...SIM.alive.map(a=>a.ctl+a.d+a.g)),mxAll=Math.max(...SIM.alive.map(a=>a.ctl+a.d+a.g+a.r+a.h));if(mx>4)errs.push('排期占名额的会话 '+mx+' 超过 4');
+ if(SIM.alive.some(a=>a.g>1))errs.push('排期出现两条生成线同时占名额');if(SIM.alive.some(a=>a.d>2))errs.push('排期设计线超过 2');
  if(!SIM.lines.filter(l=>l.k!=='r').every(l=>l.st==='done'))errs.push('排期没跑完');
  if(!SIM.lines.filter(l=>l.k==='r').every(l=>l.st==='done'))errs.push('有修订没开');
  const segs=SIM.lines.reduce((s,l)=>s+l.bars.length,0);
- $('selftest').innerHTML=(errs.length?'<b style="color:#cf222e">'+errs.length+' 个问题</b>：'+errs.join('；'):'<b style="color:#1a7f37">通过</b>')+'。检查了 '+SC.length+' 个返工场景共 '+SC.reduce((s,x)=>s+x.s.length,0)+' 步（执行者、节点、循环目标、条目状态转换、渲染）；排期：占名额的会话同时最多 '+mx+' 个（加上等人工的生成③ 最多 '+mxAll+' 个），生成线不并行，设计侧不超过 2，一共开 '+SIM.created+' 个会话（总控 1 + 段和修订 '+segs+'）。';
+ $('selftest').innerHTML=(errs.length?'<b style="color:#cf222e">'+errs.length+' 个问题</b>：'+errs.join('；'):'<b style="color:#1a7f37">通过</b>')+'。检查了 '+SC.length+' 个返工场景共 '+SC.reduce((s,x)=>s+x.s.length,0)+' 步（执行者、节点、循环目标、条目状态转换、渲染）；排期：占名额的会话同时最多 '+mx+' 个（加上修订会话和等人工的生成③ 最多 '+mxAll+' 个），生成线不并行，设计线不超过 2，一共开 '+SIM.created+' 个会话（总控 1 + 段和修订 '+segs+'）。';
  document.body.dataset.selftest=errs.length?'fail':'ok';
  sc=0;cur=0;})();
 
