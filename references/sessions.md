@@ -93,7 +93,7 @@
 | design/detail/L<nn>/followups.closed.json | 这一关的生成线 | — |
 | kit spec 生成的 spec.json、spec.check.json、elements.json、followups.json、handoff.json | 谁都可以跑 kit spec 重新生成，不手改 | — |
 | standards/decisions.json | 值为空的项由 step 所在步骤的执行者首次填写；填了以后的修改（含暂定改已定）归总控；生成线新增的项归当前在跑的生成线 | 登记交给总控 |
-| standards/art.md、work/ 根目录下的文件和 refs/、assets-src/（外观规则、模型清单、许可，以及生成器自己的共用配置）、生成器 | 当前在跑的那条生成线 | 没有生成线在跑时，交给下一条 |
+| standards/art.md、work/ 下除 L<nn>/ 以外的文件、生成器 | 当前在跑的那条生成线 | 没有生成线在跑时，交给下一条 |
 | work/L<nn>/、build/L<nn>/ | 这一关的生成线 | — |
 | sources/ | 谁都能追加（kit sources add 分配编号），不改别人的条目 | 勘误写 errata |
 | design/REVIEW-LOG.md | 谁都能追加，只追加 | — |
