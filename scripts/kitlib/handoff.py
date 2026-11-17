@@ -233,16 +233,30 @@ def handoff(spec: dict, level_dir: Path, fups: list, spec_failed: int) -> dict:
                              for pid, ids in by_piece.items()},
         "sources_note": "只列设计数据里引用过的资料；还要按对象和用途找更多，用 kit sources find <对象> --use look",
         "followups_for_build": [f for f in fups if f["to"] == "build" and f["status"] == "open"],
-        "gaps_back": "生成线交回的缺口清单写成 build/gaps.json；跟进项做完写进 followups.closed.json（{key: 说明}），不改规划和设计文件",
+        "gaps_back": "生成线交回的缺口清单写成 work/L<nn>/gaps.json；跟进项做完写进 followups.closed.json（{key: 说明}），不改规划和设计文件",
     }
 
 
-def write(spec: dict, level_dir: Path, spec_failed: int = 0) -> dict:
+def build(spec: dict, level_dir: Path, spec_passed: bool = True) -> dict:
+    """The three lists as kit spec would write them, without writing (kit status compares by content)."""
     els = elements(spec)
     fups = followups(spec, level_dir)
-    ho = handoff(spec, level_dir, fups, spec_failed)
-    for name, data in (("elements.json", {"level": spec["level"], "count": len(els), "elements": els}),
-                       ("followups.json", {"level": spec["level"], "open": sum(1 for f in fups if f["status"] == "open"), "items": fups}),
-                       ("handoff.json", ho)):
-        (level_dir / name).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
-    return {"elements": len(els), "followups_open": sum(1 for f in fups if f["status"] == "open")}
+    ho = handoff(spec, level_dir, fups, 0 if spec_passed else 1)
+    return {"elements.json": {"level": spec["level"], "count": len(els), "elements": els},
+            "followups.json": {"level": spec["level"], "open": sum(1 for f in fups if f["status"] == "open"), "items": fups},
+            "handoff.json": ho}
+
+
+def write(spec: dict, level_dir: Path, spec_failed: int = 0) -> dict:
+    data = build(spec, level_dir, spec_failed == 0)
+    for name, d in data.items():
+        p = level_dir / name
+        old = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+        if name == "handoff.json" and old is not None:
+            same = {k: v for k, v in old.items() if k != "generated"} == {k: v for k, v in d.items() if k != "generated"}
+        else:
+            same = old == d
+        if not same:  # unchanged content keeps its time
+            p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    fu = data["followups.json"]
+    return {"elements": data["elements.json"]["count"], "followups_open": fu["open"]}

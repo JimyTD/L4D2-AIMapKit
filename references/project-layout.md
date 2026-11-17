@@ -20,7 +20,18 @@
     plan/               campaign.json、DESIGN.md、rooms.json、levels/L<n>.json、data/、views/、reports/
     detail/L<nn>/       README.md、grades.json、layout.json、events.json、FACTS.md（D2 结构事实底稿，给 agent 用）、structures/、areas/、spec.json、level.html
                         kit spec 顺手写出：elements.json（设计元素总表）、followups.json（待跟进项）、handoff.json（交接）
-                        followups.closed.json（生成线或试玩关掉的跟进项）、BLIND-REVIEW.json（D6 盲审分类）
+                        followups.closed.json（生成线关掉的跟进项）、BLIND-REVIEW.json（D6 盲审分类）
+  standards/art.md      美术规范（G0）
+  logs/L<nn>-design.md、L<nn>-build.md   每条线的日志：每段结束追加一节交接
+  issues.json           跨线的问题（交给规划、跨关、没有线认领的），见 references/sessions.md
+  work/                 生成线不能重新生成的文件，提交
+    refs/               参照板 refs.json（外观类型、自制清单、缺口提问）
+    style.json models.json licenses.json assets-src/   项目共用的风格配置、模型清单、素材许可、自制资源源文件
+    L<nn>/              gaps.json（交回设计的缺口）、dressing/、fallbacks.json、playtest.json、human-todo.json、feedback.json、
+                        manual-checks.md（脚本还没有时的人工核对结果）、invalidated.json、delivered/parts.json
+  build/L<nn>/          生成线能重新生成的产物，不提交：vmf、bsp、instances/、kinds.json、parts.json、intake.json、
+                        faces.json、report.json、REPORT.md、HUMAN-TODO.md、check/、stamps/、_regress/
+  nav/<地图>.nav        用户交回的导航网格
 ```
 
 ## 资料索引 `sources/index.json`
@@ -55,5 +66,5 @@
 
 ## 仓库
 
-文本走普通 git，图片等二进制走 Git LFS，编译产物不提交（骨架里已经配好 `.gitignore` 和 `.gitattributes`）。资料库里有网络照片的项目仓库不能公开。
+文本走普通 git，图片等二进制走 Git LFS，编译产物不提交（骨架里已经配好 `.gitignore` 和 `.gitattributes`）：`build/` 不提交，`work/` 提交。资料库里有网络照片的项目仓库不能公开。
 

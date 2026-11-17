@@ -8,6 +8,7 @@ not recommendations. Uses a temporary copy and leaves nothing behind in the Kit.
 from __future__ import annotations
 
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -188,6 +189,28 @@ def handoff_checks(proj) -> int:
         _, after2 = kit(tmp, "status")
         res.append(("改了 spec 用到的值（面数上限），spec 显示过期", "过期：跑 kit spec" in after2))
         res.append(("改了值，下一步不会被带回规划阶段", "下一步：P3" not in after))
+        # D6 covers the design, not the embedded standards; handoff lists are compared by content
+        kit(tmp, "spec", "1")
+        kit(tmp, "approve", "L01/D6", "--note", "selftest")
+        edit(tmp, "standards/decisions.json", lambda d: byid(d["items"], "corridor_min").__setitem__("why", "selftest: why changed"))
+        kit(tmp, "spec", "1")
+        _, s6 = kit(tmp, "status")
+        res.append(("只改待决定列表，重新合成后 D6 仍是已拍板", re.search(r"D6 整关拍板\s+已拍板", s6) is not None))
+        edit(tmp, "sources/index.json", lambda d: d.append({"id": "S9999", "type": "web", "path": "web/x", "subject": "x", "grade": "无关",
+                                                            "use": ["look"], "date": "2000-01-01", "url": "https://example.invalid"}))
+        _, s7 = kit(tmp, "status")
+        res.append(("加一条没被引用的资料，交接清单不过期", "交接清单过期" not in s7))
+        edit(tmp, L + "/events.json", lambda d: d["events"][0].__setitem__("name", "selftest renamed"))
+        kit(tmp, "spec", "1")
+        _, s8 = kit(tmp, "status")
+        res.append(("改了设计（事件），D6 显示拍板后已修改", re.search(r"D6 整关拍板\s+拍板后已修改", s8) is not None))
+        wd = tmp / "work" / "L01"
+        wd.mkdir(parents=True, exist_ok=True)
+        els = json.loads((ld / "elements.json").read_text(encoding="utf-8"))["elements"]
+        (wd / "gaps.json").write_text(json.dumps([{"id": "g1", "element": els[0]["key"], "problem": "x", "affects": ["walk"]},
+                                                  {"id": "g2", "element": "no/such/-/key", "problem": "y", "affects": []}]), encoding="utf-8")
+        _, s9 = kit(tmp, "status")
+        res.append(("生成线缺口：element 拼错的报出来，影响玩法的计数", "找不到：g2" in s9 and "影响玩法的 1 条" in s9))
         for what, passed in res:
             print(("OK   " if passed else "FAIL ") + "交接：" + what + ("" if passed else "\n" + after[-800:]))
             bad += 0 if passed else 1

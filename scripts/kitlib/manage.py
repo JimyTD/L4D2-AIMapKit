@@ -105,13 +105,29 @@ def doctor(write: bool) -> int:
 
 # ---------------------------------------------------------------- fingerprints and approvals
 
-def _sha(paths) -> str:
+def _spec_design_bytes(p: Path) -> bytes:
+    """spec.json without its embedded standards: the D6 approval covers the design, not the standards list
+    (a changed standard is tracked by the check reports, and would otherwise reopen every level's D6)."""
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return p.read_bytes()
+    d.pop("standards", None)
+    return json.dumps(d, ensure_ascii=False, sort_keys=True).encode("utf-8")
+
+
+def _sha(paths, legacy=False) -> str:
+    """Fingerprint of a unit's files. legacy=True is the old way (spec.json hashed whole, standards included),
+    kept only so approvals recorded before the change still count."""
     h = hashlib.sha256()
     for p in sorted(paths):
         p = Path(p)
         if p.exists():
             h.update(p.relative_to(root()).as_posix().encode())
-            h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+            if p.name == "spec.json" and not legacy:
+                h.update(_spec_design_bytes(p))
+            else:
+                h.update(p.read_bytes().replace(b"\r\n", b"\n"))
     return h.hexdigest()[:16]
 
 
@@ -172,7 +188,11 @@ def approval_state(unit, files):
     a = approvals().get(unit)
     if not a:
         return "待拍板"
-    return "已拍板" if a["sha"] == _sha(files) else "拍板后已修改"
+    if a["sha"] == _sha(files):
+        return "已拍板"
+    if any(Path(f).name == "spec.json" for f in files) and a["sha"] == _sha(files, legacy=True):
+        return "已拍板"  # recorded before D6 stopped covering the embedded standards
+    return "拍板后已修改"
 
 
 def _level_no(name: str) -> int:
@@ -328,6 +348,51 @@ def _newer(out, inputs):
         if fp and "decisions_used" in rep and fp != _dec_fp(rep["decisions_used"]):
             return False
     return True
+
+
+def _handoff_current(ld: Path) -> bool:
+    """The three handoff lists match what kit spec would write now. Compared by content, not file time:
+    adding a source, closing a follow-up or editing an unrelated standard does not make them stale unless
+    the lists themselves would change."""
+    names = ("elements.json", "followups.json", "handoff.json")
+    if not all((ld / n).exists() for n in names) or not (ld / "spec.json").exists():
+        return False
+    try:
+        import handoff
+        spec = rd(ld / "spec.json")
+        spec["standards"] = rd(root() / "standards" / "decisions.json")["items"]
+        fresh = handoff.build(spec, ld, rd(ld / "handoff.json").get("spec_passed", True))
+    except Exception:  # anything unreadable: let kit spec rebuild and report it
+        return False
+    for n in names:
+        old = rd(ld / n)
+        new = fresh[n]
+        if n == "handoff.json":
+            old = {k: v for k, v in old.items() if k != "generated"}
+            new = {k: v for k, v in new.items() if k != "generated"}
+        if old != new:
+            return False
+    return True
+
+
+def _gaps_state(ld: Path) -> str:
+    """Build-line gaps (references/steps/D7-handoff.md): every element must be a key of elements.json."""
+    p = root() / "work" / ld.name / "gaps.json"
+    if not p.exists():
+        return ""
+    try:
+        gaps = rd(p)
+    except json.JSONDecodeError as e:
+        return f"{p.relative_to(root()).as_posix()} 不是合法 JSON：{e}"
+    els = ld / "elements.json"
+    keys = {e["key"] for e in rd(els)["elements"]} if els.exists() else set()
+    bad = [str(g.get("id")) for g in gaps if g.get("element") not in (None, "") and g.get("element") not in keys]
+    open_ = [g for g in gaps if g.get("status", "待处理") not in ("已关闭",)]
+    design = [g for g in open_ if g.get("affects")]
+    msg = f"{len(open_)} 条未关闭（其中影响玩法的 {len(design)} 条交设计）"
+    if bad:
+        msg += f"；element 在 elements.json 里找不到：{', '.join(bad[:10])}"
+    return msg
 
 
 def _dec_fp(ids):
@@ -503,15 +568,15 @@ def status() -> int:
             rows.append((f"{L} D5 合成", "未合成"))
         elif not _newer(spec, ins) or not _newer(ld / "spec.check.json", ins):
             rows.append((f"{L} D5 合成", "过期：跑 kit spec"))
-        elif not all(_newer(ld / n, [spec, ld / "BLIND-REVIEW.json", ld / "followups.closed.json",
-                                     r / "standards" / "decisions.json", r / "sources" / "index.json",
-                                     r / "design" / "plan" / "levels" / f"L{n_}.json"])
-                     for n_ in [_level_no(L)] for n in ("elements.json", "followups.json", "handoff.json")):
+        elif not _handoff_current(ld):
             rows.append((f"{L} D5 合成", "交接清单过期或缺（elements / followups / handoff）：跑 kit spec"))
         else:
             rows.append((f"{L} D5 合成", "通过" if _check_ok(ld / "spec.check.json") else "spec 核验未通过"))
         s6 = approval_state(f"{L}/D6", u[f"{L}/D6"]) if spec.exists() else "—"
         rows.append((f"{L} D6 整关拍板", s6))
+        gaps_msg = _gaps_state(ld)
+        if gaps_msg:
+            rows.append((f"    {L} 生成线缺口", gaps_msg))
     pm = r / "PROJECT.md"
     for step, state in rows:
         print(f"{step:<22} {state}")
