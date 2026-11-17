@@ -27,6 +27,7 @@
   work/                 生成线不能重新生成的文件，提交
     refs/               参照板 refs.json（外观类型、自制清单、缺口提问）
     style.json models.json licenses.json assets-src/   项目共用的风格配置、模型清单、素材许可、自制资源源文件
+    其他 *.json         生成器自己的项目共用配置（如环境、运行层、音景）；只属于一关的放 L<nn>/
     L<nn>/              gaps.json（交回设计的缺口）、dressing/、fallbacks.json、playtest.json、human-todo.json、feedback.json、
                         manual-checks.md（脚本还没有时的人工核对结果）、invalidated.json、delivered/parts.json
   build/L<nn>/          生成线能重新生成的产物，不提交：vmf、bsp、instances/、kinds.json、parts.json、intake.json、
