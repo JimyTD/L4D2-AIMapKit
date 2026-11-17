@@ -3,7 +3,7 @@
 用 AI 设计并搭建《求生之路 2》（L4D2）自定义战役地图的 skill。从一个主题开始，经过规划和详设，产出整关搭建规格（`spec.json`），再由生成线做成能编译、能试走的成品关卡。
 
 - agent 的入口：[SKILL.md](SKILL.md)
-- 给人看的流程说明：[docs/flow.html](docs/flow.html)（用浏览器打开）
+- 给人看的流程说明：[docs/flow.html](docs/flow.html)；会话、子 agent 与返工：[docs/rework.html](docs/rework.html)（用浏览器打开）
 - 生成线（从 `spec.json` 到成品关卡）写的是步骤和检查规则；生成器本身放在各项目里。
 
 ## 用法

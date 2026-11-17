@@ -75,4 +75,4 @@ D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），�
 | [sessions.md](references/sessions.md) | 开会话、换会话、处理别的线交来的问题前读 |
 | [engine-facts.md](references/engine-facts.md) | 需要引擎数值时 |
 | [tools.md](references/tools.md) | 读原版游戏资源；脚本没覆盖到或报错时 |
-| `docs/flow.html` | 给人看的流程说明，agent 不用读 |
+| `docs/flow.html`、`docs/rework.html` | 给人看的流程说明和会话、返工说明，agent 不用读 |

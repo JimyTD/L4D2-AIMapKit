@@ -48,7 +48,7 @@ h2.sec{font-size:16px;margin:0 0 10px}
 .seq div{padding:8px 10px;border-bottom:1px solid #eaeef2;font-size:13px}.seq .h{background:#f6f8fa;font-weight:600;color:var(--mut)}
 .seq .r{font-weight:600}
 </style></head><body>
-<header><div><h1>L4D2 AIMapKit：设计线与生成线流程</h1><div class="sub">设计线：从“一个主题”到“可交给生成的整关规格”。生成线：从 spec.json 到成品关卡。给人看的说明；agent 按 SKILL.md 和 references/ 工作。会话怎么分、问题怎么交回，见 <code>references/sessions.md</code>。</div></div>
+<header><div><h1>L4D2 AIMapKit：设计线与生成线流程</h1><div class="sub">设计线：从“一个主题”到“可交给生成的整关规格”。生成线：从 spec.json 到成品关卡。给人看的说明；agent 按 SKILL.md 和 references/ 工作。会话怎么分、问题怎么交回，见 <a href="rework.html">rework.html</a>。</div></div>
 <nav id="tabs"><button class="on" data-t="flow">流程图</button><button data-t="skill">Skill 结构</button><button data-t="scripts">脚本清单</button><button data-t="agents">子 agent 协作</button><button data-t="gates">门槛与规则</button><button data-t="session">新会话怎么开工</button></nav></header>
 <main>
 
@@ -442,7 +442,9 @@ document.getElementById('tree').textContent=
 '│  ├─ requirements.json          kit doctor 检查的依赖\n'+
 '│  ├─ review-pages/              评审页模板（结构体、开放区、整关）\n'+
 '│  └─ selftest-project/          虚构样例，只给 kit selftest 用\n'+
-'└─ docs/flow.html                本页';
+'└─ docs/                       给人看的说明（agent 不读）\n'+
+'   ├─ flow.html                 本页：设计线与生成线流程\n'+
+'   └─ rework.html               会话、子 agent 与返工';
 const tbl=(id,h,rows)=>document.getElementById(id).innerHTML='<tr>'+h.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('');
 tbl('layers',['层','管什么','什么时候读'],[
  ['SKILL.md','开工顺序、硬规则、流程表（项目处于哪一步就读哪一页）','每次开工'],

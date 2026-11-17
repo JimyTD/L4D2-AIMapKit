@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>L4D2 AIMapKit：会话、子 agent 与返工</title>
+<style>
+:root{--ink:#1f2328;--mut:#57606a;--line:#d0d7de;--bg:#f6f8fa;--plan:#0969da;--det:#1a7f37;--gen:#bc4c00;--own:#cf222e;--kit:#8250df;--new:#d4760a;--rev:#0e8a9a}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.6 'Microsoft YaHei','PingFang SC',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;position:sticky;top:0;z-index:5}
+h1{font-size:20px;margin:0}.sub{color:var(--mut);font-size:13px}
+nav{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+nav button,.pill{border:1px solid var(--line);background:#fff;border-radius:16px;padding:4px 12px;cursor:pointer;font:inherit}
+nav button.on,.pill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+main{padding:16px 20px;max-width:1440px}
+.tab{display:none}.tab.on{display:block}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 10px}h3{font-size:14px;margin:12px 0 6px}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:14px}
+.num{background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.num b{display:block;font-size:24px;line-height:1.2}.num span{font-size:12.5px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid #eaeef2;padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600;background:#f6f8fa}
+.m-hum{display:inline-block;font-size:11px;border-radius:8px;padding:0 6px;background:#ffebe9;color:#cf222e;border:1px solid #ff8182;white-space:nowrap}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin:0 0 10px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px}
+svg{width:100%;height:auto;display:block}
+.role rect{stroke-width:1.5}.role{cursor:pointer}.role:hover rect{stroke-width:3}
+.role text{font-size:12.5px;text-anchor:middle}.role .s{font-size:11px;fill:#57606a}
+#roleinfo dt{font-weight:600;color:var(--mut);font-size:12px;margin-top:8px}#roleinfo dd{margin:2px 0 0}
+.ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.ctrl button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 12px;cursor:pointer;font:inherit}
+.nd rect{fill:#fff;stroke:#8c959f;stroke-width:1.2}.nd text{font-size:12px;text-anchor:middle}.nd .s{font-size:10.5px;fill:#57606a}
+.nd.hl rect{stroke:var(--ink);stroke-width:3}.nd.stale rect{fill:#fff8c5;stroke:#bf8700;stroke-width:2.2}.nd.void rect{fill:#fbefff;stroke:#8250df;stroke-width:2.2}
+.arc{fill:none;stroke-width:2.6}.arc.back{stroke:#cf222e}.arc.fwd{stroke:#1a7f37;stroke-dasharray:8 5;animation:dash 1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-13}}
+.al{font-size:12px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:5px}
+#seq tr{cursor:pointer}#seq tr.f td{opacity:.3}#seq tr.now td{background:#fff8c5}
+#seq td{width:15%}#seq td:first-child{width:34px;text-align:center}
+.b{display:block;border-radius:6px;padding:4px 8px;background:#f6f8fa;border:1px solid var(--line)}
+.rcv{font-size:12px;color:var(--mut);border:1px dashed #8c959f;border-radius:10px;padding:0 8px;display:inline-block}
+.loopb{border:1.5px solid var(--det);color:var(--det);background:#dafbe1;border-radius:6px;padding:2px 9px;cursor:pointer;font:inherit;font-weight:700;margin-top:4px}
+.lap{font-weight:700;color:var(--det)}
+.tl .bar{stroke:#fff;stroke-width:1}.tl text{font-size:11px}
+code{font-family:Consolas,monospace;font-size:12.5px;background:#eff2f5;border-radius:4px;padding:0 4px}
+.note{border-left:4px solid var(--new);padding-left:10px;background:#fffaf2}
+.ask{border-left:4px solid var(--own);padding-left:10px}
+ol,ul{margin:0;padding-left:20px}li{margin:3px 0}
+#selftest{font-size:12px;color:var(--mut)}
+</style></head><body>
+<header><h1>L4D2 AIMapKit：会话、子 agent 与返工</h1>
+<div class="sub">回答三件事：要多少个会话和子 agent；正常工作怎么走；发现问题怎么回到前面再走回来。给人看的说明；agent 按 <code>references/sessions.md</code> 工作。配合 <a href="flow.html">flow.html</a> 看。</div>
+<nav id="tabs"></nav></header>
+<main>
+
+<section class="tab" id="t-org">
+<div class="nums">
+<div class="num"><b>1</b><span>主会话（总控）。同一时间只有 1 个；上下文满了就换一个新的接班，状态全在文件里</span></div>
+<div class="num"><b>每关 6 个</b><span>段会话：设计线 3 段 + 生成线 3 段，每段一个会话，在接力点换；另有修订会话，按需</span></div>
+<div class="num"><b>占名额的同时 ≤ 4 个</b><span>总控 1 + 设计侧（含修订）max_parallel_lines 个 + 生成线 1 条，默认 max_parallel_lines = 2。生成③ 等负责人试走时不占名额</span></div>
+<div class="num"><b>子 agent 按任务派</b><span>每会话同时几个看环境（P0 写进 agents.max_subagents）。做完就结束，不出现在侧栏，不和负责人说话</span></div>
+<div class="num"><b>一关约 6–7 个</b><span>会话（先后开，不是同时）：段会话 6 + 修订按需。整个项目另有总控 1 个</span></div>
+</div>
+<div class="cols">
+<div class="card"><h2>组织图（点任一框看它负责什么、读什么、谁开它）</h2>
+<svg id="orgsvg" viewBox="0 0 760 600"></svg>
+<div class="legend"><span>━ 灰实线：谁开谁（上一段在拍板点开下一段）</span><span style="color:#cf222e">┅ 红点线：负责人直接对话</span><span>虚线框：按需才有</span></div></div>
+<div class="card" id="roleinfo"><h2>点左边的框</h2><p class="sub">每个角色写清：负责什么、开工读什么、写哪些文件、什么时候结束、谁开它、它能开谁、上下文怎么控制。</p></div>
+</div>
+<div class="card"><h2>三条组织原则（其余规则都从这里推出来）</h2><ol>
+<li><b>会话只是干活的载体，权限来自文件归属和拍板。</b>每个文件只有一条线负责（见“依赖与归属”）。设计文件改了，拍板记录的指纹会让它变成“拍板后已修改”，谁改都绕不过负责人。</li>
+<li><b>会话之间不发消息，只靠文件交接。</b>交接写进本线日志和问题清单，下一个会话开工读文件。会话结束、上下文压缩都不丢东西。</li>
+<li><b>会话只在段表列出的接力点换。</b>负责人本来就要在接力点出现，在这里换会话不增加他的操作。段内的其他停顿点（D1 有压缩候选时、D4 彩蛋）照常停下讨论，不换会话。</li>
+</ol></div>
+<div class="card"><h2>子 agent：按任务派，做完即结束</h2>
+<table><thead><tr><th>在哪一段</th><th>任务</th><th>派几个</th><th>档</th><th>交回什么</th></tr></thead><tbody id="subtab"></tbody></table>
+<p class="sub" style="margin:8px 0 0">子 agent 只写派给它的那一个输出；编号、合并、提交只由派它的会话做。同一个任务两次没过核验，改由会话自己做。</p></div>
+</section>
+
+<section class="tab" id="t-work">
+<div class="card"><h2>正常工作流程：5 关从头到尾，会话怎么排</h2>
+<p class="sub" style="margin:0 0 8px">按下面的规则模拟一个 5 关项目的排期（时间是相对单位，不是小时）。拖动滑块看任一时刻有哪些会话活着、一共几个，负责人是不是成了瓶颈。</p>
+<div class="legend"><span><span style="display:inline-block;width:14px;height:10px;background:#1a7f37"></span> 设计段</span><span><span style="display:inline-block;width:14px;height:10px;background:#bc4c00"></span> 生成段</span><span><span style="display:inline-block;width:14px;height:10px;background:#0e8a9a"></span> 修订</span><span><span style="display:inline-block;width:14px;height:10px;background:#0969da"></span> 总控</span><span>◆ 拍板点（等负责人）</span><span><span style="display:inline-block;width:14px;height:10px;background:#f2cc60"></span> 排队等负责人</span></div>
+<svg id="tl" class="tl" viewBox="0 0 1400 480"></svg>
+<div class="ctrl"><span>时刻</span><input type="range" id="tslider" min="0" max="100" value="20" style="width:420px"><span id="tnow"></span></div>
+<div id="tstat" class="sub"></div>
+</div>
+<div class="cols">
+<div class="card"><h2>排期规则</h2><ol>
+<li>总控做完规划（P0–P4）和 D0 后转入待命，不再做步骤里的活。</li>
+<li>设计侧同时最多 <code>max_parallel_lines</code> 个会话（模拟取 2），修订会话也占这个名额。让出名额的会话先开“待开修订”的条目，没有再开下一关的设计①。</li>
+<li>生成线同时只有 1 条：生成器和美术规范各关共用，完整编译也会互相抢 CPU。生成③ 等负责人试走时不占名额：G9 拍板后名额就放给下一关。</li>
+<li>每段结束都是接力点。负责人一次审一个，后到的排队（黄色）。审完由这一段的会话开下一段，自己结束。</li>
+<li>一关设计做完 D7，由设计③开这一关的生成①；生成线有人在跑就在 PROJECT.md 主线分工表的“排队”列登记，由让出名额的会话开。</li>
+<li>生成① 在 G4 之后停一次，只交这一批要设计修订的问题；负责人同意后开修订会话（模拟里每关 1 次），生成② 照常往下做。</li>
+</ol></div>
+<div class="card"><h2>每一段是什么，在哪里停</h2><table><thead><tr><th>段</th><th>做哪些步骤</th><th>结束时的拍板点</th></tr></thead><tbody id="segtab"></tbody></table></div>
+</div>
+<div class="card"><h2>换会话：每段结束时写什么，下一段开工读什么</h2>
+<div class="cols" style="grid-template-columns:1fr 1fr">
+<div><h3>结束的会话写（交接）</h3><ol>
+<li>本线日志 <code>logs/L&lt;nn&gt;-design.md</code> 或 <code>-build.md</code> 追加一节：这段做完了什么；负责人这次的决定（原话写进 <code>design/REVIEW-LOG.md</code>，日志只写日期）；留下的“假设”和它们影响哪些产物；本段新登记的问题编号；下一段从哪一步开始。</li>
+<li><code>PROJECT.md</code> 主线分工表只改本线那一行：现在第几段、哪个会话、状态。不往 PROJECT.md 追加长段落。</li>
+<li>只 add 自己改的文件并提交，再开下一段的会话（P0 授权了 <code>auto_handoff</code> 才自己开，没授权就把开场白交负责人）。开场白三句：用这个 skill；项目目录；“你负责 L&lt;nn&gt; 设计②”。然后结束。</li>
+</ol></div>
+<div><h3>新开的会话读（只读这些）</h3><ol>
+<li>Kit 的 SKILL.md、PROJECT.md、<code>kit status</code>。</li>
+<li>本线日志的最后一节。</li>
+<li>交给本线、还没关闭的问题，以及当前步骤的步骤页。</li>
+<li>不读别的会话的对话记录，不读其他步骤页。读完能接着干，就说明交接写够了。</li>
+</ol></div></div>
+<p class="sub" style="margin:8px 0 0"><b>提前换</b>：一段没做完但上下文已经压缩过一次，做完手上这一步就写交接、提前接力，不等接力点。压缩后的会话会忘细节，容易漏读别的线留下的交接。</p>
+</div>
+</section>
+
+<section class="tab" id="t-rework">
+<div class="card">
+<div style="display:flex;gap:6px;flex-wrap:wrap" id="sctabs"></div>
+<p id="scdesc" style="margin:8px 0 4px"></p>
+<div class="legend"><span style="color:#cf222e">━ 红线：从发现问题的地方指向要改的地方</span><span style="color:#1a7f37">┅ 绿线：改完以后，下游按依赖表过期、重跑</span><span><span style="display:inline-block;width:14px;height:10px;background:#fff8c5;border:1.5px solid #bf8700"></span> 过期要重跑</span><span><span style="display:inline-block;width:14px;height:10px;background:#fbefff;border:1.5px solid #8250df"></span> 人做的产物作废，要人重做</span></div>
+<svg id="pipe" viewBox="0 0 1340 330"></svg>
+<div class="ctrl"><button id="prev">◀ 上一步</button><button id="next">下一步 ▶</button><button id="play">▶ 自动播放</button><button id="reset">从头</button><span id="cnt"></span><span class="lap" id="lap"></span><span style="margin-left:auto" id="istate"></span></div>
+<table><thead><tr><th>#</th><th>负责人</th><th>总控</th><th>设计侧会话（设计线 / 修订）</th><th>生成线会话</th><th>子 agent</th><th>文件与脚本</th></tr></thead><tbody id="seq"></tbody></table>
+</div>
+<div class="cols">
+<div class="card"><h2>问题清单的条目状态</h2>
+<svg viewBox="0 0 560 150" id="statesvg"></svg>
+<p class="sub" style="margin:6px 0 0">只有接收方能把条目改成“已修复”或“已驳回”；只有发现方重跑完才能改成“已关闭”。“发现方”指一条线：由它当时在跑的会话关闭，整条线都结束了由总控关闭。一条只有一个结局，修复和驳回二选一。</p></div>
+<div class="card"><h2>循环什么时候停</h2><ol>
+<li>每转一圈，要么关掉一条，要么登记一条新的再转；问题清单里没有“待处理”，<code>kit status</code> 也没有过期项，循环结束。</li>
+<li><b>防乒乓</b>：同一个设计元素（elements.json 的 key，没有 key 的按条目 id）第 3 次重开时，重开它的会话停下交负责人查根子。</li>
+<li><b>挡路的才停</b>：不挡后面全部工作的，带着“假设”继续做，并在条目里写清假设影响哪些产物；改完只重做这些。影响 G3 几何或导航的假设当挡路问题；只影响 G4–G7 的照做并登记。</li>
+<li><b>成批交</b>：交回设计的问题攒到本段的停顿点一起交，不一个一个打断负责人。</li>
+<li><b>只改局部</b>：机器部分（生成、核验、快速编译）整体重跑；AI 和人的产物只改受影响的那几处；拍板只交改动的那几条，负责人已答复过的取舍不再拍板。</li>
+</ol></div></div>
+</section>
+
+<section class="tab" id="t-deps">
+<div class="card"><h2>依赖表：改了什么，哪些要复查</h2>
+<p class="sub" style="margin:0 0 8px">返工时中间的步骤靠这张表管：上游一改，按它列出要复查的每一步，不靠记忆。机器部分整体重跑，AI 和人的产物只改受影响的那几处。</p>
+<table><thead><tr><th>改了什么</th><th>要复查的（按顺序）</th><th>人做的产物作废</th></tr></thead><tbody id="deptab"></tbody></table>
+<div class="note" style="margin-top:10px"><b>生成线的过期判断</b>：每个 G 步骤跑完写 <code>build/L&lt;nn&gt;/stamps/G&lt;k&gt;.json</code>，记下它读过的输入的指纹：spec 里用到的部分、读过的待决定项、生成器版本、美术规范、参照板、拍板登记行。开工和每一步之前比对，就知道从哪一步过期；记下的产物在 build/ 里不存在的也算过期。</div>
+</div>
+<div class="card"><h2>文件归属：谁能改，改了要做什么</h2>
+<table><thead><tr><th>文件</th><th>归谁</th><th>别人发现问题怎么办</th></tr></thead><tbody id="owntab"></tbody></table></div>
+</section>
+
+<section class="tab" id="t-risk">
+<div class="card"><h2>风险与对策</h2>
+<table><thead><tr><th style="width:15%">风险</th><th style="width:24%">怎么发生</th><th style="width:15%">后果</th><th style="width:28%">对策</th><th>剩下的风险</th></tr></thead><tbody id="risktab"></tbody></table></div>
+</section>
+
+<section class="tab" id="t-now">
+<div class="card ask"><h2>P0 要你授权的一件事</h2>
+<p style="margin:0">会话按流程在接力点开下一段会话，要负责人在 P0 一次授权，写进 <code>kit.local.json</code> 的 <code>agents.auto_handoff</code>。环境能不能开会话另记在 <code>new_session</code>，两者分开。</p>
+<ul style="margin-top:6px"><li><b>授权</b>：你在接力点回复“可以”，下一段会话就出现在侧栏，你接着在新会话里对话。每段结束的消息里写明开了哪个会话、结束了哪个会话。</li>
+<li><b>不授权</b>：每段结束时，会话把三句开场白写好，你自己开。会话数量不变，每关多 6–7 次手动操作。</li></ul>
+<p class="sub" style="margin:8px 0 0">其余都已按上面的原则定下：线会话之间不发消息；总控不做步骤里的活；生成线一次一条；修订由发现问题的会话在停顿点开；Kit 的问题只告诉你，改不改由你在流程外决定。</p></div>
+<div class="card"><h2>自检</h2><div id="selftest"></div></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s);
+const MK={kit:'',new:'',hum:'<span class="m-hum">要人做</span>'};
+/* ---------------- tabs */
+const TABS=[['org','组织：几个会话、几个子 agent'],['work','正常工作流程'],['rework','返工流程'],['deps','依赖与归属'],['risk','风险'],['now','授权与自检']];
+$('tabs').innerHTML=TABS.map(t=>'<button data-t="'+t[0]+'">'+t[1]+'</button>').join('');
+function showTab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='t-'+t));}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{showTab(b.dataset.t);history.replaceState(null,'','#'+b.dataset.t)});
+
+/* ---------------- roles */
+const ROLES={
+ own:{n:'负责人',c:'#cf222e',x:380,y:40,w:150,
+  d:{'负责什么':'方向、玩法取舍、他知道的现场事实、喜好；每个拍板点；导航网格和试走（G10 的人工任务清单）','直接对话':'总控（规划、调度、总体情况）；每个段会话在它的接力点','不做':'在会话之间转述内容'}},
+ ctl:{n:'总控会话',s:'1 个，可接班',c:'#0969da',x:380,y:130,w:170,
+  d:{'负责什么':'P0–P4 规划和 D0；之后待命：开第一批设计①；处理没有线认领的问题（规划、待决定列表、跨关）；把 Kit 的问题成批告诉负责人；回答“现在整体怎样”','开工读':'SKILL.md、PROJECT.md、kit status、issues.json 里归总控和无人认领的条目','写':'design/plan/、decisions.json 填了以后的修改、PROJECT.md、HUMAN.md、kit.local.json、issues.json','不做':'任何 D、G 步骤里的活；不读其他会话的对话记录；不给其他会话发消息','上下文':'只在线的开头和结尾、负责人来问时被用到；压缩过一次就写交接、换新的总控','谁开它':'负责人（项目开始时）','它能开':'设计① 的第一批（不超过 max_parallel_lines 条）；改规划时自己改，不另开会话'}},
+ d1:{n:'设计①',s:'D1 + 结构事实清单',c:'#1a7f37',x:110,y:260,w:150},
+ d2:{n:'设计②',s:'画结构体和开放区',c:'#1a7f37',x:110,y:330,w:150},
+ d3:{n:'设计③',s:'彩蛋 → 盲审 → D7',c:'#1a7f37',x:110,y:400,w:150},
+ rv:{n:'修订会话',s:'按需',c:'#0e8a9a',x:110,y:490,w:150,dash:1,
+  d:{'负责什么':'设计线结束后，别人交回这一关设计的问题。按 D2、D3 的规则改、核验，重新合成 spec，更新交接','开工读':'SKILL.md、PROJECT.md、kit status；开场白给的条目编号；kit status 指向的步骤页；要改的那几个文件','写':'design/detail/L&lt;nn&gt;/ 里条目涉及的文件；条目状态','只能改':'登记过、负责人在停顿点同意修订的条目','拍板':'负责人已答复过这条取舍、只改了这一处的，直接 kit approve，原话写进 REVIEW-LOG.md；超出原话范围才重新交拍板','谁开它':'发现问题的会话，在它的停顿点、负责人同意后开；没有名额就标“待开修订”，由让出名额的会话开','结束':'条目都改成已修复或已驳回后结束，不开后继；有会话在等这条的，告诉负责人回到那个会话说继续','名额':'占设计侧名额，优先于开下一关的设计'}},
+ g1:{n:'生成①',s:'G0（只第一关）、G1–G4',c:'#bc4c00',x:420,y:260,w:170},
+ g2:{n:'生成②',s:'G5–G7 → G9 交付',c:'#bc4c00',x:420,y:330,w:170},
+ g3:{n:'生成③',s:'G10 人工任务与反馈',c:'#bc4c00',x:420,y:400,w:170},
+ sub:{n:'子 agent',s:'按任务派',c:'#57606a',x:640,y:330,w:150,dash:1,
+  d:{'是什么':'会话内部派出的执行者：不在侧栏、不和负责人说话、做完就结束','读写':'只读派活说明给的文件，只写给它的那一个输出（Kit 已有）','交回':'一段话：做了什么、没做成什么、要派它的会话决定的问题','为什么用':'产出大部分会丢掉的活（搜资料、找模型、建模、看编译日志），交给它们就不占会话的上下文','数量':'按任务派，见下表；同时几个看 agents.max_subagents'}}
+};
+const LINE_D={'负责什么':'这一关的一段：见“正常工作流程”里的段表。一段一个会话，两个接力点之间','开工读':'SKILL.md、PROJECT.md、kit status、本线日志最后一节、交给本线还没关闭的问题、当前步骤页','写':'本关的文件（设计线：design/detail/L&lt;nn&gt;/；生成线：work/L&lt;nn&gt;/、build/L&lt;nn&gt;/，以及共用的生成器和美术规范，见归属表）、本线日志、PROJECT.md 本线那一行','结束':'本段的接力点负责人说可以：写交接 → 开下一段（授权了 auto_handoff 才自己开）→ 结束','谁开它':'上一段；第一段由总控（设计①）或本关设计③（生成①）开，生成线有人在跑时由让出名额的会话开','它能开':'下一段；在停顿点、负责人同意时开修订会话；设计③开本关生成①','上下文':'只活在两个接力点之间；压缩过一次就提前接力'};
+['d1','d2','d3','g1','g2','g3'].forEach(k=>ROLES[k].d=LINE_D);
+const EDGES=[['own','ctl','talk'],['ctl','d1','open'],['d1','d2','open'],['d2','d3','open'],['d3','g1','open'],['g1','g2','open'],['g2','g3','open'],['g1','rv','open'],['g3','rv','open']];
+function drawOrg(sel){
+ let h='<defs><marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8c959f"/></marker></defs>';
+ h+='<rect x="20" y="210" width="720" height="330" rx="10" fill="#f6f8fa" stroke="#d0d7de"/><text x="34" y="232" font-size="12" fill="#57606a" font-weight="700">每一关一组（结构相同）：段会话 = 设计 3 段 + 生成 3 段，修订按需</text>';
+ const cx=k=>ROLES[k].x, cy=k=>ROLES[k].y+22;
+ EDGES.forEach(([a,b,t])=>{const A=ROLES[a],B=ROLES[b];
+  let x1=A.x,y1=A.y+44,x2=B.x,y2=B.y;
+  if(a==='d3'&&b==='g1'){x1=A.x+75;y1=A.y+22;x2=B.x-85;y2=B.y+22}
+  if((a==='g1'||a==='g3')&&b==='rv'){x1=A.x-85;y1=A.y+22+(a==='g3'?10:0);x2=B.x+75;y2=B.y+22}
+  if(a==='own'&&b==='kit'){x1=A.x+75;y1=A.y+22;x2=B.x;y2=B.y}
+  if(t==='talk'&&b!=='ctl'){x1=A.x-(b==='d2'?75:-75);y1=A.y+44;x2=B.x+(b==='d2'?-75:75);y2=B.y+10}
+  if(t==='talk'&&b!=='ctl')h+='<path d="M'+x1+','+y1+' C'+x1+','+(y1+120)+' '+x2+','+(y2-80)+' '+x2+','+y2+'" fill="none" stroke="#cf222e" stroke-width="1.4" stroke-dasharray="2 4"/>';
+  else if(t==='talk')h+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#cf222e" stroke-width="1.6" stroke-dasharray="2 4"/>';
+  else h+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="#8c959f" stroke-width="1.6" marker-end="url(#ao)"/>';
+ });
+ h+='<text x="300" y="520" font-size="11.5" fill="#cf222e" text-anchor="middle">负责人在每一段的拍板点，直接和这一段的会话对话（图中未画线）</text>';
+ h+='<text x="640" y="392" font-size="11" fill="#57606a" text-anchor="middle">任何会话都可以派</text><text x="640" y="146" font-size="11.5" fill="#8250df" text-anchor="middle">Kit 的问题：在停顿点告诉负责人</text><text x="640" y="162" font-size="11.5" fill="#8250df" text-anchor="middle">项目里的会话不改 Kit</text><text x="640" y="406" font-size="11" fill="#57606a" text-anchor="middle">只交回给派它的会话</text>';
+ for(const k in ROLES){const r=ROLES[k];const x=r.x-r.w/2;
+  h+='<g class="role" data-k="'+k+'"><rect x="'+x+'" y="'+r.y+'" width="'+r.w+'" height="44" rx="8" fill="'+(sel===k?'#fff8c5':'#fff')+'" stroke="'+r.c+'"'+(r.dash?' stroke-dasharray="5 4"':'')+'/><text x="'+r.x+'" y="'+(r.y+18)+'" font-weight="700" fill="'+r.c+'">'+r.n+'</text>'+(r.s?'<text class="s" x="'+r.x+'" y="'+(r.y+34)+'">'+r.s+'</text>':'')+'</g>';}
+ h+='<text x="110" y="560" font-size="11" fill="#57606a" text-anchor="middle">修订改完不开后继，只改文件</text><text x="420" y="452" font-size="11" fill="#57606a" text-anchor="middle">生成线同时只有 1 条</text>';
+ $('orgsvg').innerHTML=h;
+ document.querySelectorAll('.role').forEach(g=>g.onclick=()=>{drawOrg(g.dataset.k);const r=ROLES[g.dataset.k];
+  $('roleinfo').innerHTML='<h2 style="color:'+r.c+'">'+r.n+(r.s?'（'+r.s+'）':'')+'</h2><dl>'+Object.entries(r.d).map(([a,b])=>'<dt>'+a+'</dt><dd>'+b+'</dd>').join('')+'</dl>';});
+}
+const SUBS=[
+ ['总控 · P2','按问题搜资料、认照片、初步分级','按问题数','轻量','sources/_inbox/ 里的候选条目'],
+ ['总控 · P3','查玩法的原版先例','每个玩法 1 个','轻量','实体名、接线、出处'],
+ ['设计① · D2','按可进入结构体调研结构事实','每个可进入结构体 1 个','轻量','事实清单和资料编号'],
+ ['设计② · D2','只有外壳的结构体批量起稿','按结构体数','轻量','结构体文件，过 kit detail structure'],
+ ['设计③ · D6','盲审：不给背景，复述路线和玩法','1','主模型','原话存 BLIND-REVIEW.md'],
+ ['生成① · G1','生成器改动后对已完成的关回归比对','1','轻量','一致 / 修好了旧问题 / 退步'],
+ ['生成① · G2','地标缺资料时补搜照片','按缺口数','轻量','候选照片和来源'],
+ ['生成② · G5','自制模型，一件一个','每件 1 个','主模型','模型路径、预览图、参照编号'],
+ ['生成② · G5','在原版资源包里找候选模型','按需要','轻量','路径、尺寸、能不能做静态道具'],
+ ['生成② · G9','完整编译没过时读日志','按失败次数','轻量','原因和建议改法']];
+$('subtab').innerHTML=SUBS.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+'</td><td>'+r[4]+'</td></tr>').join('');
+
+/* ---------------- segments & timeline */
+const SEGS=[
+ ['设计①','D1；D2 先查结构事实（子 agent 并行）','结构事实清单：负责人答完、记下回答，kit status 显示“已确认”'],
+ ['设计②','D2 画结构体、D3 画开放区，核验全过','整关详设'],
+ ['设计③','D4 彩蛋（停一次，不换会话）；D5；D6；D7，开本关生成①','整关拍板'],
+ ['生成①','G0（只在第一关）；G1–G4','G4 之后的停顿：只交问题'],
+ ['生成②','G5–G7；完整编译；G9','G9 成品交付'],
+ ['生成③','G10：人工任务清单、按反馈改','人工任务清单全部有结果'],
+ ['修订','改交回的设计问题；核验；重新合成 spec；更新交接','条目都改成已修复或已驳回']];
+$('segtab').innerHTML=SEGS.map(s=>'<tr><td><b>'+s[0]+'</b></td><td>'+s[1]+'</td><td>'+s[2]+'</td></tr>').join('');
+
+const DUR={d:[3,5,3],g:[5,5,3],r:[2]},PLAN=6,NL=5;
+function simulate(){
+ const lines=[];for(let n=1;n<=NL;n++){lines.push({id:'d'+n,lv:n,k:'d',seg:-1,rem:0,st:'wait',bars:[]});lines.push({id:'g'+n,lv:n,k:'g',seg:-1,rem:0,st:'wait',bars:[]});lines.push({id:'r'+n,lv:n,k:'r',seg:-1,rem:0,st:'none',bars:[]});}
+ const L=id=>lines.find(l=>l.id===id);const queue=[];const user=[];let t=0;const alive=[];let created=1;
+ const ctl={bars:[{t0:0,t1:PLAN,lab:'规划'}]};
+ function start(l){l.seg=0;l.rem=DUR[l.k][0];l.st='run';l.bars.push({t0:t,lab:SEGS[(l.k==='d'?0:l.k==='g'?3:6)][0]});created++;}
+ while(t<400){
+  const active=k=>lines.filter(l=>(l.k===k)&&(l.st==='run'||l.st==='review'||l.st==='inrev')&&!(k==='g'&&l.seg>=2));
+  if(t>=PLAN){
+   // revisions first
+   lines.filter(l=>l.k==='r'&&l.st==='ready').forEach(l=>{if(active('d').length+active('r').length<2)start(l)});
+   for(const l of lines.filter(l=>l.k==='d'&&l.st==='wait')){ if(l.lv>1&&L('d'+(l.lv-1)).st==='wait')break; if(lines.some(x=>x.k==='r'&&x.st==='ready'))break; if(active('d').length+active('r').length<2)start(l);else break;}
+   for(const l of lines.filter(l=>l.k==='g'&&l.st==='wait')){ if(L('d'+l.lv).st!=='done')break; const gp=L('g'+(l.lv-1)); if(l.lv>1&&!(gp.st==='done'||gp.seg>=2))break; if(active('g').length<1)start(l);break;}
+  }
+  // user reviews one per tick (FIFO)
+  const inrev=lines.find(l=>l.st==='inrev');
+  if(inrev){inrev.revLeft--; if(inrev.revLeft<=0){const b=inrev.bars[inrev.bars.length-1];b.t1=t;b.stop=b.stop||t;
+     if(inrev.k==='g'&&inrev.seg===0){const r=L('r'+inrev.lv);if(r.st==='none')r.st='ready';}
+     inrev.seg++; if(inrev.seg<DUR[inrev.k].length){inrev.st='run';inrev.rem=DUR[inrev.k][inrev.seg];inrev.bars.push({t0:t,lab:SEGS[(inrev.k==='d'?0:3)+inrev.seg][0]});created++;} else inrev.st='done';}}
+  if(!lines.find(l=>l.st==='inrev')&&queue.length){const l=queue.shift();l.st='inrev';l.revLeft=1;l.bars[l.bars.length-1].rv=t;}
+  lines.filter(l=>l.st==='run').forEach(l=>{l.rem--; if(l.rem<=0){l.st='review';l.bars[l.bars.length-1].stop=t+1;queue.push(l);}});
+  const cnt={d:0,g:0,r:0,h:0};lines.forEach(l=>{if(['run','review','inrev'].includes(l.st)){if(l.k==='g'&&l.seg>=2)cnt.h++;else cnt[l.k]++}});
+  alive.push({t,ctl:1,...cnt,user:lines.filter(l=>l.st==='inrev').length,queue:queue.length});
+  t++;
+  if(lines.every(l=>l.st==='done'||l.st==='none'))break;
+ }
+ return {lines,alive,T:t,created,ctl};
+}
+const SIM=simulate();
+function drawTL(cur){
+ const {lines,alive,T}=SIM,X0=120,W=1260,sx=W/T,RH=19,Y0=30;
+ const rows=[{lab:'负责人审阅',k:'u'},{lab:'总控',k:'c'}];for(let n=1;n<=NL;n++){rows.push({lab:'L'+n+' 设计',id:'d'+n});rows.push({lab:'L'+n+' 生成',id:'g'+n});rows.push({lab:'L'+n+' 修订',id:'r'+n});}
+ let h='';const col={d:'#1a7f37',g:'#bc4c00',r:'#0e8a9a'};
+ rows.forEach((r,i)=>{const y=Y0+i*RH;h+='<text x="'+(X0-8)+'" y="'+(y+13)+'" text-anchor="end" fill="#57606a">'+r.lab+'</text><line x1="'+X0+'" y1="'+(y+RH)+'" x2="'+(X0+W)+'" y2="'+(y+RH)+'" stroke="#eaeef2"/>';
+  if(r.k==='c'){h+='<rect class="bar" x="'+X0+'" y="'+(y+3)+'" width="'+(PLAN*sx)+'" height="'+(RH-6)+'" fill="#0969da"/><rect x="'+(X0+PLAN*sx)+'" y="'+(y+7)+'" width="'+((T-PLAN)*sx)+'" height="'+(RH-14)+'" fill="#0969da" opacity=".25"/><text x="'+(X0+PLAN*sx+6)+'" y="'+(y+13)+'" fill="#0969da">待命：只在线开头结尾、负责人来问时用</text>';}
+  if(r.id){const l=lines.find(x=>x.id===r.id);l.bars.forEach(b=>{const t1=b.t1??T;const st=b.stop??t1;
+   h+='<rect class="bar" x="'+(X0+b.t0*sx)+'" y="'+(y+3)+'" width="'+Math.max(1,(st-b.t0)*sx)+'" height="'+(RH-6)+'" fill="'+col[l.k]+'"/>';
+   if(b.rv!==undefined&&b.rv>st)h+='<rect x="'+(X0+st*sx)+'" y="'+(y+3)+'" width="'+((b.rv-st)*sx)+'" height="'+(RH-6)+'" fill="#f2cc60"/>';
+   const dx=X0+(b.rv??st)*sx;h+='<path d="M'+dx+','+(y+3)+'l6,6.5l-6,6.5l-6,-6.5z" fill="#cf222e"/>';
+   if((st-b.t0)*sx>26)h+='<text x="'+(X0+b.t0*sx+4)+'" y="'+(y+13)+'" fill="#fff" font-weight="700">'+b.lab.replace(/设计|生成/,'')+'</text>';});}
+  if(r.k==='u'){alive.forEach(a=>{if(a.user)h+='<rect x="'+(X0+a.t*sx)+'" y="'+(y+3)+'" width="'+sx+'" height="'+(RH-6)+'" fill="#cf222e" opacity=".7"/>';if(a.queue)h+='<rect x="'+(X0+a.t*sx)+'" y="'+(y+RH-5)+'" width="'+sx+'" height="'+(Math.min(a.queue,3)*1.5)+'" fill="#bf8700"/>';});}
+ });
+ const yb=Y0+rows.length*RH+8;
+ const B=yb+50;h+='<text x="'+(X0-8)+'" y="'+(yb+12)+'" text-anchor="end" fill="#57606a">同时活着的会话</text>';
+ alive.forEach(a=>{const n=a.ctl+a.d+a.g+a.r,m=n+a.h,w=Math.max(1,sx-0.5);if(a.h)h+='<rect x="'+(X0+a.t*sx)+'" y="'+(B-m*9)+'" width="'+w+'" height="'+(a.h*9)+'" fill="#d0d7de"/>';h+='<rect x="'+(X0+a.t*sx)+'" y="'+(B-n*9)+'" width="'+w+'" height="'+(n*9)+'" fill="'+(n>4?'#cf222e':'#8c959f')+'"/>';});
+ h+='<line x1="'+X0+'" y1="'+(B-36)+'" x2="'+(X0+W)+'" y2="'+(B-36)+'" stroke="#cf222e" stroke-dasharray="4 3"/><text x="'+(X0+W)+'" y="'+(B-39)+'" text-anchor="end" fill="#cf222e">名额上限 4（浅灰：生成③ 等人工，不占名额）</text>';
+ const cx=X0+cur*sx;h+='<line x1="'+cx+'" y1="'+(Y0-6)+'" x2="'+cx+'" y2="'+(B+4)+'" stroke="#1f2328" stroke-width="1.5"/>';
+ $('tl').setAttribute('viewBox','0 0 1400 '+(B+12));$('tl').innerHTML=h;
+ const a=alive[Math.min(cur,alive.length-1)];const names=[];lines.forEach(l=>{const b=l.bars.find(b=>b.t0<=cur&&cur<(b.t1??SIM.T));if(b)names.push('L'+l.lv+' '+b.lab)});
+ $('tnow').textContent='第 '+cur+' / '+(SIM.T-1);
+ $('tstat').innerHTML='此刻活着：<b>总控</b>'+(names.length?'、'+names.join('、'):'')+'，共 <b>'+(a.ctl+a.d+a.g+a.r+a.h)+'</b> 个，其中占名额 <b>'+(a.ctl+a.d+a.g+a.r)+'</b> 个；负责人'+(a.user?'正在审一个接力点':'空闲')+(a.queue?'，另有 '+a.queue+' 个在排队':'')+'。全程：一共开过 <b>'+SIM.created+'</b> 个会话，占名额最多同时 <b>'+Math.max(...alive.map(a=>a.ctl+a.d+a.g+a.r))+'</b> 个；负责人一共审 <b>'+SIM.lines.reduce((s,l)=>s+l.bars.length,0)+'</b> 次接力点（每段 1 次，彩蛋另算未画）。';
+}
+$('tslider').max=SIM.T-1;$('tslider').oninput=e=>drawTL(+e.target.value);
+
+/* ---------------- rework scenarios */
+const P=[['P','规划','P1–P4','c'],['D1','准备','D1','d'],['D2','结构体','D2','d'],['D3','开放区','D3','d'],['D4','彩蛋','D4','d'],['D5','合成','D5','d'],['D6','盲审拍板','D6','d'],['D7','交接','D7','d'],
+ ['G1','对表','G1','g'],['G2','参照','G2','g'],['G3','几何','G3','g'],['G4','运行层','G4','g'],['G5','成品化','G5–G7','g'],['G9','交付','G9','g'],['C1','导航','G10 人工','h'],['C2','试走','G10 人工','h']];
+const NW=66,GAP=77,X0=12,NY=150;const NODE={};P.forEach((p,i)=>NODE[p[0]]={id:p[0],t:p[1],s:p[2],g:p[3],x:X0+i*GAP,y:NY});
+NODE.GEN={id:'GEN',t:'生成器',s:'各关共用',x:X0+12*GAP,y:268,off:1};NODE.KIT={id:'KIT',t:'Kit',s:'告诉负责人',x:X0+4*GAP,y:268,off:1};
+const LANES=['own','ctl','des','gen','sub','file'];
+const SC=[
+{n:'① 生成线发现设计矛盾（设计线已结束）',f:'G4',tg:'D3',bl:'登记 gaps.json → G4 停顿交问题 → 修订会话改',fl:'spec 变了 → 比对 stamps，只重跑 G4',
+ d:'最常见的情况：生成线开工时，这一关的设计会话早已结束。设计数据前后说法不一致，生成线不能自己改设计文件。',
+ s:[
+ {w:'gen',t:'生成① 做 G4：物件写“被破坏才触发”，事件写“进入房间就触发”，对不上',at:['G4']},
+ {w:'gen',to:['file'],t:'只影响 G4–G7，不挡路。写进 work/L&lt;nn&gt;/gaps.json：涉及的元素 key；先按“进入就触发”做（假设）；影响 G4 和哪些试走项',at:['G4'],back:1,st:0},
+ {w:'gen',to:['own'],t:'G4 之后的停顿：只交问题。“本批要设计修订的问题 1 条”，附建议',at:['G4'],back:1},
+ {w:'own',to:['gen'],t:'同意修订，取舍是“进入就触发”',at:['G4'],back:1,m:'hum',st:1},
+ {w:'gen',to:['des','file'],t:'原话写进 REVIEW-LOG.md；查 PROJECT.md：设计线已结束、设计侧有名额 → 开修订会话（开场白带条目编号）。没名额就标“待开修订”',at:['G4'],back:1},
+ {w:'gen',t:'写交接 → 开生成② → 结束。生成② 带着假设做 G5–G7，和修订会话同时跑',at:['G5'],back:1},
+ {w:'des',to:['file'],t:'修订会话开工：kit status 列出交给本关设计的问题；只读 D3 步骤页和要改的文件',at:['D3'],back:1},
+ {w:'des',to:['file'],t:'改开放区文件里的物件触发方式；kit detail area 核验通过',at:['D3'],back:1},
+ {w:'des',to:['file'],t:'kit status：这个开放区“拍板后已修改”，D5 过期 → kit spec 重新合成，核验通过',at:['D5'],back:1,fwd:1,stale:['D5','D6']},
+ {w:'des',to:['file'],t:'负责人已在 G4 停顿答复过这条取舍，只改了这一处 → 直接 kit approve，原话写进 REVIEW-LOG.md，下次拍板的“只是告诉你的”里带过',at:['D6'],back:1,fwd:1,stale:['D6']},
+ {w:'des',to:['file'],t:'更新本关交接（D7）；条目“已修复”；结束，不开后继，让出的名额按“谁开谁”处理',at:['D7'],back:1,fwd:1,st:2},
+ {w:'gen',to:['file'],t:'生成② 下一步之前比对 stamps：事件变了、几何没变 → G4 过期，涉及的试走项作废；G3、G5–G7 不动',at:['G4'],back:1,fwd:1,stale:['G4'],void:['C2']},
+ {w:'gen',to:['file'],t:'重跑 G4（机器部分整体重跑）；去掉假设；条目“已关闭”；invalidated.json 记下要重走的试走项',at:['G4'],back:1,fwd:1,stale:['G4'],void:['C2'],st:4},
+ {w:'gen',t:'重跑时又发现新问题？',at:['G4'],loop:2,end:'没有 → 继续到 G9。同一个 key 第 3 次重开 → 停下交负责人查根子'}]},
+{n:'② 试走发现玩法问题',f:'C2',tg:'D3',bl:'影响“能不能翻” → 登记 → 修订会话改',fl:'几何变了 → G3、这一段的 G5–G7、G9 重跑；导航和这段试走作废',
+ d:'负责人试走时发现问题。先判断归谁：只是难看，生成线自己改，不登记；会影响能不能走、能不能翻的，是设计的问题。',
+ s:[
+ {w:'own',t:'G10 试走：一处封路的栏杆翻得过去，记下 getpos 坐标',at:['C2'],m:'hum'},
+ {w:'own',to:['gen'],t:'把这一轮反馈交给生成③',at:['C2'],m:'hum'},
+ {w:'gen',to:['file'],t:'按坐标用构件记录查到元素 key，写进 feedback.json；按 D7 的 affects 规则分类：这条影响“能不能翻” → 交设计；外观问题自己改',at:['C2']},
+ {w:'gen',to:['file'],t:'写进 gaps.json：哪个开放区、key、坐标、建议加高或换成翻不过去的封堵',at:['C2'],back:1,st:0},
+ {w:'gen',to:['own'],t:'本段停顿点：汇报已改的外观问题 + 本批要设计修订的问题',at:['C2'],back:1},
+ {w:'own',to:['gen'],t:'同意修订，取舍：加高到翻不过去',at:['C2'],back:1,m:'hum',st:1},
+ {w:'gen',to:['des'],t:'设计侧有名额 → 开修订会话。生成③ 不结束，等修订完再重跑',at:['C2'],back:1},
+ {w:'des',to:['file'],t:'修订会话改开放区文件的封路高度，核验；kit spec 重新合成',at:['D3','D5'],back:1,fwd:1,stale:['D5','D6']},
+ {w:'des',to:['file'],t:'取舍负责人已答复、只改了这一处 → 直接 kit approve，原话写进 REVIEW-LOG.md',at:['D6'],back:1,fwd:1,stale:['D6']},
+ {w:'des',to:['own','file'],t:'条目“已修复”；结束前告诉负责人：“L&lt;nn&gt; 的生成③在等这条，回到那个会话说继续即可”',at:['D7'],back:1,fwd:1,st:2},
+ {w:'own',to:['gen'],t:'回到生成③：继续',at:['C2'],back:1,fwd:1,m:'hum'},
+ {w:'gen',to:['file'],t:'比对 stamps：几何变了 → G3 → 这一段的 G5–G7 → G9；导航作废，涉及这段的试走项作废',at:['G3'],back:1,fwd:1,stale:['G3','G5','G9'],void:['C1','C2']},
+ {w:'gen',t:'重跑 G3、受影响的 G5–G7；完整编译；G9 检查通过，只交改动处',at:['G9'],back:1,fwd:1,stale:['G3','G5','G9'],void:['C1','C2']},
+ {w:'gen',to:['own','file'],t:'人工任务清单只列受影响的项：重新生成导航、重走这一段；条目“已关闭”',at:['G9'],back:1,fwd:1,void:['C1','C2'],st:4},
+ {w:'own',t:'重做导航、重走这一段；还有问题？',at:['C1','C2'],loop:1,end:'没有 → 人工任务清单全部有结果，生成③ 结束，这一关完成',m:'hum'}]},
+{n:'③ 设计发现规划做不到',f:'D2',tg:'P',bl:'写进 plan_deviations → 整关详设时拍板',fl:'规划改了 → kit spec；引用改动处的设计复查',
+ d:'设计② 画结构体时发现规划要穿过的门现实里没有。偏差先写进设计文件的 plan_deviations，规划本身归总控。',
+ s:[
+ {w:'des',t:'设计② D2：规划路线要穿过的那扇门，资料显示不存在',at:['D2']},
+ {w:'des',to:['file'],t:'写进结构体文件的 plan_deviations（问题、建议）；按建议先画，标假设',at:['D2'],back:1},
+ {w:'des',t:'不停，画完其余结构体和开放区',at:['D3'],back:1},
+ {w:'des',to:['own'],t:'整关详设的停顿：偏差和其他问题一起交',at:['D3'],back:1},
+ {w:'own',to:['des'],t:'A：接受偏差，规划改成走旁边的门 / B：驳回，按规划保留这扇门',at:['P'],back:1,m:'hum'},
+ {w:'des',to:['file'],t:'记下决定（decision 字段）。选 B：去掉假设，照规划画，到此结束',at:['D2'],back:1},
+ {w:'des',to:['file'],t:'选 A：规划归总控，在 issues.json 登记一条“交给规划”；设计按已拍板的偏差继续',at:['P'],back:1,st:0},
+ {w:'own',to:['ctl'],t:'负责人下次找总控时，总控列出这条',at:['P'],back:1},
+ {w:'ctl',to:['file'],t:'总控改 levels/L&lt;nn&gt;.json；kit plan build、verify；规划这一关变成“拍板后已修改”',at:['P'],back:1,fwd:1,stale:['P'],st:2},
+ {w:'ctl',to:['own'],t:'交规划重新拍板（只这一处）',at:['P'],back:1,fwd:1},
+ {w:'own',to:['ctl'],t:'可以；kit approve',at:['P'],back:1,fwd:1,m:'hum'},
+ {w:'ctl',to:['file'],t:'跑 kit spec：核验没过、或引用了改动处的，登记给这一关的设计复查；条目“已关闭”',at:['D2','D3'],back:1,fwd:1,stale:['D2','D3'],st:4}]},
+{n:'④ 盲审发现（自己的文件）',f:'D6',tg:'D2',bl:'文件归自己：直接改',fl:'结构体改了 → 合成过期 → 再拍板',noreg:1,
+ d:'设计③ 自己的盲审。文件归自己，不登记问题清单，直接回去改。同样是一圈，中间的合成和拍板都要重走。',
+ s:[
+ {w:'des',to:['sub'],t:'D6：kit page 出整关页；派盲审子 agent（主模型档，不给背景）',at:['D6']},
+ {w:'sub',to:['des','file'],t:'盲审原话：某处看不懂往哪走；存进 BLIND-REVIEW.md',at:['D6']},
+ {w:'des',t:'分四类：设计问题留给负责人；数据错误直接改；细想没问题的写理由排除；评审页表达问题是 Kit 的问题，停顿时告诉负责人',at:['D6']},
+ {w:'des',to:['file'],t:'数据错误：结构体文件归自己，回 D2 直接改；核验',at:['D2'],back:1},
+ {w:'des',to:['file'],t:'kit status：结构体“拍板后已修改”，D5 过期 → kit spec',at:['D5'],back:1,fwd:1,stale:['D5','D6']},
+ {w:'des',to:['own'],t:'整关拍板：设计问题逐条附建议；已改的数据错误一句带过',at:['D6'],back:1,fwd:1,stale:['D6']},
+ {w:'own',to:['des'],t:'定了设计问题：改那处路标',at:['D6'],back:1,fwd:1,m:'hum'},
+ {w:'des',t:'改了路线或玩法？是 → 再审只给改动处，第二次仍有设计问题的不再派盲审、直接交负责人；否 → kit approve 一次登记',at:['D6'],loop:1,end:'否 → 往下做 D7，开本关生成①'}]},
+{n:'⑤ 改生成器影响已完成的关',f:'G3',tg:'GEN',bl:'为新一关扩生成器',fl:'回归：在 build/_regress/ 重新生成、比对',
+ d:'生成器是各关共用的。后一关的生成线为了新东西改生成器，已完成的关重新生成的结果可能跟着变。',
+ s:[
+ {w:'gen',t:'后一关的生成① G1 对表：spec 里有生成器还不会做的新物件',at:['G1']},
+ {w:'gen',to:['file'],t:'按固定步骤改生成器：原版先例 → FGD → 实现 → 回归样例',at:['GEN'],back:1},
+ {w:'gen',to:['sub'],t:'派回归子 agent：在 build/_regress/ 对已完成的关重新生成并快速编译，和上次交付比对实体、面数、接线；不写 build/L&lt;nn&gt;/',at:['GEN'],back:1,fwd:1},
+ {w:'sub',to:['gen'],t:'结果三种：完全一致 / 修好了旧问题 / 退步',at:['GEN'],back:1,fwd:1},
+ {w:'gen',t:'一致 → 提交，到此结束。退步 → 修生成器直到一致',at:['GEN'],back:1,fwd:1},
+ {w:'gen',to:['file'],t:'变好了，而且那一关已交付：在 issues.json 登记给总控“要不要重新交付”',at:['GEN'],back:1,fwd:1,stale:['G3','G9'],st:0},
+ {w:'own',to:['ctl'],t:'负责人找总控时看到；决定先不动，还是排一次那一关的生成② 重新交付',at:['G9'],back:1,fwd:1,stale:['G3','G9'],m:'hum',st:1},
+ {w:'ctl',to:['file'],t:'记下决定；要重新交付的进生成线排队（同时只有 1 条）；条目“已修复”',at:['G9'],back:1,fwd:1,stale:['G3','G9'],void:['C1'],st:2}]},
+{n:'⑥ 挡住全部工作的问题',f:'G1',tg:'D5',bl:'停下，直接找负责人',fl:'修好后回到等着的会话说继续',
+ d:'唯一允许中途停的情况：后面所有工作都做不下去，比如拿到的 spec 核验没过。等修订的会话不结束，继续占着名额。',
+ s:[
+ {w:'gen',t:'生成① G1：spec.json 核验没过（有结构体文件改过但没重新合成），生成器读不进去',at:['G1']},
+ {w:'gen',to:['own','file'],t:'挡住全部工作：写进 gaps.json，标“挡路”，中途停下告诉负责人',at:['G1'],back:1,st:0},
+ {w:'own',to:['gen'],t:'同意开修订会话',at:['G1'],back:1,m:'hum',st:1},
+ {w:'gen',to:['des','file'],t:'开修订会话（开场白带条目编号）；生成① 不结束，继续占着生成线名额等它',at:['G1'],back:1},
+ {w:'des',to:['file'],t:'修订会话：kit status 显示 D5 过期 → kit spec 重新合成；核验通过',at:['D5'],back:1,fwd:1,stale:['D5']},
+ {w:'des',to:['file'],t:'没改设计内容，不需要新拍板；条目“已修复”',at:['D5'],back:1,fwd:1,st:2},
+ {w:'des',to:['own'],t:'结束前告诉负责人：“L&lt;nn&gt; 的生成①在等这条，回到那个会话说继续即可”',at:['D5'],back:1,fwd:1},
+ {w:'own',to:['gen'],t:'回到生成①：继续',at:['G1'],back:1,fwd:1,m:'hum'},
+ {w:'gen',to:['file'],t:'从 G1 重跑；条目“已关闭”',at:['G1'],back:1,fwd:1,stale:['G1'],st:4}]},
+{n:'⑦ 流程或 Kit 的问题',f:'G5',tg:'KIT',bl:'停顿时告诉负责人',fl:'',noreg:1,
+ d:'问题不在这个项目，而在 Kit 的规则或格式。Kit 的问题不登记问题清单，项目里的会话也不改 Kit，只告诉负责人。',
+ s:[
+ {w:'gen',t:'生成② 做 G5：步骤页规定的做法在这类结构上行不通',at:['G5']},
+ {w:'gen',t:'先绕过去继续做；记下哪一步、哪里不对、怎么绕过去的、影响哪些产物',at:['G5'],back:1},
+ {w:'gen',to:['own'],t:'到本段停顿点（G9）一起告诉负责人',at:['G9'],back:1},
+ {w:'own',t:'改不改 Kit 由负责人在流程外决定；这个流程到此为止',at:['KIT'],back:1,m:'hum'}]}
+];
+const STATES=['待处理','已答复','已修复','已驳回','已关闭'];
+let sc=0,cur=0,lap=1,timer=null;
+function el(t,a,x){let s='<'+t;for(const k in a)s+=' '+k+'="'+a[k]+'"';return s+'>'+(x||'')+'</'+t+'>'}
+function drawPipe(){
+ const S=SC[sc],st=S.s[cur],F=NODE[S.f],T=NODE[S.tg];
+ let h='<defs><marker id="mb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#cf222e"/></marker><marker id="mf" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#1a7f37"/></marker><marker id="mg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8c959f"/></marker></defs>';
+ const band=(a,b,c,lab)=>{const A=NODE[a],B=NODE[b];h+=el('rect',{x:A.x-5,y:NY-10,width:B.x+NW-A.x+10,height:76,rx:7,fill:c,'fill-opacity':.06,stroke:c,'stroke-opacity':.35})+el('text',{x:(A.x+B.x+NW)/2,y:NY+60,'text-anchor':'middle','font-size':11.5,fill:c,'font-weight':700},lab)};
+ band('P','P','#0969da','总控');band('D1','D7','#1a7f37','设计侧会话（设计①②③ / 修订）');band('G1','G9','#bc4c00','生成线会话（生成①②③）');band('C1','C2','#cf222e','负责人');
+ for(let i=0;i<P.length-1;i++)h+=el('line',{x1:X0+i*GAP+NW,y1:NY+20,x2:X0+(i+1)*GAP-2,y2:NY+20,stroke:'#8c959f','stroke-width':1.3,'marker-end':'url(#mg)'});
+ const stale=st.stale||[],vd=st.void||[];
+ const show=[...P.map(p=>NODE[p[0]])];if(NODE[S.tg].off)show.push(NODE[S.tg]);
+ show.forEach(n=>{const c='nd'+((st.at||[]).includes(n.id)?' hl':'')+(stale.includes(n.id)?' stale':'')+(vd.includes(n.id)?' void':'');
+  h+='<g class="'+c+'">'+el('rect',{x:n.x,y:n.y,width:NW,height:40,rx:6,style:n.off?'stroke-dasharray:4 3':''})+el('text',{x:n.x+NW/2,y:n.y+17,'font-weight':700},n.t)+el('text',{x:n.x+NW/2,y:n.y+32,class:'s'},n.s)+'</g>';
+  if(stale.includes(n.id))h+=el('text',{x:n.x+NW/2,y:n.y-14,class:'al',fill:'#9a6700'},'过期');
+  if(vd.includes(n.id))h+=el('text',{x:n.x+NW/2,y:n.y-14,class:'al',fill:'#8250df'},'作废');});
+ const fx=F.x+NW/2,tx=T.x+NW/2,dx=Math.abs(fx-tx);
+ if(st.back){
+  if(T.off){h+=el('path',{d:'M'+(fx-10)+','+(NY+42)+' C'+(fx-10)+','+(T.y+36)+' '+(tx+(fx>tx?110:-110))+','+(T.y+36)+' '+(tx+(fx>tx?NW/2+4:-NW/2-4))+','+(T.y+30),class:'arc back','marker-end':'url(#mb)'});h+=el('text',{x:(fx+tx)/2,y:T.y+62,class:'al',fill:'#cf222e'},'① '+S.bl)}
+  else{const hu=Math.min(120,40+dx*.12);h+=el('path',{d:'M'+fx+','+(NY-2)+' C'+fx+','+(NY-2-hu)+' '+tx+','+(NY-2-hu)+' '+tx+','+(NY-4),class:'arc back','marker-end':'url(#mb)'});h+=el('text',{x:(fx+tx)/2,y:NY-2-hu*.75-6,class:'al',fill:'#cf222e'},'① '+S.bl)}}
+ if(st.fwd){
+  const tgt=(stale.length?NODE[stale[stale.length-1]]:F);let ex=tgt.x+NW/2;
+  if(T.off){const gx=(stale.length?ex:fx)+8;const right=gx>T.x;const sx0=right?T.x+NW:T.x;h+=el('path',{d:'M'+sx0+','+(T.y+8)+' C'+(sx0+(right?90:-90))+','+(T.y+8)+' '+gx+','+(NY+100)+' '+gx+','+(NY+44),class:'arc fwd','marker-end':'url(#mf)'});h+=el('text',{x:(gx+sx0)/2+(right?30:-30),y:NY+96,class:'al',fill:'#1a7f37'},'② '+S.fl)}
+  else{const a=Math.min(tx,ex),b=Math.max(tx,ex);const hd=Math.min(80,30+(b-a)*.07);const s0=T.x+NW/2,e0=ex+(ex>s0?-4:4);
+   h+=el('path',{d:'M'+s0+','+(NY+66)+' C'+s0+','+(NY+66+hd)+' '+e0+','+(NY+66+hd)+' '+e0+','+(NY+68),class:'arc fwd','marker-end':'url(#mf)'});h+=el('text',{x:(s0+e0)/2,y:NY+66+hd*.75+14,class:'al',fill:'#1a7f37'},'② '+S.fl)}}
+ h+=el('text',{x:fx,y:F.y+(F.off?56:-28),class:'al',fill:'#cf222e'},'发现问题');
+ if(S.tg!==S.f)h+=el('text',{x:tx,y:T.y+(T.off?56:-28),class:'al',fill:'#0969da'},'要改的地方');
+ $('pipe').innerHTML=h;
+}
+function curState(){const S=SC[sc];let v=-1;for(let i=0;i<=cur;i++)if(S.s[i].st!==undefined)v=S.s[i].st;return v}
+function drawStates(v){const pos=[[40,75],[150,75],[290,40],[290,110],[440,75]];let h='<defs><marker id="sa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8c959f"/></marker></defs>';
+ [[0,1,'负责人给取舍'],[1,2,'接收方改了'],[1,3,'接收方不改，写理由'],[2,4,'发现方重跑完'],[3,4,'发现方去掉假设']].forEach(([a,b,l])=>{const A=pos[a],B=pos[b];h+=el('line',{x1:A[0]+45,y1:A[1],x2:B[0]-47,y2:B[1],stroke:'#8c959f','stroke-width':1.4,'marker-end':'url(#sa)'})+el('text',{x:(A[0]+B[0])/2,y:(A[1]+B[1])/2-5,'font-size':10.5,fill:'#57606a','text-anchor':'middle'},l)});
+ h+=el('path',{d:'M85,62 C110,20 230,15 245,35',fill:'none',stroke:'#8c959f','stroke-dasharray':'3 3','marker-end':'url(#sa)'})+el('text',{x:150,y:18,'font-size':10.5,fill:'#57606a','text-anchor':'middle'},'不涉及玩法，接收方直接改');
+ STATES.forEach((s,i)=>{const p=pos[i];h+=el('rect',{x:p[0]-45,y:p[1]-14,width:90,height:28,rx:14,fill:i===v?'#1f2328':'#fff',stroke:'#8c959f'})+el('text',{x:p[0],y:p[1]+5,'text-anchor':'middle','font-size':12.5,fill:i===v?'#fff':'#1f2328'},s)});
+ $('statesvg').innerHTML=h;}
+function drawSeq(){const S=SC[sc];let h='';
+ S.s.forEach((s,i)=>{h+='<tr class="'+(i<cur?'':i===cur?'now':'f')+'" data-i="'+i+'"><td>'+(i+1)+'</td>';
+  LANES.forEach(L=>{let c='';const w=s.w==='kit'?'sub':s.w;
+   if(w===L){c='<span class="b">'+s.t+(s.m?' '+MK[s.m]:'')+'</span>';if(s.loop)c+='<button class="loopb" data-loop="'+(s.loop-1)+'">有 → ↺ 回到第 '+s.loop+' 步</button><div class="sub">'+s.end+'</div>';}
+   else if((s.to||[]).includes(L))c='<span class="rcv">● 收到</span>';
+   h+='<td>'+c+'</td>';});h+='</tr>';});
+ $('seq').innerHTML=h;
+ document.querySelectorAll('#seq tr').forEach(tr=>tr.onclick=e=>{if(e.target.dataset.loop!==undefined)return;stop();go(+tr.dataset.i)});
+ document.querySelectorAll('.loopb').forEach(b=>b.onclick=()=>{stop();lap++;go(+b.dataset.loop)});}
+function render(){drawPipe();drawSeq();const v=curState();drawStates(v);
+ $('cnt').textContent='第 '+(cur+1)+' / '+SC[sc].s.length+' 步';$('lap').textContent=lap>1?'第 '+lap+' 圈':'';
+ $('istate').innerHTML='问题清单条目：<b>'+(SC[sc].noreg?'不登记':v<0?'还没登记':STATES[v])+'</b>';$('scdesc').textContent=SC[sc].d;
+ document.querySelectorAll('#sctabs .pill').forEach((b,i)=>b.classList.toggle('on',i===sc));}
+function go(i){cur=Math.max(0,Math.min(SC[sc].s.length-1,i));render()}
+function stop(){if(timer){clearInterval(timer);timer=null;$('play').textContent='▶ 自动播放'}}
+$('sctabs').innerHTML=SC.map((s,i)=>'<button class="pill" data-i="'+i+'">'+s.n+'</button>').join('');
+document.querySelectorAll('#sctabs .pill').forEach(b=>b.onclick=()=>{stop();sc=+b.dataset.i;cur=0;lap=1;render()});
+$('prev').onclick=()=>{stop();go(cur-1)};$('next').onclick=()=>{stop();go(cur+1)};$('reset').onclick=()=>{stop();lap=1;go(0)};
+$('play').onclick=()=>{if(timer){stop();return}$('play').textContent='❚❚ 暂停';timer=setInterval(()=>{if(cur>=SC[sc].s.length-1){stop();return}go(cur+1)},1800)};
+
+/* ---------------- deps, owners, risks, now */
+const DEPS=[
+ ['结构体或开放区的几何','设计：本文件核验 → D5 → D6 再拍板。生成：G3 → 受影响的段的 G5–G7 → G9','导航；涉及这段的试走项'],
+ ['物件、事件、物资','设计：核验 → D5 → D6。生成：G4 → 有外观的 G6 → G9','涉及的事件试走项；物件挡路时导航'],
+ ['分级、地标','设计：D1 估算。生成：G2 → G5 → G9','—'],
+ ['layout（原点、朝向）','设计：D5。生成：G3 起全部','导航、试走全部'],
+ ['规划','规划视图 → 引用它的结构体和开放区','—'],
+ ['待决定列表','读过这一项的核验报告（Kit 自动判）；生成线的 stamps 同样记下读过的项','视值而定'],
+ ['美术规范','G2 → G5–G7 → G9；已完成的关回归','—'],
+ ['生成器','改到的那层 → G9；已完成的关回归','比对有变化时导航、试走']];
+$('deptab').innerHTML=DEPS.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>').join('');
+const OWN=[
+ ['design/plan/','总控','登记交给规划；偏差先写设计文件的 plan_deviations，负责人拍板后再改'],
+ ['design/detail/L&lt;nn&gt;/（followups.closed.json 除外）','这一关的设计线；设计线结束后只有修订会话能改','登记交回设计'],
+ ['design/detail/L&lt;nn&gt;/followups.closed.json','这一关的生成线','—'],
+ ['kit spec 生成的 spec.json、spec.check.json、elements.json、followups.json、handoff.json','谁都可以跑 kit spec 重新生成，不手改','—'],
+ ['standards/decisions.json','值为空的项由 step 所在步骤首次填写；填了以后的修改归总控；生成线新增的项归当前生成线','登记交给总控'],
+ ['standards/art.md、work/refs/、work/style.json、work/models.json、work/licenses.json、work/assets-src/、生成器','当前在跑的那条生成线','没有生成线在跑时，交给下一条'],
+ ['work/L&lt;nn&gt;/、build/L&lt;nn&gt;/','这一关的生成线','—'],
+ ['sources/','谁都能追加（kit sources add 分配编号），不改别人的条目','勘误写 errata'],
+ ['design/REVIEW-LOG.md','谁都能追加，只追加','—'],
+ ['design/approvals.json','只由 kit approve 写','—'],
+ ['PROJECT.md','总控；每条线只改主线分工表里自己那一行','—'],
+ ['HUMAN.md','总控（只写通用方法）','登记交给总控'],
+ ['issues.json','谁都能新增；状态按条目状态规则改','—'],
+ ['kit.local.json','总控（P0 写）','—'],
+ ['logs/L&lt;nn&gt;-*.md','这条线','—']];
+$('owntab').innerHTML=OWN.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>').join('');
+const RISK=[
+ ['总控上下文爆炸','总控既调度又做具体活，或负责人在总控里长时间讨论','漏事、前后矛盾','总控不做任何 D、G 步骤的活，不读其他会话的对话记录，只读文件；压缩过一次就换新总控','长时间讨论仍会撑大它：放到流程外的会话里谈'],
+ ['段会话上下文爆炸','一个会话从头做到尾','后半段质量下降','一段只活在两个接力点之间；建模、搜资料、看日志交子 agent；压缩过一次就提前接力','一段里活特别多（比如几十件自制模型）：靠子 agent 分担'],
+ ['交接丢信息','只靠对话记忆；压缩后漏读别的线留下的反馈','重复劳动、问题没人处理','交接写进本线日志和问题清单；新会话只读文件，读完能接着干才算写够','日志写得不全：负责人在接力点能看到交接，可以当场指出'],
+ ['问题没人认领','发现问题时，负责那个文件的会话已经结束','一直挂着，或靠负责人转述','发现方在自己的停顿点、负责人同意后开修订会话；没名额标“待开修订”；没有线在跑的文件归总控或下一条生成线','kit status 在每个会话里列出未关闭的缺口'],
+ ['两个会话改同一个文件','并行时都改 PROJECT.md、资料库编号、decisions.json','覆盖对方的改动','一个文件一个主人；PROJECT.md 每线只改一行；共用文件改完立刻提交；只 add 自己改的文件；生成线一次一条','共用一个工作区：提交前看一眼 git status'],
+ ['改生成器弄坏已完成的关','生成器各关共用','已交付的地图悄悄变了','在 build/_regress/ 对已完成的关回归比对；退步修到一致，变好了交负责人决定（场景 ⑤）','比对只看实体、面数、接线，外观的细微变化查不出'],
+ ['返工乒乓','设计改完，生成又发现新问题，再改','时间和钱耗在来回上','同一个 key 第 3 次重开就停下查根子；问题成批交','根子在格式或 Kit 时，只能告诉负责人，等他在流程外决定'],
+ ['返工成本过大','少量改动却把前面的步骤整个重做','时间和钱浪费','机器部分整体重跑，AI 和人的产物只改受影响的几处；已答复过的取舍不再拍板','导航网格受工具限制只能整关重生成'],
+ ['带着假设做的活作废','不挡路的问题先按假设做','白做','条目里写清假设影响哪些产物，改完只重做这些；影响 G3 几何或导航的当挡路问题','其余假设的影响面靠会话自己写清'],
+ ['负责人审阅成为瓶颈','多条设计线、生成线、修订同时到接力点','排队等待（时间线里的黄色）','设计并行上限 max_parallel_lines、生成 1；每段只停一次；问题成批交','并行上限要按负责人的时间调'],
+ ['会话自己开会话失控','接力链一直开下去','侧栏堆满、重复干活','只在固定接力点开；开之前查 PROJECT.md 名额；开完结束自己；要负责人在 P0 授权 auto_handoff','授权后负责人对开会话的感知变弱：每段结束消息里写明开了哪个、结束了哪个'],
+ ['生成线不知道从哪一步重跑','设计或共用文件改了','凭记忆重跑，漏步或多跑','每个 G 步骤写 stamps，开工和每步之前比对','stamps 只记读过的输入：没记下的输入变了查不出'],
+ ['子 agent 质量不稳','轻量档判断错','错误进了主产物','子 agent 产物必须过脚本核验；两次没过由会话自己做','视觉类产物（模型）脚本查不全：负责人在 G9 看']];
+$('risktab').innerHTML=RISK.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('');
+
+/* ---------------- self test */
+(function(){const errs=[];
+ SC.forEach((S,si)=>{if(!NODE[S.f]||!NODE[S.tg])errs.push('场景'+(si+1)+'节点不存在');
+  S.s.forEach((s,i)=>{if(!['own','ctl','des','gen','sub','file','kit'].includes(s.w))errs.push('场景'+(si+1)+'第'+(i+1)+'步执行者未知');
+   [...(s.at||[]),...(s.stale||[]),...(s.void||[])].forEach(n=>{if(!NODE[n])errs.push('场景'+(si+1)+'第'+(i+1)+'步节点 '+n+' 不存在')});
+   if(s.loop&&(s.loop<1||s.loop>i+1))errs.push('场景'+(si+1)+'第'+(i+1)+'步循环目标错');
+   if(i>0&&s.st!==undefined){let p=-1;for(let j=0;j<i;j++)if(S.s[j].st!==undefined)p=S.s[j].st;
+    const ok={'-1':[0],0:[1,2,3],1:[2,3],2:[4],3:[4]};if(!(ok[p]||[]).includes(s.st))errs.push('场景'+(si+1)+'第'+(i+1)+'步状态 '+STATES[p]+'→'+STATES[s.st]+' 不合法');}
+   try{sc=si;cur=i;drawPipe();drawSeq()}catch(e){errs.push('场景'+(si+1)+'第'+(i+1)+'步渲染出错 '+e.message)}});});
+ const mx=Math.max(...SIM.alive.map(a=>a.ctl+a.d+a.g+a.r)),mxAll=Math.max(...SIM.alive.map(a=>a.ctl+a.d+a.g+a.r+a.h));if(mx>4)errs.push('排期占名额的会话 '+mx+' 超过 4');
+ if(SIM.alive.some(a=>a.g>1))errs.push('排期出现两条生成线同时占名额');if(SIM.alive.some(a=>a.d+a.r>2))errs.push('排期设计侧超过 2');
+ if(!SIM.lines.filter(l=>l.k!=='r').every(l=>l.st==='done'))errs.push('排期没跑完');
+ if(!SIM.lines.filter(l=>l.k==='r').every(l=>l.st==='done'))errs.push('有修订没开');
+ const segs=SIM.lines.reduce((s,l)=>s+l.bars.length,0);
+ $('selftest').innerHTML=(errs.length?'<b style="color:#cf222e">'+errs.length+' 个问题</b>：'+errs.join('；'):'<b style="color:#1a7f37">通过</b>')+'。检查了 '+SC.length+' 个返工场景共 '+SC.reduce((s,x)=>s+x.s.length,0)+' 步（执行者、节点、循环目标、条目状态转换、渲染）；排期：占名额的会话同时最多 '+mx+' 个（加上等人工的生成③ 最多 '+mxAll+' 个），生成线不并行，设计侧不超过 2，一共开 '+SIM.created+' 个会话（总控 1 + 段和修订 '+segs+'）。';
+ document.body.dataset.selftest=errs.length?'fail':'ok';
+ sc=0;cur=0;})();
+
+/* ---------------- init */
+drawOrg();drawTL(20);render();
+const hs=location.hash.slice(1);const m=hs.match(/^rework-(\d+)-(\d+)$/);
+if(m){sc=+m[1];cur=+m[2];render();showTab('rework')}else showTab(TABS.some(t=>t[0]===hs)?hs:'org');
+</script></body></html>
