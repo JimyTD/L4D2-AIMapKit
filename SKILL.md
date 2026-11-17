@@ -61,7 +61,7 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [G9](references/steps/G9-delivery.md) | 成品交付：硬标准全过，用户看本关新出现的类型 | 脚本 + 拍板 |
 | [G10](references/steps/G10-handover.md) | 人工任务（导航、试走）与反馈 | 脚本 + 拍板 |
 
-D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），每条线分三段、在固定接力点换会话；设计线可以几关并行，生成线同时只有一条。会话怎么分、谁开谁、问题怎么交回，见 [sessions.md](references/sessions.md)；子 agent 的规则见 [subagents.md](references/subagents.md)。生成线的目标是成品关卡，白盒只是内部中间产物；只有设计数据明确标为白盒关时才跳过美术步骤。生成器放在项目里，Kit 只放步骤页和检查规则。
+D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），每条线分三段、在固定接力点换会话；同时开发几关由用户在 P0 定，每关自己走完设计和生成。会话怎么分、谁开谁、问题怎么交回，见 [sessions.md](references/sessions.md)；子 agent 的规则见 [subagents.md](references/subagents.md)。生成线的目标是成品关卡，白盒只是内部中间产物；只有设计数据明确标为白盒关时才跳过美术步骤。生成器放在项目里，Kit 只放步骤页和检查规则。
 
 ## 参考（按需读）
 

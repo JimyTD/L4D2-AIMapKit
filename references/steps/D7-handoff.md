@@ -4,7 +4,7 @@
 
 ## 做
 
-1. 交接以 `kit spec` 写出的 `handoff.json` 为准（读哪些文件、每个结构体和开放区引用的资料、交给生成线的待跟进项），不手抄。`PROJECT.md` 的“交接”段每关只写一行，指向 handoff.json 和生成线日志；哪些已经做过、不要重做，写进生成线日志 `logs/L<nn>-build.md` 的第一节。然后开本关的生成①（或排队，见 [sessions.md](../sessions.md)）。
+1. 交接以 `kit spec` 写出的 `handoff.json` 为准（读哪些文件、每个结构体和开放区引用的资料、交给生成线的待跟进项），不手抄。`PROJECT.md` 的“交接”段每关只写一行，指向 handoff.json 和生成线日志；哪些已经做过、不要重做，写进生成线日志 `logs/L<nn>-build.md` 的第一节。然后开本关的生成①（见 [sessions.md](../sessions.md)）。
 2. 生成线交回的缺口清单在 `work/L<nn>/gaps.json`（提交）：`[{"id", "element": elements.json 里的 key, "problem", "affects": ["walk"|"vault"|"sight"|"trigger"]}]`，`affects` 为空表示只影响搭建。逐条按一条规则分类：**改了它，会不会影响玩家能不能走、能不能翻、看不看得到、会不会触发东西？**（就是 `affects` 非空）
    - 会：由设计补。回到 D2 或 D3 改对应的设计文件，重新核验、拍板，再合成。
    - 不会：生成线自己定。
