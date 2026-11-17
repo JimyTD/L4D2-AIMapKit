@@ -7,16 +7,16 @@
 1. **只问负责人能定的喜好和取舍**：旧到什么程度、真实名称和品牌出不出现、偏写实还是偏风格化（美术方向三问）。P1 已经问过的不再问，一份问卷一次问完。现场事实不在这里问：照 [review.md](../review.md) 的“不问的东西”，不在路线上的外观按资料或推断定，标“推断”；地标由 P3 的地标问题和 G2 的地标缺口提问覆盖。
 2. **其余按依据定**，每条写依据（资料编号、设计元素的 key、P1 或 G0 回答的编号，至少一样）：色值和光色倾向、旧化分档、材质做法、标识样式、资源来源和许可。
 3. **每一节、每一条规则给固定 id**（例：light.color、rule.upright）。增补只加新 id、不重排；后面各步引用 id，不引用节号。
-4. **资源来源**，前一层够用就不往后走：① 原版资源（\`kit game find\`、FGD 核对）；② CC0 素材库（免登录可下载）；③ Blender 脚本参数化建模（主力，留脚本可复现）；④ 图片生成网格（要另装软件，用到时先问）。不依赖个人账号的商城资源；不用要求署名的许可；网络照片只作参考。
-5. **不对标原版关卡**：参数以设计和本规范为准。只有设计案点名参照某张原版关卡时，才用 \`kit game find <实体类型> --map <地图>\` 查点名的那几项，记下出处；查到的值只作起始值，不反过来改设计。
+4. **资源来源**，前一层够用就不往后走：① 原版资源（`kit game find`、FGD 核对）；② CC0 素材库（免登录可下载）；③ Blender 脚本参数化建模（主力，留脚本可复现）；④ 图片生成网格（要另装软件，用到时先问）。不依赖个人账号的商城资源；不用要求署名的许可；网络照片只作参考。
+5. **不对标原版关卡**：参数以设计和本规范为准。只有设计案点名参照某张原版关卡时，才用 `kit game find <实体类型> --map <地图>` 查点名的那几项，记下出处；查到的值只作起始值，不反过来改设计。
 6. **工程规则**单列一节，标明“工程规则，不拍板，由脚本检查”。以后按反馈增补，改它不让整份规范变回待拍板：
    - **预算规则**：brush 只建结构；细节放在模型和贴花上；凹进的结构和不能通行的开口画在立面贴图上，凸出的结构保留实体；要用到的才挖；可玩范围外只沿外缘封一圈 playerclip，远处地基不画顶面。
    - **摆放规则**：朝向跟数据走、不随机转角；立着放，倒着的只放在设计写了的地方；成堆的东西给几种固定排法；碰撞用模型自带的。
    - **自制模型坐标约定**：正面、沿线方向各朝哪个轴。
    - **工具材质用途表**（G9 硬标准只认这一份）：trigger 只用在触发器；areaportal、hint、skip 只用在 G3 自动放的可见性 brush；clip、playerclip 只用在整块碰撞（楼梯斜坡、可玩范围外缘一圈、翻不过去的外包）；toolsskybox 只用在天空盒；nodraw 只用在看不见的面；整块 nodraw 的 brush 只允许是按钮薄板和地下的地基。
    - **模型精细档位**：分三档，每档写三角面范围、要不要 LOD。grades.json 里 landmark 为 true 的结构体内的物件和负责人点名的物件，算地标级；其余物件离本关路线（开放区 route 的 main 和 alts、结构体内的 route）25 m 以内的算近景级（和 [format/area.md](../format/area.md) 里“离路线 25 m 以内至少是外立面级”用同一个距离）；25 m 以外的、远景级结构体上的和天空盒里的，算远景级。
-   - **音景对照表**：空间类型（结构体看 \`spaces[].kind\`，开放区看 \`ground[].surface\`）→ 原版 soundscape 名，每行写 \`kit game find\` 查到的先例。
-7. **生成线新增的待决定项**写进 \`standards/decisions.json\`（status 暂定，step 写首次用到的步骤，写 why 和 verify；首次填写和修改都归当前在跑的生成线）：model_tris_tiers、texture_stretch_max（G5）；vis_ratio_max（G3）；placement_yaw_tol_deg、placement_overlap_min、dressing_noclip_max_u（G6）；light_gap_max_u、event_light_r_u、lightmapscale_out、lightmapscale_in、vrad_patch_max、skybox_ring_m（G7）。正文里不写死数值。
+   - **音景对照表**：空间类型（结构体看 `spaces[].kind`，开放区看 `ground[].surface`）→ 原版 soundscape 名，每行写 `kit game find` 查到的先例。
+7. **生成线新增的待决定项**写进 `standards/decisions.json`（status 暂定，step 写首次用到的步骤，写 why 和 verify；首次填写和修改都归当前在跑的生成线）：model_tris_tiers、texture_stretch_max（G5）；vis_ratio_max（G3）；placement_yaw_tol_deg、placement_overlap_min、dressing_noclip_max_u（G6）；light_gap_max_u、event_light_r_u、lightmapscale_out、lightmapscale_in、vrad_patch_max、skybox_ring_m（G7）。正文里不写死数值。
 
 ## 交给下一步
 
@@ -25,11 +25,11 @@
 
 ## 拍板
 
-G0 的问卷是生成① 的一次停顿，消息按 [review.md](../review.md)。负责人答完问题，规范就算定了，不逐条审规范正文。负责人说可以后，按 [G9](G9-delivery.md) 的拍板登记写法，在 \`design/REVIEW-LOG.md\` 写一行“[拍板] G0”。
+G0 的问卷是生成① 的一次停顿，消息按 [review.md](../review.md)。负责人答完问题，规范就算定了，不逐条审规范正文。负责人说可以后，按 [G9](G9-delivery.md) 的拍板登记写法，在 `design/REVIEW-LOG.md` 写一行“[拍板] G0”。
 
 ## 完成
 
-美术方向三问都有答案（P1 或这里）；规范每条都写了依据，写规范的 agent 交负责人之前逐条自查，自查记录写在规范末尾。产物是 \`standards/art.md\`。
+美术方向三问都有答案（P1 或这里）；规范每条都写了依据，写规范的 agent 交负责人之前逐条自查，自查记录写在规范末尾。产物是 `standards/art.md`。
 
 ## 常见坑
 

@@ -4,11 +4,11 @@
 
 ## 读
 
-G2 的参照板；G5 的模型清单 \`work/models.json\`；美术规范的摆放规则；kinds.json 里 need 含 dressing 的元素（space、atmosphere）；开放区和结构体的空间、路线、门。
+G2 的参照板；G5 的模型清单 `work/models.json`；美术规范的摆放规则；kinds.json 里 need 含 dressing 的元素（space、atmosphere）；开放区和结构体的空间、路线、门。
 
 ## 做
 
-1. **布景设计文件** \`work/L<nn>/dressing/<段或结构体>.json\`，每组一条：挂靠的设计元素（elements.json 的 key；路线写 <开放区 id>/route/main）、排法（规范里的哪种）、模型或贴花、数量、参照编号、依据（参照编号，或 atmosphere、事件的 key）。设计改了，按 key 找到受影响的组，只改这些组。
+1. **布景设计文件** `work/L<nn>/dressing/<段或结构体>.json`，每组一条：挂靠的设计元素（elements.json 的 key；路线写 <开放区 id>/route/main）、排法（规范里的哪种）、模型或贴花、数量、参照编号、依据（参照编号，或 atmosphere、事件的 key）。设计改了，按 key 找到受影响的组，只改这些组。
 2. **按摆放规则摆**：朝向跟数据走（沿线、靠墙的对齐长边，正面朝房间或路）；不随机转角；立着放，倒着的只放在设计写了“倒着”的地方；成堆的东西按规范里的几种排法选一种。
 3. 布景挂在空间、门、路线上，不写死坐标。
 4. **叙事痕迹按美术规范的旧化分档**：第 1 档（刚出事的痕迹：倒、散、血迹、半开的门）只放在设计数据写了的地方，每组必须引用那条 atmosphere 或事件的 key；没写的地方只做第 0 档（日常磨损）；第 2 档（损坏）只在设计点名时用。脚本检查：第 1、2 档的组都有引用。
@@ -18,7 +18,7 @@ G2 的参照板；G5 的模型清单 \`work/models.json\`；美术规范的摆�
 
 ## 产物
 
-布景设计文件；布景平面图；\`build/L<nn>/placements.json\`（摆放记录）；俯视核对图 \`build/L<nn>/check/placement_*.png\`。
+布景设计文件；布景平面图；`build/L<nn>/placements.json`（摆放记录）；俯视核对图 `build/L<nn>/check/placement_*.png`。
 
 ## 交给下一步
 

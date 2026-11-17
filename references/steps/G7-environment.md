@@ -4,7 +4,7 @@
 
 ## 读
 
-- 每关的时间和天气：读规划源文件 \`design/plan/levels/L<n>.json\` 的 time、weather（[format/plan.md](../format/plan.md)）。没有这两个字段的，读 DESIGN.md 本关一节，并在问题清单登记交给总控，把值补进源文件（这只是转写 P3 拍过板的内容，P3/L<n> 和 P4 因此显示的“拍板后已修改”按 [review.md](../review.md) 在下一次拍板时一并登记）。
+- 每关的时间和天气：读规划源文件 `design/plan/levels/L<n>.json` 的 time、weather（[format/plan.md](../format/plan.md)）。没有这两个字段的，读 DESIGN.md 本关一节，并在问题清单登记交给总控，把值补进源文件（这只是转写 P3 拍过板的内容，P3/L<n> 和 P4 因此显示的“拍板后已修改”按 [review.md](../review.md) 在下一次拍板时一并登记）。
 - G6 的灯具位置清单；G2 的参照板；美术规范。
 
 ## 做
@@ -12,18 +12,18 @@
 1. **环境档案**：天空、月光或日光、雾、色调、后期。数值由生成线按美术规范的光色倾向定起始值，每项写 why；不在 G7 单独拍板，效果放到 G9 由负责人看新类型的视点，意见写回规范。
 2. **布光规则**（可检查）：起点、终点安全屋各至少一个颜色取自美术规范光色表“暖”档的光源；每个事件触发物 event_light_r_u 以内有光源或发光面；路线上相邻两个光源的间距不超过 light_gap_max_u；颜色按美术规范的光色表。
 3. **灯具和光源对得上**（脚本）：每个光源都有对应的灯具模型或发光面（G6 的灯具清单），没有“有光没灯”；布景文件里灯具组写 lit 为 true 的都有光源。设计数据里没有字段说明“亮着”的，不从中文推，登记进 fallbacks.json；格式缺这个字段的，在本段停顿点“只是告诉你的”里告诉负责人。
-4. 设计案点名参照原版天气或雾时，用 \`kit game find env_fog_controller --map <地图>\` 取起始值，再由负责人看效果定。
-5. **3D 天空盒和远景**：从地理数据取可玩范围外一圈（宽度是 skybox_ring_m）的建筑轮廓和地形，按远景级自动生成；虚构项目按 \`sources/geodata/world.json\` 里同一圈的轮廓。不靠 AI 自己想。
+4. 设计案点名参照原版天气或雾时，用 `kit game find env_fog_controller --map <地图>` 取起始值，再由负责人看效果定。
+5. **3D 天空盒和远景**：从地理数据取可玩范围外一圈（宽度是 skybox_ring_m）的建筑轮廓和地形，按远景级自动生成；虚构项目按 `sources/geodata/world.json` 里同一圈的轮廓。不靠 AI 自己想。
 6. **光照密度**：室外大面 lightmapscale_out，室内 lightmapscale_in。
 7. **音景**按美术规范的对照表：每种空间类型放对应的原版 soundscape。会响的物件：设计数据里没有声音字段的，同样不从中文推，登记进 fallbacks.json。
 
 ## 交给下一步
 
-\`build/L<nn>/report.json\` 的 light 一节：补丁数、布光规则和灯具对应的错误数、没有音景的空间类型。
+`build/L<nn>/report.json` 的 light 一节：补丁数、布光规则和灯具对应的错误数、没有音景的空间类型。
 
 ## 完成
 
-vrad 补丁数 ≤ vrad_patch_max；布光规则、灯具和光源对应检查 0 条错；每种空间类型都有音景。这三项检查脚本做出来之前，由本步 agent 按规则逐条查，结果写进 \`work/L<nn>/manual-checks.md\`。
+vrad 补丁数 ≤ vrad_patch_max；布光规则、灯具和光源对应检查 0 条错；每种空间类型都有音景。这三项检查脚本做出来之前，由本步 agent 按规则逐条查，结果写进 `work/L<nn>/manual-checks.md`。
 
 ## 常见坑
 

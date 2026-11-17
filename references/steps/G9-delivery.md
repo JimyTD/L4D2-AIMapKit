@@ -4,26 +4,26 @@
 
 ## 读
 
-G3–G7 的产物；美术规范、G5 的风格配置 \`work/style.json\`（部位槽和外观类型到材质、模型的映射）；gaps.json 和问题清单里交给本线的条目。
+G3–G7 的产物；美术规范、G5 的风格配置 `work/style.json`（部位槽和外观类型到材质、模型的映射）；gaps.json 和问题清单里交给本线的条目。
 
 ## 做
 
 1. **按规范和风格配置铺开**：构件记录里每个部位槽按风格配置取材质或模型；按 key 单独指定的例外只管那一个，不推广。
 2. 测试视点全部从数据推（起点、每个事件、每段路线、必达点、地标、终点）。
 3. 完整编译：vbsp → 完整 vvis → vrad → 打包。整关不用 vrad -final；编译放后台，等的时候做别的。
-4. 报告：预算、可见性、光照补丁、缺资源、成品检查、耗时。REPORT.md 由脚本生成；人工核对的结果在 \`work/L<nn>/manual-checks.md\`，REPORT 引用它。
-5. **人做的产物哪些作废**（脚本）：和上次交付的构件记录 \`work/L<nn>/delivered/parts.json\` 按 key 比，几何或挡路物件变了就标“导航要重做”；按改动的设计元素 key 列出受影响的试走项。写进 \`work/L<nn>/invalidated.json\`，交给 G10。交付时把这次的 parts.json 复制到 delivered/。脚本做出来之前，由本步 agent 按 key 对比两份 parts.json，外包盒或挡路属性变了的行列出来；有一行就标“导航要重做”。
+4. 报告：预算、可见性、光照补丁、缺资源、成品检查、耗时。REPORT.md 由脚本生成；人工核对的结果在 `work/L<nn>/manual-checks.md`，REPORT 引用它。
+5. **人做的产物哪些作废**（脚本）：和上次交付的构件记录 `work/L<nn>/delivered/parts.json` 按 key 比，几何或挡路物件变了就标“导航要重做”；按改动的设计元素 key 列出受影响的试走项。写进 `work/L<nn>/invalidated.json`，交给 G10。交付时把这次的 parts.json 复制到 delivered/。脚本做出来之前，由本步 agent 按 key 对比两份 parts.json，外包盒或挡路属性变了的行列出来；有一行就标“导航要重做”。
 6. G4 之后新发现的影响玩法的问题都已写进 gaps.json，在这次拍板点一次交出；更新生成线日志和 PROJECT.md 本线那一行。
 7. **交拍板前自查**：先跑完硬标准，再看俯视核对图；模型预览图逐张和参照照片比三项：正面朝向、长宽高比例、主色，哪一项不同就改，改不了的列进拍板消息的“只是告诉你的”。不把脚本能拦的问题留给负责人。
 8. **交负责人拍板**：消息里列出要看的视点，由脚本筛 refs.json 里 types 的 approved 为空的类型和地标（之前的关已认可过的不再看）；每个视点写看哪几项：光照、布景密度、模型精细程度、旧化程度。负责人认可的类型在 approved 写日期和关号。负责人的意见写回美术规范（变成数字或档位），再按“只改受影响的部分”改。意见里暴露出检查缺口的（脚本本该拦住却没拦），补检查脚本，在本次消息“只是告诉你的”里写明缺口在哪一步。
 
 ## 拍板登记
 
-负责人说可以后，在 \`design/REVIEW-LOG.md\` 末尾追加一行固定格式：\`- [拍板] <单元> <日期> sha:<指纹>：<原话摘要>\`。单元写 G0、L<nn>/G4、L<nn>/G9、L<nn>/G10；指纹取这次拍板对象内容的 sha256 前 16 位：G0 取 standards/art.md，G4 取 work/L<nn>/gaps.json，G9 取 work/L<nn>/delivered/parts.json，G10 取 work/L<nn>/human-todo.json。生成线日志引用这一行；stamps 读最后一条同名的行，指纹对不上就当作拍板后又改过。\`kit approve\` 支持 G 单元之后，改为跑 \`kit approve\`。
+负责人说可以后，在 `design/REVIEW-LOG.md` 末尾追加一行固定格式：`- [拍板] <单元> <日期> sha:<指纹>：<原话摘要>`。单元写 G0、L<nn>/G4、L<nn>/G9、L<nn>/G10；指纹取这次拍板对象内容的 sha256 前 16 位：G0 取 standards/art.md，G4 取 work/L<nn>/gaps.json，G9 取 work/L<nn>/delivered/parts.json，G10 取 work/L<nn>/human-todo.json。生成线日志引用这一行；stamps 读最后一条同名的行，指纹对不上就当作拍板后又改过。`kit approve` 支持 G 单元之后，改为跑 `kit approve`。
 
 ## 产物
 
-\`build/L<nn>/<地图>.bsp\`、\`build/L<nn>/REPORT.md\`、\`work/L<nn>/invalidated.json\`、\`work/L<nn>/delivered/parts.json\`、测试视点清单、拍板消息里的视点清单。
+`build/L<nn>/<地图>.bsp`、`build/L<nn>/REPORT.md`、`work/L<nn>/invalidated.json`、`work/L<nn>/delivered/parts.json`、测试视点清单、拍板消息里的视点清单。
 
 ## 交给下一步
 
