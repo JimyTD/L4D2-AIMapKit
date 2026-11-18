@@ -399,6 +399,41 @@
    "blocks": false,
    "see_through": true,
    "vault": false
+  },
+  {
+   "id": "o_lift",
+   "level": 1,
+   "in": "h1",
+   "at": [
+    18.5,
+    10.5
+   ],
+   "yaw_deg": 0,
+   "size_m": [
+    2,
+    2,
+    2.5
+   ],
+   "kind": "elevator",
+   "stops": [
+    1,
+    2
+   ],
+   "shaft": [
+    17.5,
+    9.5,
+    19.5,
+    11.5
+   ],
+   "landings": {
+    "1": "h1",
+    "2": "r_start"
+   },
+   "what": "自测样例：电梯（stops 是停靠层号，和载具的停车点不同）",
+   "src": "@made",
+   "blocks": false,
+   "see_through": false,
+   "vault": false
   }
  ],
  "fixtures": [],

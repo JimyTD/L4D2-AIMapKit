@@ -53,11 +53,18 @@ def load_events(level):
 
 
 def vehicle_events(o):
-    """Events a vehicle fires (at stops and pass points) and events it waits on (resume_when)."""
+    """Events a vehicle fires (at stops and pass points) and events it waits on (resume_when).
+    Only kind vehicle: an elevator's stops are floor numbers, not stop objects."""
     fires, waits = [], []
+    if o.get("kind") != "vehicle":
+        return fires, waits
     for s in o.get("stops", []) + o.get("passes", []):
+        if not isinstance(s, dict):
+            continue
         fires += s.get("fires", [])
     for s in o.get("stops", []):
+        if not isinstance(s, dict):
+            continue
         for c in s.get("resume_when", []) or []:
             if isinstance(c, dict):
                 waits += [c[k] for k in ("fired", "ended") if isinstance(c.get(k), str)]

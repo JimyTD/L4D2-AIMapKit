@@ -224,9 +224,10 @@ def run(level_dir: Path):
                 v = o.get(k, "")
                 if isinstance(v, str) and v.startswith(("event:", "ev_")):
                     fired.setdefault(v, []).append(f"{pid}/{o['id']}")
-            vf, vw = vehicle_events(o)  # a vehicle fires events at stops and pass points, and waits on others
-            for ev in vf + vw:
-                fired.setdefault(ev, []).append(f"{pid}/{o['id']}")
+            if o.get("kind") == "vehicle":  # a vehicle fires events at stops and pass points, and waits on others
+                vf, vw = vehicle_events(o)
+                for ev in vf + vw:
+                    fired.setdefault(ev, []).append(f"{pid}/{o['id']}")
         for p in s.get("passages", []):
             for ev in p.get("fires", []):
                 fired.setdefault(ev, []).append(f"{pid}/{p['id']}")
