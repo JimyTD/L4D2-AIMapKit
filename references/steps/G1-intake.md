@@ -20,7 +20,7 @@
 4. **读交接**：可用资源取 handoff.json 里每个结构体和开放区引用的资料，缺的用 `kit sources find <对象> --use look` 查，交给 G2。
 5. **接住交给生成线的跟进项**：handoff.json 的 followups_for_build 并进对表结果；玩法先例待核的项按下面“加一种新东西的固定步骤”查先例，在 G4 核完关闭。
 6. **字段对表**（脚本）：spec 里出现的每种物件 kind、事件 type、开口 access、空间 void、门 kind 和 state 等，和生成器已支持的逐项对照，结果写进 `build/L<nn>/intake.json`：`[{"kind", "status": "supported"|"build_todo"|"out_of_format", "elements": [key]}]`。分两类：
-   - **生成线待实现**（build_todo）：FORMAT 里有定义、生成器还不会做。这是生成线欠的账，由生成线补，不退回设计；要补的种类在 G4 之后的停顿告诉负责人，不估时间。
+   - **生成线待实现**（build_todo）：FORMAT 里有定义、生成器还不会做。这是生成线欠的账，由生成线补，不退回设计；要补的种类在 G4 之后的停顿告诉负责人，不估时间。补不出来的玩法实体按 [G4](G4-runtime.md) 第 8 条登记缺口，不拿静态物或别的实体顶替。
    - **格式外或冲突**（out_of_format）：FORMAT 没定义，或定义和事件说明矛盾（例：物件写“被破坏触发”，事件写“进入就触发”）。都写进 `work/L<nn>/gaps.json`（字段见 [D7](D7-handoff.md)），problem 写明是哪一种，affects 照 D7 填。affects 非空的交回设计：数据能表达的改数据；格式确实缺字段的，由设计线告诉负责人。affects 为空的由生成线自己定，按 G4 兜底写进 fallbacks.json，gaps.json 这一条写明“已自定，见 fallbacks.json 的 id”；其中属于“FORMAT 没有定义”的，在本段停顿点的“只是告诉你的”里告诉负责人格式缺了什么。生成线不直接改 Kit，也不替负责人决定改不改 Kit。
 7. **快速实测**（脚本）：只生成几何、只跑 vbsp，十几秒拿到真实 brushside 数。不设估算门槛，按结果分两档：brushside ≤ map_budget_ratio.goal × brushside_cap、brush ≤ map_budget_ratio.goal × brush_cap，往下做；超了，按构件类别统计面数（楼体、开口、楼梯、场地、范围外……），交 G3 按预算规则改做法；按规则改完仍超，才写进 gaps.json 交回设计。实测面数写进 `build/L<nn>/faces.json`，每个结构体、每段开放区一行，和 `kit detail estimate` 的估算值并排，供拟合 brushside_estimate。
 8. **朝向照设计**：整关转不转由 D1 定，写在 layout.json 的 orientation（bevel 面的代价已算进设计的预算估算），生成线照做，不另定。
