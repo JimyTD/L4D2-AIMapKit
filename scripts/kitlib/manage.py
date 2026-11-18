@@ -203,34 +203,68 @@ def _legacy_design_unchanged(sha: str, files) -> bool:
     """An old-style approval hashed the whole spec.json, standards included, so editing a standard broke it.
     Find the committed spec.json whose whole-file fingerprint is the recorded one, and compare its design part
     (standards dropped) with the current file. Read-only: approvals.json is not rewritten. False when the
-    project has no git history for the file or no committed version matches."""
+    project has no git history for the file or no committed version matches.
+
+    The search (git log plus up to 200 git show) runs once per recorded fingerprint: its answer (the design
+    fingerprint of that old spec, or "not found" as of the file's latest commit) is cached in the project's git
+    directory (.git/kit-legacy-approvals.json), outside the work tree, so it is never committed."""
     if len(files) != 1:
         return False
     p = Path(files[0])
     if not p.exists():
         return False
     rel = p.relative_to(root()).as_posix()
+
+    def git(*args, text=True):
+        return subprocess.run(["git", "-C", str(root()), *args], capture_output=True, text=text, timeout=20).stdout
     try:
-        revs = subprocess.run(["git", "-C", str(root()), "log", "--format=%H", "--", rel],
-                              capture_output=True, text=True, timeout=20).stdout.split()
+        gd = git("rev-parse", "--absolute-git-dir").strip()
+        latest = git("log", "-1", "--format=%H", "--", rel).strip()
     except (OSError, subprocess.SubprocessError):
         return False
+    if not gd or not latest:
+        return False
+    cache_p = Path(gd) / "kit-legacy-approvals.json"
+    try:
+        cache = json.loads(cache_p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        cache = {}
+    key = f"{rel}@{sha}"
+    hit = cache.get(key)
+    if hit and hit.get("design"):
+        return hit["design"] == _sha([p])
+    if hit and hit.get("missing_as_of") == latest:
+        return False
+    design = _legacy_search(rel, sha, git)
+    cache[key] = {"design": design} if design else {"missing_as_of": latest}
+    try:
+        cache_p.write_text(json.dumps(cache, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+    return bool(design) and design == _sha([p])
+
+
+def _legacy_search(rel: str, sha: str, git):
+    """Design fingerprint (as _sha computes it now) of the committed spec.json whose whole-file fingerprint is sha."""
+    try:
+        revs = git("log", "--format=%H", "--", rel).split()
+    except (OSError, subprocess.SubprocessError):
+        return None
     for rev in revs[:200]:
         try:
-            blob = subprocess.run(["git", "-C", str(root()), "show", f"{rev}:{rel}"], capture_output=True, timeout=20).stdout
+            blob = git("show", f"{rev}:{rel}", text=False)
         except (OSError, subprocess.SubprocessError):
-            return False
+            return None
         h = hashlib.sha256(rel.encode() + blob.replace(b"\r\n", b"\n")).hexdigest()[:16]
         if h != sha:
             continue
         try:
             d = json.loads(blob.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
-            return False
+            return None
         d.pop("standards", None)
-        old = hashlib.sha256(rel.encode() + json.dumps(d, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
-        return old == _sha([p])
-    return False
+        return hashlib.sha256(rel.encode() + json.dumps(d, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+    return None
 
 
 def _level_no(name: str) -> int:
