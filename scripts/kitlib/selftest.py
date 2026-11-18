@@ -284,13 +284,22 @@ def extension_checks(proj) -> int:
         "    structure.load_spec(d / 'A.json'); print('FORBID False')\n"
         "except Exception as e:\n"
         "    print('FORBID', '外壳' in str(e))\n"
+        "ext.pop('shell')\n"
+        "ext['floors'][0]['doors'][0].update({'state': 'blocked', 'five': {'挡什么': 'x', '玩家翻越': '不能', '感染者翻越': '能', '视线': '看不穿', '理由': 'x'},\n"
+        "                                     'cross': {'survivor': False, 'infected': 'ai', 'sight': 'blocked', 'method': 'clutter'}})\n"
+        "(d / 'A.json').write_text(json.dumps(ext), encoding='utf-8')\n"
+        "from project import decisions\n"
+        "s = structure.load_spec(d / 'A.json'); m = structure.build(s); structure.opening_access(m)\n"
+        "exp = structure.export(s, m, decisions())\n"
+        "dn = next(x for f in exp['floors'] for x in f['doors'] if x['id'] == 'd_new')\n"
+        "print('CROSS', dn.get('cross', {}).get('infected') == 'ai')\n"
     )
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1", "KIT_PROJECT": str(proj)}
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", env=env)
     res = out.stdout + out.stderr
     for key, what in (("SHELL", "扩展文件继承写入关的外壳"), ("ADDED", "扩展文件新增空间、保留写入关的空间"),
                       ("REMOVED", "扩展文件用 remove 去掉写入关的元素"), ("OWN", "物件、关号属于扩展所在的关"),
-                      ("FORBID", "扩展文件写外壳字段时报错")):
+                      ("FORBID", "扩展文件写外壳字段时报错"), ("CROSS", "扩展文件里封住的门，搭建数据带出 cross")):
         passed = f"{key} True" in res
         print(("OK   " if passed else "FAIL ") + "extends：" + what + ("" if passed else "\n" + res[-800:]))
         bad += 0 if passed else 1
