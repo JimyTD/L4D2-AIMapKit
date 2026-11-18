@@ -173,8 +173,12 @@ def budget_line(level_dir):
 
 def add_object(objects, items, owner, o, w, where):
     label = f"{o['id']}：{o.get('what', '')}"
+    fires = list(o.get("fires", []))
+    if o["kind"] == "vehicle":  # events fired along the way count as this vehicle's triggers
+        from fmt import vehicle_events
+        fires += vehicle_events(o)[0]
     rec = {"key": f"{owner}/{o['id']}", "owner": owner, "kind": o["kind"], "at": [round(w[0], 2), round(w[1], 2)], "label": label,
-           "fires": o.get("fires", []), "opened_by": o.get("opened_by"), "when": o.get("when", ""), "egg": bool(o.get("easter_egg"))}
+           "fires": fires, "opened_by": o.get("opened_by"), "when": o.get("when", ""), "egg": bool(o.get("easter_egg"))}
     objects.append(rec)
     if o["kind"] == "item_spawn":
         its = "<br>".join(f"{i['entity']} × {i['count']}" + (f"（{i['options']}）" if i.get("options") else "") for i in o.get("items", []))

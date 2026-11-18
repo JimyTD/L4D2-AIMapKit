@@ -33,7 +33,8 @@ from structure import FIVE, GRADES, m2u, page_sources, plan_refs_valid, root_rel
 
 BUILDING_GRADES = {"可进入", "外立面", "远景", "省略"}
 SEG_KINDS = {"building", "blocker", "barrier", "exit"}
-SITE_OBJ_KINDS = {"button", "item_spawn", "alarm", "clutter_block", "prop", "event_door", "fire", "infected"}
+SITE_OBJ_KINDS = {"button", "item_spawn", "alarm", "clutter_block", "prop", "event_door", "fire", "infected", "vehicle"}
+ON_PATH_M = 1.5  # a vehicle stop or pass point must lie on its path within this distance
 FIXTURE_KINDS = {"furniture", "equipment", "partition", "clutter", "plant", "structure"}
 RASTER = 0.5
 
@@ -43,6 +44,52 @@ def gpoly(p):
     if isinstance(p, dict):
         return Polygon(p["shell"], p.get("holes", []))
     return Polygon(p)
+
+
+def vehicle_path(spec, o):
+    """A vehicle's path as a polyline: written out, or route:main / route:<alt name> of the area. None if unresolved."""
+    p = o.get("path")
+    if isinstance(p, list):
+        return p if len(p) >= 2 else None
+    if not isinstance(p, str) or not p.startswith("route:"):
+        return None
+    name = p[6:]
+    if name == "main":
+        return spec["route"]["main"]
+    alt = next((a for a in spec["route"].get("alts", []) if a.get("name") == name), None)
+    return alt["path"] if alt else None
+
+
+def check_vehicle_path(ok, spec, o, area, footprints, bl_shapes, segs):
+    """A vehicle drives its path inside the area; the swept body clears buildings, blockers and barriers;
+    every stop and pass point lies on the path, in driving order."""
+    pts = vehicle_path(spec, o)
+    ok("载具", f"{o['id']} 路线能解析成折线", pts is not None, str(o.get("path"))[:60])
+    if pts is None:
+        return
+    line = LineString(pts)
+    ok("载具", f"{o['id']} 起点在车的位置（{ON_PATH_M} m 内）", Point(pts[0]).distance(Point(o["at"])) <= ON_PATH_M,
+       f"{Point(pts[0]).distance(Point(o['at'])):.1f} m")
+    ok("载具", f"{o['id']} 路线在范围内", line.difference(area.buffer(0.5)).length < 0.5, f"超出 {line.difference(area.buffer(0.5)).length:.1f} m")
+    w = (o.get("size_m") or [0, 0])[1]
+    body = line.buffer(w / 2, cap_style=2, join_style=2)
+    solids = [footprints] + list(bl_shapes.values()) + [LineString([s["from"], s["to"]]).buffer(0.1) for s in segs if s["kind"] == "barrier"]
+    hit = body.intersection(unary_union(solids)).area
+    ok("载具", f"{o['id']} 车体（宽 {w} m）沿路线扫过不碰楼、封路、围挡", hit < 0.2, f"{hit:.1f} m²")
+    for s in o.get("stops", []) + o.get("passes", []):
+        at = s.get("at")
+        good = isinstance(at, list) and len(at) == 2
+        d = line.distance(Point(at)) if good else 999
+        ok("载具", f"{o['id']} 点 {s.get('id')} 在路线上（{ON_PATH_M} m 内）", d <= ON_PATH_M, f"{d:.1f} m")
+    stops = o.get("stops", [])
+    last = -1.0
+    for s in stops:
+        if isinstance(s.get("at"), list):
+            m = line.project(Point(s["at"]))
+            ok("载具", f"{o['id']} 停车点 {s.get('id')} 按行驶顺序排列", m >= last, f"{m:.0f} m")
+            last = m
+    if stops and isinstance(stops[-1].get("at"), list):
+        ok("载具", f"{o['id']} 最后一个停车点在路线终点（{ON_PATH_M} m 内）", Point(stops[-1]["at"]).distance(Point(pts[-1])) <= ON_PATH_M)
 
 
 def label(mask):
@@ -325,6 +372,8 @@ def check(spec, world, dec, srcs, plan_level):
         ok("物件", f"{o['id']} 在范围内或贴着范围", area.buffer(1.0).contains(Point(o["at"])))
         check_src(f"物件 {o['id']}", o)
         fmt.check_object(ok, f"物件 {o['id']}", o, events, None)
+        if o["kind"] == "vehicle":
+            check_vehicle_path(ok, spec, o, area, footprints, bl_shapes, segs)
         if o.get("door"):
             bid, _, did = o["door"].partition("/")
             bp = level_dir(spec["level"]) / "structures" / f"{bid}.json"
@@ -413,6 +462,11 @@ def export(spec, world):
     for it in out["fixtures"]:
         it["src"] = resolve(spec, it.get("src"))
         it["size_u"] = [U(x) for x in it["size_m"]]
+    for it in out["objects"]:  # the generator reads the vehicle path as a polyline, whatever the source wrote
+        if it.get("kind") == "vehicle":
+            pts = vehicle_path(spec, it)
+            it["path_m"] = pts
+            it["path_len_m"] = round(LineString(pts).length, 2) if pts else None
     out["stats"] = {
         "area_m2": round(Polygon(spec["area"]).area),
         "structures": {g: sum(1 for b in spec["structures"] if b["grade"] == g) for g in BUILDING_GRADES},

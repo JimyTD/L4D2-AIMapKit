@@ -28,6 +28,10 @@ NEW_OBJ_KINDS = {"fire", "elevator", "mounted_gun", "infected"}
 INFECTED_TYPES = {"Tank", "Witch", "Boomer", "Hunter", "Smoker", "Jockey", "Charger", "Spitter"}
 MOUNTED_GUNS = {"prop_minigun", "prop_minigun_l4d1", "prop_mounted_machine_gun"}
 GLAZING = {"fixed", "open", "breakable"}
+VEHICLE_WAIT = {"humans", "survivors", "none"}  # who the vehicle waits for before it moves on
+VEHICLE_STRAGGLERS = {"teleport", "left"}  # survivors not aboard when it moves on: put back aboard, or left behind
+RESUME_KEYS = {"fired", "ended", "time_s", "boarded"}
+BREAKABLE_KINDS = {"prop", "clutter_block"}
 
 
 @lru_cache(None)
@@ -46,6 +50,57 @@ def game_classes():
 
 def load_events(level):
     return _events(level)
+
+
+def vehicle_events(o):
+    """Events a vehicle fires (at stops and pass points) and events it waits on (resume_when)."""
+    fires, waits = [], []
+    for s in o.get("stops", []) + o.get("passes", []):
+        fires += s.get("fires", [])
+    for s in o.get("stops", []):
+        for c in s.get("resume_when", []) or []:
+            if isinstance(c, dict):
+                waits += [c[k] for k in ("fired", "ended") if isinstance(c.get(k), str)]
+    return fires, waits
+
+
+def check_vehicle(ok, label, o, events):
+    """Field checks of a vehicle (format/area.md). Geometry against the area is checked in area.py."""
+    sp = o.get("speed_m_s")
+    ok("载具", f"{label} 写了车速（speed_m_s > 0）", isinstance(sp, (int, float)) and sp > 0, str(sp))
+    p = o.get("path")
+    ok("载具", f"{label} 写了路线（折线或 route:main / route:<分支名>）",
+       (isinstance(p, list) and len(p) >= 2) or (isinstance(p, str) and p.startswith("route:")), str(p)[:60])
+    b = o.get("boarding") or {}
+    ok("载具", f"{label} 写了等谁上车（boarding.wait_for）", b.get("wait_for") in VEHICLE_WAIT, str(b.get("wait_for")))
+    if b.get("wait_for") in ("humans", "survivors"):
+        ok("载具", f"{label} 写了没上车的人怎么办（boarding.stragglers）", b.get("stragglers") in VEHICLE_STRAGGLERS, str(b.get("stragglers")))
+    ok("载具", f"{label} 写了起步的事件（enabled_by）", bool(o.get("enabled_by")))
+    stops = o.get("stops") or []
+    ok("载具", f"{label} 至少有一个停车点（最后一个是终点）", bool(stops))
+    ids = [s.get("id") for s in stops + (o.get("passes") or [])]
+    ok("载具", f"{label} 停车点和经过点的 id 齐全且不重复", all(ids) and len(set(ids)) == len(ids), ",".join(map(str, ids)))
+    for i, s in enumerate(stops):
+        last = i == len(stops) - 1
+        rw = s.get("resume_when")
+        if last:
+            ok("载具", f"{label} 终点 {s.get('id')} 不再继续（不写 resume_when）", not rw)
+            continue
+        ok("载具", f"{label} 停车点 {s.get('id')} 写了什么时候继续（resume_when）", isinstance(rw, list) and bool(rw))
+        for c in rw or []:
+            good = isinstance(c, dict) and len(c) == 1 and next(iter(c)) in RESUME_KEYS
+            if good and "time_s" in c:
+                good = isinstance(c["time_s"], (int, float)) and c["time_s"] > 0
+            if good and "boarded" in c:
+                good = c["boarded"] is True and b.get("wait_for") in ("humans", "survivors")
+            ok("载具", f"{label} 停车点 {s.get('id')} 继续条件写法合法", good, json.dumps(c, ensure_ascii=False))
+    for s in o.get("passes") or []:
+        ok("载具", f"{label} 经过点 {s.get('id')} 写了触发的事件（fires）", bool(s.get("fires")))
+    fires, waits = vehicle_events(o)
+    for ev in fires:
+        ok("事件", f"{label} 沿途触发的事件 {ev} 在事件表里", events is None or ev in events, ev)
+    for ev in waits:
+        ok("事件", f"{label} 停车等的事件 {ev} 在事件表里", events is None or ev in events, ev)
 
 
 def five_consistent(five, cross):
@@ -107,6 +162,11 @@ def check_object(ok, label, o, events, door_ids=None, srcs=None):
             ok("事件", f"{label} 打开它的事件 {o['opened_by']} 在事件表里", events is None or o["opened_by"] in events, o["opened_by"])
     if o.get("enabled_by"):
         ok("事件", f"{label} 前置事件 {o['enabled_by']} 在事件表里", events is None or o["enabled_by"] in events, o["enabled_by"])
+    if "breakable" in o:
+        ok("物件", f"{label} breakable 只用在 prop、clutter_block，取值 true", o["kind"] in BREAKABLE_KINDS and o["breakable"] is True,
+           f"{o['kind']} / {o['breakable']}")
+    if o["kind"] == "vehicle":
+        check_vehicle(ok, label, o, events)
     for ev in o.get("fires", []):
         ok("事件", f"{label} 触发的事件 {ev} 在事件表里", events is None or ev in events, ev)
     if o["kind"] == "mounted_gun":

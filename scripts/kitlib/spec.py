@@ -35,6 +35,7 @@ from shapely.geometry import Point, Polygon
 
 from project import COORD_MAX_U, KitError, decision_items, decisions, decisions_stamp, plan, plan_level, root
 from project import level_dir as ldir
+from fmt import vehicle_events
 from structure import Frame, base_file, load_spec, plan_refs_valid
 
 
@@ -223,6 +224,9 @@ def run(level_dir: Path):
                 v = o.get(k, "")
                 if isinstance(v, str) and v.startswith(("event:", "ev_")):
                     fired.setdefault(v, []).append(f"{pid}/{o['id']}")
+            vf, vw = vehicle_events(o)  # a vehicle fires events at stops and pass points, and waits on others
+            for ev in vf + vw:
+                fired.setdefault(ev, []).append(f"{pid}/{o['id']}")
         for p in s.get("passages", []):
             for ev in p.get("fires", []):
                 fired.setdefault(ev, []).append(f"{pid}/{p['id']}")

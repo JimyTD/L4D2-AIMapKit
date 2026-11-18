@@ -20,6 +20,51 @@
     "play:1"
    ],
    "src": "plan:plays[1]"
+  },
+  {
+   "id": "ev_truck_go",
+   "name": "发车",
+   "type": "Effect",
+   "what": "自测样例：发车",
+   "until": "",
+   "plan": [],
+   "src": "plan:events[0]"
+  },
+  {
+   "id": "ev_tree_stop",
+   "name": "停在倒树前",
+   "type": "Effect",
+   "what": "自测样例：停在倒树前",
+   "until": "",
+   "plan": [],
+   "src": "plan:events[0]"
+  },
+  {
+   "id": "ev_tree_down",
+   "name": "树断",
+   "type": "Effect",
+   "what": "自测样例：树断",
+   "until": "",
+   "plan": [],
+   "src": "plan:events[0]"
+  },
+  {
+   "id": "ev_horn",
+   "name": "鸣笛",
+   "type": "Effect",
+   "what": "自测样例：鸣笛",
+   "until": "",
+   "plan": [],
+   "src": "plan:events[0]"
+  },
+  {
+   "id": "ev_truck_end",
+   "name": "到站",
+   "type": "Effect",
+   "what": "自测样例：到站",
+   "until": "",
+   "plan": [],
+   "src": "plan:events[0]"
   }
  ]
 }

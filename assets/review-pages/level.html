@@ -56,7 +56,7 @@ svg.setAttribute('viewBox',`0 0 ${maxx-minx} ${maxy-miny}`);
 const el=(t,a,par)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(par||svg).appendChild(e);return e};
 const pts=a=>a.map(p=>P(...p).map(v=>v.toFixed(2)).join(',')).join(' ');
 const BG={'可进入':'#12b886','外立面':'#fd7e14','远景':'#74c0fc','省略':'#adb5bd'};
-const OK={button:'#e8590c',item_spawn:'#2f9e44',alarm:'#c2255c',clutter_block:'#495057',prop:'#7048e8',event_door:'#1971c2',saferoom_door:'#1864ab',fire:'#f03e3e',elevator:'#0b7285',mounted_gun:'#212529',infected:'#a61e4d'};
+const OK={button:'#e8590c',item_spawn:'#2f9e44',alarm:'#c2255c',clutter_block:'#495057',prop:'#7048e8',event_door:'#1971c2',saferoom_door:'#1864ab',fire:'#f03e3e',elevator:'#0b7285',mounted_gun:'#212529',infected:'#a61e4d',vehicle:'#5c940d'};
 const ON=__OBJNAMES__;
 let sel=null,hl=null;
 function draw(){svg.innerHTML='';const g=k=>document.getElementById(k).checked;

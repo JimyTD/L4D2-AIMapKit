@@ -95,6 +95,12 @@ def elements(spec: dict) -> list:
         for coll, path, fields in AREA_COLLECTIONS:
             for x in _get(a["data"], path):
                 out.append(_row(a["id"], "area", coll, x, fields))
+        for v in _get(a["data"], ("objects",)):  # a vehicle's stops and pass points get keys of their own
+            if v.get("kind") != "vehicle":
+                continue
+            for coll, key in (("vehicle_stop", "stops"), ("vehicle_pass", "passes")):
+                for x in v.get(key, []) or []:
+                    out.append(_row(a["id"], "area", coll, {**x, "kind": coll}, ("note",), xid=f"{v.get('id')}.{x.get('id')}"))
         for x in _get(a["data"], ("structures",)):  # outlines the area shows (distant buildings etc.)
             out.append(_row(a["id"], "area", "shown_structure", x, ("look", "name", "grade"), xid=x.get("outline")))
     for e in spec.get("events", []):

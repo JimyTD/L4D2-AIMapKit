@@ -314,6 +314,124 @@
    "blocks": false,
    "see_through": true,
    "vault": true
+  },
+  {
+   "id": "o_truck",
+   "kind": "vehicle",
+   "at": [
+    -5,
+    18
+   ],
+   "yaw_deg": 9,
+   "size_m": [
+    6,
+    2.4,
+    2.6
+   ],
+   "blocks": true,
+   "see_through": false,
+   "vault": true,
+   "enabled_by": "ev_truck_go",
+   "path": [
+    [
+     -5,
+     18
+    ],
+    [
+     20,
+     22
+    ],
+    [
+     50,
+     22
+    ]
+   ],
+   "speed_m_s": 4,
+   "boarding": {
+    "wait_for": "humans",
+    "stragglers": "teleport"
+   },
+   "stops": [
+    {
+     "id": "tree",
+     "at": [
+      30,
+      22
+     ],
+     "fires": [
+      "ev_tree_stop"
+     ],
+     "resume_when": [
+      {
+       "fired": "ev_tree_down"
+      },
+      {
+       "boarded": true
+      }
+     ]
+    },
+    {
+     "id": "end",
+     "at": [
+      50,
+      22
+     ],
+     "fires": [
+      "ev_truck_end"
+     ]
+    }
+   ],
+   "passes": [
+    {
+     "id": "horn",
+     "at": [
+      10,
+      20.4
+     ],
+     "fires": [
+      "ev_horn"
+     ]
+    }
+   ],
+   "what": "自测样例：会开的车",
+   "src": "@made"
+  },
+  {
+   "id": "o_tree",
+   "kind": "clutter_block",
+   "at": [
+    33,
+    24
+   ],
+   "yaw_deg": 0,
+   "size_m": [
+    4,
+    0.8,
+    1
+   ],
+   "breakable": true,
+   "enabled_by": "ev_tree_stop",
+   "fires": [
+    "ev_tree_down"
+   ],
+   "five": {
+    "挡什么": "倒树",
+    "玩家翻越": "能",
+    "感染者翻越": "能",
+    "视线": "能看穿",
+    "理由": "自测"
+   },
+   "cross": {
+    "survivor": true,
+    "infected": "all",
+    "sight": "through",
+    "method": "clutter"
+   },
+   "what": "自测样例：车停下后才能打断的树",
+   "src": "@made",
+   "blocks": false,
+   "see_through": true,
+   "vault": true
   }
  ],
  "links": [

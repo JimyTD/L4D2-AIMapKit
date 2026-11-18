@@ -75,6 +75,13 @@ CASES = [
     ("栅栏的五件事和翻越字段对不上", A, lambda d: byid(d["boundary"], "s3")["cross"].__setitem__("survivor", True), "area"),
     ("走不到的点其实走得到", A, lambda d: d["route"]["must_not_reach"].__setitem__("x", [20, 22]), "area"),
     ("出口没写接到哪里", A, lambda d: byid(d["boundary"], "s4").pop("leads_to"), "area"),
+    ("载具没写车速", A, lambda d: byid(d["objects"], "o_truck").pop("speed_m_s"), "area"),
+    ("载具停车点不在路线上", A, lambda d: byid(d["objects"], "o_truck")["stops"][0].__setitem__("at", [30, 16]), "area"),
+    ("载具路线穿进楼里", A, lambda d: byid(d["objects"], "o_truck").__setitem__("path", [[-5, 18], [20, 10], [50, 22]]), "area"),
+    ("载具停车点的继续条件写错", A, lambda d: byid(d["objects"], "o_truck")["stops"][0].__setitem__("resume_when", [{"after": "ev_tree_down"}]), "area"),
+    ("载具终点还写了继续条件", A, lambda d: byid(d["objects"], "o_truck")["stops"][1].__setitem__("resume_when", [{"time_s": 5}]), "area"),
+    ("载具停车等的事件不在事件表里", A, lambda d: byid(d["objects"], "o_truck")["stops"][0].__setitem__("resume_when", [{"fired": "ev_nothing"}]), "area"),
+    ("能打坏写在了不能打的物件上", A, lambda d: byid(d["objects"], "o_cart").__setitem__("kind", "button") or byid(d["objects"], "o_cart").__setitem__("breakable", True), "area"),
     ("规划条目丢了落点", A, lambda d: d.__setitem__("plan_refs", [r for r in d["plan_refs"] if r["ref"] != "spawn:0"]), "spec"),
     ("事件表里多了没人触发的事件", f"{L}/events.json", lambda d: d["events"].append(
         {"id": "ev_orphan", "type": "PanicEvent", "until": "", "plan": []}), "spec"),
@@ -108,7 +115,10 @@ def chain(proj, upto=None):
 
 # each case must be caught by the check it targets, not by an unrelated one
 EXPECT = {"走廊窄于标准": "游戏尺度", "门没落在两个空间的交界上": "门在交界上", "规划条目丢了落点": "规划覆盖",
-          "事件表里多了没人触发的事件": "事件", "整关面数估算超过预算": "预算"}
+          "事件表里多了没人触发的事件": "事件", "整关面数估算超过预算": "预算",
+          "载具没写车速": "车速", "载具停车点不在路线上": "在路线上", "载具路线穿进楼里": "不碰楼",
+          "载具停车点的继续条件写错": "继续条件写法", "载具终点还写了继续条件": "终点", "载具停车等的事件不在事件表里": "停车等的事件",
+          "能打坏写在了不能打的物件上": "breakable"}
 
 
 def run() -> int:
@@ -169,6 +179,8 @@ def handoff_checks(proj) -> int:
             res.append(("elements 带结构体的门和物件、开放区的封路", any(e["collection"] == "door" for e in els)
                         and any(e["collection"] == "object" for e in els) and any(e["collection"] == "boundary" for e in els)))
             res.append(("elements 的 key 整关唯一", len({e["key"] for e in els}) == len(els)))
+            res.append(("elements 带载具的停车点和经过点", any(e["key"] == "yard/vehicle_stop/-/o_truck.tree" for e in els)
+                        and any(e["collection"] == "vehicle_pass" for e in els)))
             fu = json.loads((ld / "followups.json").read_text(encoding="utf-8"))["items"]
             pk = next((f["key"] for f in fu if f["type"] == "play_precedent" and f["to"] == "build" and f["status"] == "open"), None)
             res.append(("玩法先例 pending 进 followups，交给生成线", bool(pk)))
