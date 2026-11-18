@@ -137,6 +137,7 @@ def run() -> int:
         bad += handoff_checks(proj)
         bad += status_checks(proj)
         bad += extension_checks(proj)
+        bad += legacy_approval_checks(proj)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     for what, rel, fn, must in CASES:
@@ -225,6 +226,38 @@ def handoff_checks(proj) -> int:
         res.append(("生成线缺口：element 拼错的报出来，影响玩法的计数", "找不到：g2" in s9 and "影响玩法的 1 条" in s9))
         for what, passed in res:
             print(("OK   " if passed else "FAIL ") + "交接：" + what + ("" if passed else "\n" + after[-800:]))
+            bad += 0 if passed else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return bad
+
+
+def legacy_approval_checks(proj) -> int:
+    """A D6 approval recorded the old way (whole spec.json, standards included) survives a standards change
+    when the design part of the committed spec it was recorded on is unchanged; a design edit still shows."""
+    import hashlib
+    bad = 0
+    tmp = proj.parent / "legacy"
+    shutil.copytree(proj, tmp)
+    try:
+        kit(tmp, "spec", "1")
+        sp = tmp / L / "spec.json"
+        rel = f"{L}/spec.json"
+        old = hashlib.sha256(rel.encode() + sp.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:16]
+        (tmp / "design" / "approvals.json").write_text(json.dumps({"L01/D6": {"sha": old, "date": "2000-01-01", "note": "old"}}), encoding="utf-8")
+        g = lambda *a: subprocess.run(["git", "-C", str(tmp), *a], capture_output=True)  # noqa: E731
+        g("init", "-q")
+        g("add", "-A")
+        g("-c", "user.name=selftest", "-c", "user.email=selftest@invalid", "commit", "-q", "-m", "x")
+        edit(tmp, "standards/decisions.json", lambda d: d["items"].append({"id": "zz_new", "value": 1, "status": "暂定"}))
+        kit(tmp, "spec", "1")
+        _, s1 = kit(tmp, "status")
+        edit(tmp, L + "/events.json", lambda d: d["events"][0].__setitem__("name", "selftest renamed"))
+        kit(tmp, "spec", "1")
+        _, s2 = kit(tmp, "status")
+        for what, passed, out in (("旧算法登记的 D6，只改待决定列表后仍是已拍板", re.search(r"D6 整关拍板\s+已拍板", s1) is not None, s1),
+                                  ("旧算法登记的 D6，改了设计后显示拍板后已修改", re.search(r"D6 整关拍板\s+拍板后已修改", s2) is not None, s2)):
+            print(("OK   " if passed else "FAIL ") + "拍板：" + what + ("" if passed else "\n" + out[-800:]))
             bad += 0 if passed else 1
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

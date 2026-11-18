@@ -190,9 +190,47 @@ def approval_state(unit, files):
         return "待拍板"
     if a["sha"] == _sha(files):
         return "已拍板"
-    if any(Path(f).name == "spec.json" for f in files) and a["sha"] == _sha(files, legacy=True):
-        return "已拍板"  # recorded before D6 stopped covering the embedded standards
+    if any(Path(f).name == "spec.json" for f in files):
+        # recorded before D6 stopped covering the embedded standards (the whole file was hashed)
+        if a["sha"] == _sha(files, legacy=True):
+            return "已拍板"
+        if _legacy_design_unchanged(a["sha"], files):
+            return "已拍板"
     return "拍板后已修改"
+
+
+def _legacy_design_unchanged(sha: str, files) -> bool:
+    """An old-style approval hashed the whole spec.json, standards included, so editing a standard broke it.
+    Find the committed spec.json whose whole-file fingerprint is the recorded one, and compare its design part
+    (standards dropped) with the current file. Read-only: approvals.json is not rewritten. False when the
+    project has no git history for the file or no committed version matches."""
+    if len(files) != 1:
+        return False
+    p = Path(files[0])
+    if not p.exists():
+        return False
+    rel = p.relative_to(root()).as_posix()
+    try:
+        revs = subprocess.run(["git", "-C", str(root()), "log", "--format=%H", "--", rel],
+                              capture_output=True, text=True, timeout=20).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        return False
+    for rev in revs[:200]:
+        try:
+            blob = subprocess.run(["git", "-C", str(root()), "show", f"{rev}:{rel}"], capture_output=True, timeout=20).stdout
+        except (OSError, subprocess.SubprocessError):
+            return False
+        h = hashlib.sha256(rel.encode() + blob.replace(b"\r\n", b"\n")).hexdigest()[:16]
+        if h != sha:
+            continue
+        try:
+            d = json.loads(blob.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return False
+        d.pop("standards", None)
+        old = hashlib.sha256(rel.encode() + json.dumps(d, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        return old == _sha([p])
+    return False
 
 
 def _level_no(name: str) -> int:
