@@ -29,7 +29,7 @@
 | `path` | 行驶路线：折线 `[[x, y], ...]`，或引用本文件路线 `"route:main"`、`"route:<分支 name>"`。起点就是车的位置 |
 | `speed_m_s` | 车速，米每秒 |
 | `boarding` | `{"wait_for": "humans"|"survivors"|"none", "stragglers": "teleport"|"left"}`：起步和每次继续前等谁上车（`humans` 只等活着的真人玩家，`survivors` 等全部活着的幸存者，`none` 不等）；等人时写没上车的人怎么办（`teleport` 传送回车上，`left` 留在原地） |
-| `stops` | 停车点，按行驶顺序：`[{"id", "at", "fires": [事件], "resume_when": [条件], "note"}]`。车开到 `at` 停下并触发 `fires`；`resume_when` 里的条件全部满足才继续。最后一个停车点是终点，在路线末端，不写 `resume_when` |
+| `stops` | 停车点（和电梯 `stops` 的层号列表同名不同义，按 `kind` 区分），按行驶顺序：`[{"id", "at", "fires": [事件], "resume_when": [条件], "note"}]`。车开到 `at` 停下并触发 `fires`；`resume_when` 里的条件全部满足才继续。最后一个停车点是终点，在路线末端，不写 `resume_when` |
 | `passes` | 经过时触发、不停车的点：`[{"id", "at", "fires", "note"}]` |
 
 `resume_when` 的条件每条只写一项：`{"fired": 事件}` 事件已经触发过；`{"ended": 事件}` 事件已经结束（到了它的 `until`）；`{"time_s": 秒}` 停够这么久；`{"boarded": true}` 按 `boarding` 等到人上车。
