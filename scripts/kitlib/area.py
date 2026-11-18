@@ -29,7 +29,7 @@ import fmt
 import imagery
 from geo import load
 from project import KIT, decisions, decisions_stamp, level_dir, need, plan_level, root, sources
-from structure import FIVE, GRADES, m2u, page_sources, plan_refs_valid, root_rel
+from structure import FIVE, GRADES, load_spec, m2u, page_sources, plan_refs_valid, root_rel
 
 BUILDING_GRADES = {"可进入", "外立面", "远景", "省略"}
 SEG_KINDS = {"building", "blocker", "barrier", "exit"}
@@ -175,7 +175,7 @@ def check(spec, world, dec, srcs, plan_level):
         elif g["grade"] == "外立面":
             okf = False
             if f and (root() / f).exists():
-                okf = json.loads((root() / f).read_text(encoding="utf-8")).get("grade") == "外立面"
+                okf = load_spec(root() / f).get("grade") == "外立面"
             ok("级别交付", f"{g.get('name')} 外立面：有只含外壳的结构体文件（grade=外立面）或写明待做步骤",
                okf or bool(g.get("pending")), f or g.get("pending", "缺"))
         elif g["grade"] == "远景":
@@ -379,7 +379,7 @@ def check(spec, world, dec, srcs, plan_level):
             bp = level_dir(spec["level"]) / "structures" / f"{bid}.json"
             ids = set()
             if bp.exists():
-                bd = json.loads(bp.read_text(encoding="utf-8"))
+                bd = load_spec(bp)  # an extension file is read merged onto the writer's file
                 ids = {d["id"] for fl in bd.get("floors", []) for d in fl.get("doors", [])} | {d["id"] for c in bd.get("cores", []) for d in c.get("doors", [])}
             ok("物件", f"物件 {o['id']} 指向的门 {o['door']} 在结构体文件里", did in ids, o["door"])
     for lk in spec["links"]:
@@ -389,8 +389,7 @@ def check(spec, world, dec, srcs, plan_level):
             exists = p.exists()
             ok("衔接", f"{lk['id']} 结构体文件存在", exists, f)
             if exists:
-                bj = json.loads(p.with_suffix("").with_suffix(".build.json").read_text(encoding="utf-8")) if p.with_suffix("").with_suffix(".build.json").exists() else None
-                bsrc = json.loads(p.read_text(encoding="utf-8"))
+                bsrc = load_spec(p)  # a structure another level wrote and this level extends: frame and doors come merged
                 door = next((d for fl in bsrc.get("floors", []) for d in fl.get("doors", []) if d["id"] == lk["door"]), None)
                 fr = bsrc["frames"][door["frame"]] if door and door.get("frame") else bsrc["frame"]
                 a = math.radians(fr["u_angle_deg"])
@@ -402,7 +401,6 @@ def check(spec, world, dec, srcs, plan_level):
                     ok("衔接", f"{lk['id']} 门点和结构体文件的门 {lk['door']} 一致", dd <= 0.5, f"{dd:.2f} m")
                 else:
                     ok("衔接", f"{lk['id']} 结构体文件里有门 {lk['door']}", False)
-                _ = bj
         else:
             ok("衔接", f"{lk['id']} 没有结构体文件时写明待做步骤", bool(lk.get("pending")), lk.get("pending", "缺"))
 

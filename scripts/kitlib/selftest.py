@@ -293,13 +293,23 @@ def extension_checks(proj) -> int:
         "exp = structure.export(s, m, decisions())\n"
         "dn = next(x for f in exp['floors'] for x in f['doors'] if x['id'] == 'd_new')\n"
         "print('CROSS', dn.get('cross', {}).get('infected') == 'ai')\n"
+        "import area, geo, project\n"
+        "y = json.loads((d.parents[1] / 'L01/areas/yard.json').read_text(encoding='utf-8'))\n"
+        "y['links'][0]['file'] = 'design/detail/L02/structures/A.json'\n"
+        "try:\n"
+        "    res = area.check(y, geo.load(), decisions(), project.sources(), project.plan_level(1))\n"
+        "    lk = [r for r in res if r['check'].startswith('Lout 门点')]\n"
+        "    print('AREALINK', bool(lk) and all(r['pass'] for r in lk))\n"
+        "except Exception as e:\n"
+        "    print('AREALINK False', type(e).__name__, e)\n"
     )
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1", "KIT_PROJECT": str(proj)}
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, encoding="utf-8", env=env)
     res = out.stdout + out.stderr
     for key, what in (("SHELL", "扩展文件继承写入关的外壳"), ("ADDED", "扩展文件新增空间、保留写入关的空间"),
                       ("REMOVED", "扩展文件用 remove 去掉写入关的元素"), ("OWN", "物件、关号属于扩展所在的关"),
-                      ("FORBID", "扩展文件写外壳字段时报错"), ("CROSS", "扩展文件里封住的门，搭建数据带出 cross")):
+                      ("FORBID", "扩展文件写外壳字段时报错"), ("CROSS", "扩展文件里封住的门，搭建数据带出 cross"),
+                      ("AREALINK", "开放区接别关扩展的楼，按合并后的结构体读门坐标")):
         passed = f"{key} True" in res
         print(("OK   " if passed else "FAIL ") + "extends：" + what + ("" if passed else "\n" + res[-800:]))
         bad += 0 if passed else 1
