@@ -16,7 +16,7 @@
    - **工具材质用途表**（G9 硬标准只认这一份）：trigger 只用在触发器；areaportal、hint、skip 只用在 G3 自动放的可见性 brush；clip、playerclip 只用在整块碰撞（楼梯斜坡、可玩范围外缘一圈、翻不过去的外包）；toolsskybox 只用在天空盒；nodraw 只用在看不见的面；整块 nodraw 的 brush 只允许是按钮薄板和地下的地基。
    - **模型精细档位**：分三档，每档写三角面范围、要不要 LOD。grades.json 里 landmark 为 true 的结构体内的物件和负责人点名的物件，算地标级；其余物件离本关路线（开放区 route 的 main 和 alts、结构体内的 route）25 m 以内的算近景级（和 [format/area.md](../format/area.md) 里“离路线 25 m 以内至少是外立面级”用同一个距离）；25 m 以外的、远景级结构体上的和天空盒里的，算远景级。
    - **音景对照表**：空间类型（结构体看 `spaces[].kind`，开放区看 `ground[].surface`）→ 原版 soundscape 名，每行写 `kit game find` 查到的先例。
-7. **生成线新增的待决定项**写进 `standards/decisions.json`（status 暂定，step 写首次用到的步骤，写 why 和 verify；首次填写和修改都归新增它的那条生成线）：model_tris_tiers、texture_stretch_max（G5）；vis_ratio_max（G3）；placement_yaw_tol_deg、placement_overlap_min、dressing_noclip_max_u（G6）；light_gap_max_u、event_light_r_u、lightmapscale_out、lightmapscale_in、vrad_patch_max、skybox_ring_m（G7）。正文里不写死数值。
+7. **生成线新增的待决定项**写进 `standards/decisions.json`（status 暂定，step 写首次用到的步骤，写 why 和 verify；首次填写和修改都归新增它的那条生成线）：model_tris_tiers、texture_stretch_max（G5）；vis_ratio_max（G3）；placement_yaw_tol_deg、placement_overlap_min、dressing_noclip_max_u（G6）；light_gap_max_u、event_light_r_u、lightmapscale_out、lightmapscale_in、vrad_patch_max、skybox_ring_m（G7）；ground_snap_tol_u、door_leaf_fit_tol_u、model_brush_intersect_max_u（G9）。正文里不写死数值。
 
 ## 交给下一步
 
