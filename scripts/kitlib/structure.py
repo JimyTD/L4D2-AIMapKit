@@ -39,10 +39,9 @@ PASSABLE = {"open", "event_open"}
 FIVE = ("挡什么", "玩家翻越", "感染者翻越", "视线", "理由")
 DOOR_ON_EDGE_TOL = 0.35  # m: a door segment may sit this far off the shared edge (drawing tolerance)
 OBJECT_PLAN_PREFIX = ("play:", "item:", "event:", "room:")
-# interior intent (references/format/structure.md "室内意图"): what a full entry must say, and the short one for
-# spaces that are only seen
-INTERIOR_FULL = ("is", "now", "first_sight", "has", "surfaces", "basis")
-INTERIOR_SEEN = ("is", "now", "seen", "basis")
+# interior intent (references/format/structure.md "室内意图"): what every entry must say. Any other field
+# (older drafts wrote first_sight, has, surfaces, seen, same_as) is accepted and ignored.
+INTERIOR_NEED = ("is", "now")
 
 
 def m2u(m):
@@ -869,15 +868,12 @@ def interior_targets(m):
 
 
 def check_interiors(ok, spec, m, srcs, qids, used_q):
+    """One entry per built space saying what the room is and what became of it; that is all the format asks.
+    Landmarks also need a photo or an open question. Layout, contents and looks are the build line's judgement."""
     targets = interior_targets(m)
-    entries = spec.get("interiors", [])
-    byid = {e.get("id"): e for e in entries}
     landmark = _landmark(spec)
     seen = {}
-    fx_in = {}
-    for fx in spec.get("fixtures", []):
-        fx_in.setdefault((fx["level"], fx["in"]), []).append(fx["id"])
-    for e in entries:
+    for e in spec.get("interiors", []):
         eid = e.get("id", "?")
         sp = e.get("space")
         key = tuple(sp) if isinstance(sp, list) and len(sp) == 2 else None
@@ -886,50 +882,20 @@ def check_interiors(ok, spec, m, srcs, qids, used_q):
             continue
         ok("室内", f"{eid}：一个空间只有一条室内意图", key not in seen, f"和 {seen.get(key)} 重复" if key in seen else "")
         seen[key] = eid
-        if e.get("same_as"):
-            base = byid.get(e["same_as"])
-            ok("室内", f"{eid} 照抄的 {e['same_as']} 存在且不是照抄来的", bool(base) and not base.get("same_as"))
-            ok("室内", f"{eid} 写了和 {e['same_as']} 的不同之处", bool(e.get("differs")))
-            continue
-        kind = targets[key][0]
-        miss = [k for k in (INTERIOR_SEEN if kind == "seen" else INTERIOR_FULL) if not e.get(k)]
-        ok("室内", f"{eid} 写全了{'只看得到的空间的简版' if kind == 'seen' else '室内意图'}", not miss, "缺 " + "、".join(miss) if miss else "")
-        if kind == "full":
-            fs = e.get("first_sight") or {}
-            lv = key[0] if key[0] != "core" else None
-            doors = {d["id"] for f in m["floors"].values() for d in f["doors"]
-                     if key[1] in d["between"] and (lv is None or f is m["floors"].get(lv))}
-            ok("室内", f"{eid} 进门第一眼从哪扇门看（这个空间的门）", fs.get("from") in doors and bool(fs.get("what")),
-               f"{fs.get('from')} 不是这个空间的门" if fs.get("from") not in doors else "")
-            has = e.get("has") or []
-            ok("室内", f"{eid} 的 has 每项写了是什么", all(isinstance(h, dict) and h.get("what") for h in has))
-            named = {h.get("fixture") for h in has if isinstance(h, dict) and h.get("fixture")}
-            here = set(fx_in.get(key, [])) if key[0] != "core" else set()
-            for f in sorted(named - here):
-                ok("室内", f"{eid} 引用的构件 {f} 在这个空间里", False, "构件不存在或不在这个空间")
-            for f in sorted(here - named):
-                ok("室内", f"{eid} 写进了这个空间的构件 {f}", False, "这个空间的第 2 档构件没出现在 has 里")
-        basis = e.get("basis") or []
-        for i, b in enumerate(basis):
-            refs, made = b.get("refs") or [], b.get("made_up")
-            why = []
-            if not b.get("what"):
-                why.append("缺 what")
-            if not refs and not made:
-                why.append("既没有照片编号，也没写创作依据")
-            for r in refs:
-                if r not in srcs or srcs[r]["grade"] == "无关":
-                    why.append(f"资料 {r} 不存在或无关")
-            if landmark and not refs:
-                if b.get("question") in qids:
-                    used_q.add(b["question"])
-                else:
-                    why.append("地标的室内要照片，没有照片就挂一个问题（question）")
-            ok("室内", f"{eid} 依据 {i + 1}（{'照片' if refs else '创作'}）", not why, "；".join(why))
-    for key, (kind, sp) in targets.items():
+        miss = [k for k in INTERIOR_NEED if not e.get(k)]
+        ok("室内", f"{eid} 写了是什么房间、出事后怎样", not miss, "缺 " + "、".join(miss) if miss else "")
+        refs = list(e.get("refs") or []) + [r for b in e.get("basis") or [] if isinstance(b, dict) for r in b.get("refs") or []]
+        bad = [r for r in refs if r not in srcs or srcs[r]["grade"] == "无关"]
+        if refs:
+            ok("室内", f"{eid} 引用的照片存在", not bad, "、".join(bad))
+        if landmark:
+            q = e.get("question") or next((b.get("question") for b in e.get("basis") or [] if isinstance(b, dict) and b.get("question")), None)
+            if q in qids:
+                used_q.add(q)
+            ok("室内", f"{eid}：地标的室内有照片，或挂了问题", bool(refs) or q in qids)
+    for key in targets:
         where = f"楼梯间 {key[1]}" if key[0] == "core" else f"{key[0]}F {key[1]}"
         ok("室内", f"{where} 有室内意图", key in seen, "建出来的空间都要写，没有互动物也一样")
-
 
 
 def route_points(spec, m):
