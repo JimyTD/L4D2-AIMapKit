@@ -27,6 +27,7 @@ STRUCTURE_COLLECTIONS = [
     ("fixture", ("fixtures",), ("what",)),
     ("object", ("objects",), ("what",)),
     ("atmosphere", ("atmosphere",), ("text",)),
+    ("interior", ("interiors",), ("is",)),
 ]
 FLOOR_COLLECTIONS = [("space", "spaces", ("use",)), ("door", "doors", ("label", "kind")), ("closed_door", "closed_doors", ("label",))]
 AREA_COLLECTIONS = [

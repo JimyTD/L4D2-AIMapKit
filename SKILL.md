@@ -44,7 +44,7 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [P4](references/steps/P4-plan-final.md) | 规划视图与规划定稿 | 脚本 + 拍板 |
 | [D0](references/steps/D0-detail-prep.md) | 详设准备（项目级，只做一次） | 脚本 |
 | [D1](references/steps/D1-level-prep.md) | 关卡准备：分级、分段、面数初估、压缩与朝向 | 脚本；有压缩候选时拍板 |
-| [D2](references/steps/D2-structures.md) | 内部结构设计：先交整关的结构事实清单，再逐个画 | 文字讨论一次；画完和 D3 一起交 |
+| [D2](references/steps/D2-structures.md) | 内部结构设计：先交整关的结构事实清单，再逐个画（含每个空间的室内意图） | 文字讨论一次；画完和 D3 一起交 |
 | [D3](references/steps/D3-areas.md) | 开放区设计，逐段画 | 和 D2 一起，整关页交一次 |
 | [D4](references/steps/D4-easter-eggs.md) | 彩蛋（先问用户） | 脚本 + 拍板 |
 | [D5](references/steps/D5-compose.md) | 整关收口与合成 `spec.json` | 脚本 |
@@ -56,7 +56,7 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [G3](references/steps/G3-geometry.md) | 几何与构件记录 | 脚本 |
 | [G4](references/steps/G4-runtime.md) | 运行层；做完停一次，只交问题 | 脚本 + 拍板 |
 | [G5](references/steps/G5-look.md) | 外观、模型与地标 | 脚本 |
-| [G6](references/steps/G6-dressing.md) | 布景与叙事 | 脚本 |
+| [G6](references/steps/G6-dressing.md) | 布景与叙事：按室内意图做房间，室内盲审 | 脚本 |
 | [G7](references/steps/G7-environment.md) | 环境与远景 | 脚本 |
 | [G9](references/steps/G9-delivery.md) | 成品交付：硬标准全过，用户看本关新出现的类型 | 脚本 + 拍板 |
 | [G10](references/steps/G10-handover.md) | 人工任务（导航、试走）与反馈 | 脚本 + 拍板 |

@@ -34,7 +34,7 @@ FORMAT 的字段 → `kit game find` 在原版地图里找先例（实体、接�
 
 - **种类清单** `build/L<nn>/kinds.json`（脚本）：读 elements.json 按 collection 和 kind 汇总（数量、各元素的 key），不另扫 spec。每个 kind 标 need，取值是 look、dressing、none 的组合：
   - look（G5 做外观）：opening、entrance、roof_box、core、core_door、space（室内墙面、地面）、door、closed_door、fixture、object（含 kind 为 vehicle 的载具）、ground、blocker、passage；boundary 里 kind 为 barrier 的；shown_structure 里没有 file 的（远景楼）。
-  - dressing（G6 布景）：space、atmosphere。
+  - dressing（G6 布景）：space、atmosphere、interior。室内的墙地顶仍是 space 的 look，由 G5 按室内意图的 surfaces 定规则。
   - none：spawn、link、event、vehicle_stop、vehicle_pass；boundary 里 kind 为 building、blocker、exit 的（外观分别由它引用的结构体、对应的封路管，exit 不建东西）；shown_structure 里有 file 的（就是本关的某个结构体）。
 - intake.json（带 key）、faces.json。
 

@@ -528,5 +528,142 @@
   }
  ],
  "plan_deviations": [],
- "questions": []
+ "questions": [],
+ "interiors": [
+  {
+   "id": "i_h1",
+   "space": [
+    1,
+    "h1"
+   ],
+   "is": "一楼门厅",
+   "now": "空无一人，灯半亮",
+   "first_sight": {
+    "from": "d_out",
+    "what": "正对大门的登记台"
+   },
+   "has": [
+    {
+     "what": "登记台"
+    },
+    {
+     "what": "靠墙一排椅子"
+    }
+   ],
+   "empty": "中间留空走人",
+   "surfaces": "水磨石地面，白墙，平吊顶",
+   "basis": [
+    {
+     "what": "门厅布置",
+     "made_up": "自测样例：虚构"
+    }
+   ]
+  },
+  {
+   "id": "i_c1",
+   "space": [
+    1,
+    "c1"
+   ],
+   "is": "一楼走廊，通楼梯",
+   "now": "地上有几张散落的纸",
+   "first_sight": {
+    "from": "d_h",
+    "what": "走廊尽头的楼梯门和出口灯"
+   },
+   "has": [
+    {
+     "what": "墙上的消防栓箱"
+    },
+    {
+     "what": "出口灯"
+    }
+   ],
+   "surfaces": "同门厅",
+   "basis": [
+    {
+     "what": "走廊陈设",
+     "made_up": "自测样例：虚构"
+    }
+   ]
+  },
+  {
+   "id": "i_c2",
+   "space": [
+    2,
+    "c2"
+   ],
+   "is": "二楼走廊",
+   "now": "同一楼，更暗",
+   "first_sight": {
+    "from": "st2",
+    "what": "一排关着的房门"
+   },
+   "has": [
+    {
+     "what": "房门边的门牌"
+    }
+   ],
+   "surfaces": "同门厅",
+   "basis": [
+    {
+     "what": "走廊陈设",
+     "made_up": "自测样例：虚构"
+    }
+   ]
+  },
+  {
+   "id": "i_start",
+   "space": [
+    2,
+    "r_start"
+   ],
+   "is": "起点房，原来是办公室",
+   "now": "办公桌被推到门边，桌上放着医疗包",
+   "first_sight": {
+    "from": "d_r",
+    "what": "窗前的办公桌"
+   },
+   "has": [
+    {
+     "what": "办公桌和椅子"
+    },
+    {
+     "what": "文件柜"
+    }
+   ],
+   "surfaces": "木地板，白墙",
+   "basis": [
+    {
+     "what": "办公室布置",
+     "made_up": "自测样例：虚构"
+    }
+   ]
+  },
+  {
+   "id": "i_st",
+   "space": [
+    "core",
+    "st"
+   ],
+   "is": "东端楼梯间",
+   "now": "楼梯扶手上挂着一件外套",
+   "first_sight": {
+    "from": "st1",
+    "what": "往上的第一跑楼梯"
+   },
+   "has": [
+    {
+     "what": "楼层号"
+    }
+   ],
+   "surfaces": "水泥踏步，白墙",
+   "basis": [
+    {
+     "what": "楼梯间",
+     "made_up": "自测样例：虚构"
+    }
+   ]
+  }
+ ]
 }

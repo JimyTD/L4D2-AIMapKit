@@ -90,6 +90,9 @@ CASES = [
     ("台阶和门外地面标高对不上", f"{L}/layout.json", lambda d: d["structures"][0].__setitem__("z0_m", 0.9), "layout"),
     ("玩法没写原版依据", "design/plan/levels/L1.json", lambda d: d["plays"][0].pop("precedent"), "plan verify"),
     ("资料缺用途字段", "sources/index.json", lambda d: d[0].pop("use"), "sources check"),
+    ("建出来的空间没写室内意图", S, lambda d: d.__setitem__("interiors", [x for x in d["interiors"] if x["id"] != "i_c2"]), "structure"),
+    ("室内意图缺必写项", S, lambda d: byid(d["interiors"], "i_start").pop("first_sight"), "structure"),
+    ("室内意图的依据既无照片也无创作", S, lambda d: byid(d["interiors"], "i_h1").__setitem__("basis", [{"what": "x"}]), "structure"),
     ("待决定项没定值就被脚本用到", "standards/decisions.json", lambda d: byid(d["items"], "corridor_min").__setitem__("value", None), "structure"),
 ]
 
@@ -118,7 +121,8 @@ EXPECT = {"走廊窄于标准": "游戏尺度", "门没落在两个空间的交�
           "事件表里多了没人触发的事件": "事件", "整关面数估算超过预算": "预算",
           "载具没写车速": "车速", "载具停车点不在路线上": "在路线上", "载具路线穿进楼里": "不碰楼",
           "载具停车点的继续条件写错": "继续条件写法", "载具终点还写了继续条件": "终点", "载具停车等的事件不在事件表里": "停车等的事件",
-          "能打坏写在了不能打的物件上": "breakable"}
+          "能打坏写在了不能打的物件上": "breakable",
+          "建出来的空间没写室内意图": "有室内意图", "室内意图缺必写项": "写全了", "室内意图的依据既无照片也无创作": "依据"}
 
 
 def run() -> int:

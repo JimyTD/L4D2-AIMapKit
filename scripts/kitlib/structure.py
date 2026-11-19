@@ -39,6 +39,10 @@ PASSABLE = {"open", "event_open"}
 FIVE = ("挡什么", "玩家翻越", "感染者翻越", "视线", "理由")
 DOOR_ON_EDGE_TOL = 0.35  # m: a door segment may sit this far off the shared edge (drawing tolerance)
 OBJECT_PLAN_PREFIX = ("play:", "item:", "event:", "room:")
+# interior intent (references/format/structure.md "室内意图"): what a full entry must say, and the short one for
+# spaces that are only seen
+INTERIOR_FULL = ("is", "now", "first_sight", "has", "surfaces", "basis")
+INTERIOR_SEEN = ("is", "now", "seen", "basis")
 
 
 def m2u(m):
@@ -56,17 +60,17 @@ def plan_refs_valid(lvl):
 
 def merge_parts(spec, path):
     """A structure split into files: the shell file lists "parts" (floor files next to it); each part
-    holds {"floors": [...], "objects": [...], "fixtures": [...], "atmosphere": [...]} for its floors."""
+    holds {"floors": [...], "objects": [...], "fixtures": [...], "atmosphere": [...], "interiors": [...]} for its floors."""
     for part in spec.pop("parts", []):
         d = json.loads((path.parent / part).read_text(encoding="utf-8"))
-        for k in ("floors", "objects", "fixtures", "atmosphere", "plan_refs", "questions", "plan_deviations"):
+        for k in ("floors", "objects", "fixtures", "atmosphere", "interiors", "plan_refs", "questions", "plan_deviations"):
             spec.setdefault(k, []).extend(d.get(k, []))
         spec.setdefault("src_defs", {}).update(d.get("src_defs", {}))
     return spec
 
 
 # A later level adds to a shared structure with an extension file in its own folder ("extends": the writer's file).
-# The extension inherits the shell and geometry; it may add floors, spaces, doors, cores, fixtures and atmosphere,
+# The extension inherits the shell and geometry; it may add floors, spaces, doors, cores, fixtures, atmosphere and interiors,
 # replace them by id, or drop them with "remove". Objects, route and plan coverage are the extension's own.
 EXT_FORBIDDEN = ("shell", "frame", "frames", "outline", "storeys", "storeys_src", "slab_m", "module", "grade", "parts")
 EXT_OWN = ("objects", "plan_refs", "route", "questions", "plan_deviations")
@@ -111,7 +115,7 @@ def load_spec(path) -> dict:
     out["extends"] = spec["extends"]
     out["src_defs"] = {**base.get("src_defs", {}), **spec.get("src_defs", {})}
     out["own_src_defs"] = list(spec.get("src_defs", {}))
-    for k in ("cores", "fixtures", "atmosphere"):
+    for k in ("cores", "fixtures", "atmosphere", "interiors"):
         out[k] = _merge_by_id(base.get(k, []), spec.get(k, []), drop)
     floors = {f["level"]: json.loads(json.dumps(f)) for f in base.get("floors", [])}
     for f in floors.values():
@@ -368,7 +372,7 @@ def check(spec, m, dec, srcs, plan_level):
     facade_only = spec.get("grade", "可进入") == "外立面"
     need = ["id", "level", "name", "outline", "frame", "module", "storeys", "shell", "src_defs"]
     if not facade_only:
-        need += ["cores", "floors", "objects", "fixtures", "atmosphere", "route", "plan_refs", "plan_deviations", "questions"]
+        need += ["cores", "floors", "objects", "fixtures", "atmosphere", "interiors", "route", "plan_refs", "plan_deviations", "questions"]
     for k in need:
         ok("格式", f"顶层字段 {k}", k in spec)
     if facade_only:
@@ -815,6 +819,9 @@ def check(spec, m, dec, srcs, plan_level):
             ok("氛围", f"{lv}F {sp['id']} 有氛围描述", (lv, sp["id"]) in covered)
     ok("氛围", "外壳有氛围描述", "shell" in covered)
 
+    # ---- interiors: every built space says what room it is ----
+    check_interiors(ok, spec, m, srcs, qids, used_q)
+
     # ---- plan ----
     plan, lvl = plan_level
     valid = plan_refs_valid(lvl)
@@ -836,6 +843,93 @@ def check(spec, m, dec, srcs, plan_level):
     for name in spec.get("own_src_defs", defs):
         ok("来源", f"来源定义 @{name} 有元素引用", f'"@{name}"' in raw)
     return res
+
+
+def _landmark(spec) -> bool:
+    """grades.json of the structure's level marks it as a landmark (only then photos are required)."""
+    from project import level_dir
+    p = level_dir(spec["level"]) / "grades.json"
+    if not p.exists():
+        return False
+    g = json.loads(p.read_text(encoding="utf-8"))
+    return any(s.get("landmark") and (s.get("id") == spec["id"] or s.get("outline") == spec["outline"]) for s in g.get("structures", []))
+
+
+def interior_targets(m):
+    """Spaces that need an interior entry: every built space, stairwells walked through included.
+    Returns {key: (kind, space)}; key is (level, id), or ("core", id) for a stair seen on several floors."""
+    out = {}
+    for lv, fl in m["floors"].items():
+        for sp in fl["spaces"]:
+            if sp.get("core"):
+                out.setdefault(("core", sp["id"]), ("seen" if sp.get("depth") == "visible" else "full", sp))
+            else:
+                out[(lv, sp["id"])] = ("seen" if sp["kind"] == "void" or sp.get("visible_only") else "full", sp)
+    return out
+
+
+def check_interiors(ok, spec, m, srcs, qids, used_q):
+    targets = interior_targets(m)
+    entries = spec.get("interiors", [])
+    byid = {e.get("id"): e for e in entries}
+    landmark = _landmark(spec)
+    seen = {}
+    fx_in = {}
+    for fx in spec.get("fixtures", []):
+        fx_in.setdefault((fx["level"], fx["in"]), []).append(fx["id"])
+    for e in entries:
+        eid = e.get("id", "?")
+        sp = e.get("space")
+        key = tuple(sp) if isinstance(sp, list) and len(sp) == 2 else None
+        ok("室内", f"{eid} 指向的空间存在", key in targets, str(sp))
+        if key not in targets:
+            continue
+        ok("室内", f"{eid}：一个空间只有一条室内意图", key not in seen, f"和 {seen.get(key)} 重复" if key in seen else "")
+        seen[key] = eid
+        if e.get("same_as"):
+            base = byid.get(e["same_as"])
+            ok("室内", f"{eid} 照抄的 {e['same_as']} 存在且不是照抄来的", bool(base) and not base.get("same_as"))
+            ok("室内", f"{eid} 写了和 {e['same_as']} 的不同之处", bool(e.get("differs")))
+            continue
+        kind = targets[key][0]
+        miss = [k for k in (INTERIOR_SEEN if kind == "seen" else INTERIOR_FULL) if not e.get(k)]
+        ok("室内", f"{eid} 写全了{'只看得到的空间的简版' if kind == 'seen' else '室内意图'}", not miss, "缺 " + "、".join(miss) if miss else "")
+        if kind == "full":
+            fs = e.get("first_sight") or {}
+            lv = key[0] if key[0] != "core" else None
+            doors = {d["id"] for f in m["floors"].values() for d in f["doors"]
+                     if key[1] in d["between"] and (lv is None or f is m["floors"].get(lv))}
+            ok("室内", f"{eid} 进门第一眼从哪扇门看（这个空间的门）", fs.get("from") in doors and bool(fs.get("what")),
+               f"{fs.get('from')} 不是这个空间的门" if fs.get("from") not in doors else "")
+            has = e.get("has") or []
+            ok("室内", f"{eid} 的 has 每项写了是什么", all(isinstance(h, dict) and h.get("what") for h in has))
+            named = {h.get("fixture") for h in has if isinstance(h, dict) and h.get("fixture")}
+            here = set(fx_in.get(key, [])) if key[0] != "core" else set()
+            for f in sorted(named - here):
+                ok("室内", f"{eid} 引用的构件 {f} 在这个空间里", False, "构件不存在或不在这个空间")
+            for f in sorted(here - named):
+                ok("室内", f"{eid} 写进了这个空间的构件 {f}", False, "这个空间的第 2 档构件没出现在 has 里")
+        basis = e.get("basis") or []
+        for i, b in enumerate(basis):
+            refs, made = b.get("refs") or [], b.get("made_up")
+            why = []
+            if not b.get("what"):
+                why.append("缺 what")
+            if not refs and not made:
+                why.append("既没有照片编号，也没写创作依据")
+            for r in refs:
+                if r not in srcs or srcs[r]["grade"] == "无关":
+                    why.append(f"资料 {r} 不存在或无关")
+            if landmark and not refs:
+                if b.get("question") in qids:
+                    used_q.add(b["question"])
+                else:
+                    why.append("地标的室内要照片，没有照片就挂一个问题（question）")
+            ok("室内", f"{eid} 依据 {i + 1}（{'照片' if refs else '创作'}）", not why, "；".join(why))
+    for key, (kind, sp) in targets.items():
+        where = f"楼梯间 {key[1]}" if key[0] == "core" else f"{key[0]}F {key[1]}"
+        ok("室内", f"{where} 有室内意图", key in seen, "建出来的空间都要写，没有互动物也一样")
+
 
 
 def route_points(spec, m):
@@ -1007,6 +1101,7 @@ def export(spec, m, dec):
         "fixtures": [{**{k: v for k, v in o.items() if k != "at_main"}, "at_m": [R(x) for x in at_of(o)], "size_u": [U(x) for x in o["size_m"]],
                       "src": resolve_src(spec, o.get("src"))} for o in spec.get("fixtures", [])],
         "atmosphere": spec.get("atmosphere", []),
+        "interiors": spec.get("interiors", []),
         "stats": stats,
         "route": spec.get("route"), "plan_refs": spec.get("plan_refs", []),
         "plan_deviations": spec.get("plan_deviations", []), "questions": spec.get("questions", []),
