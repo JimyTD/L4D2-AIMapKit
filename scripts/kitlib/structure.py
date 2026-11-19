@@ -884,6 +884,9 @@ def check_interiors(ok, spec, m, srcs, qids, used_q):
         seen[key] = eid
         miss = [k for k in INTERIOR_NEED if not e.get(k)]
         ok("室内", f"{eid} 写了是什么房间、出事后怎样", not miss, "缺 " + "、".join(miss) if miss else "")
+        for q in [e.get("question")] + [b.get("question") for b in e.get("basis") or [] if isinstance(b, dict)]:
+            if q in qids:
+                used_q.add(q)  # a question hung on an interior entry counts as referenced
         refs = list(e.get("refs") or []) + [r for b in e.get("basis") or [] if isinstance(b, dict) for r in b.get("refs") or []]
         bad = [r for r in refs if r not in srcs or srcs[r]["grade"] == "无关"]
         if refs:
