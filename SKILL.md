@@ -56,7 +56,7 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [G3](references/steps/G3-geometry.md) | 几何与构件记录 | 脚本 |
 | [G4](references/steps/G4-runtime.md) | 运行层；做完停一次，只交问题 | 脚本 + 拍板 |
 | [G5](references/steps/G5-look.md) | 外观、模型与地标 | 脚本 |
-| [G6](references/steps/G6-dressing.md) | 布景与叙事：按室内意图做房间，室内盲审 | 脚本 |
+| [G6](references/steps/G6-dressing.md) | 布景与叙事：每个房间符合用途，室内盲审 | 脚本 |
 | [G7](references/steps/G7-environment.md) | 环境与远景 | 脚本 |
 | [G9](references/steps/G9-delivery.md) | 成品交付：硬标准全过，用户看本关新出现的类型 | 脚本 + 拍板 |
 | [G10](references/steps/G10-handover.md) | 人工任务（导航、试走）与反馈 | 脚本 + 拍板 |
