@@ -70,16 +70,10 @@ def main(level_dir: Path):
                               "poly": [[round(x, 2), round(y, 2)] for x, y in geo.exterior.coords],
                               "c": [round(geo.representative_point().x, 2), round(geo.representative_point().y, 2)], "page": True, "check": c})
             graded[spec["outline"]] = True
-            byid = {e.get("id"): e for e in spec.get("interiors", [])}
             for e in spec.get("interiors", []):
-                base = byid.get(e.get("same_as"), e)
                 sp = e.get("space") or ["?", "?"]
                 where = f"{spec['name']} " + (f"楼梯间 {sp[1]}" if sp[0] == "core" else f"{sp[0]}F {sp[1]}")
-                interiors.append({"owner": pid, "where": where, "is": base.get("is", ""),
-                                  "now": e.get("differs") or base.get("now", ""),
-                                  "first": (base.get("first_sight") or {}).get("what", "") or base.get("seen", ""),
-                                  "empty": base.get("empty", ""),
-                                  "made": any(b.get("made_up") and not b.get("refs") for b in base.get("basis", []))})
+                interiors.append({"owner": pid, "where": where, "is": e.get("is", ""), "now": e.get("now", ""), "must": e.get("must", "")})
             for fl in bj["floors"]:
                 if fl.get("route_m"):
                     routes.append({"pts": [[round(v, 2) for v in fr.xy(*p)] for p in fl["route_m"]], "indoor": True})
