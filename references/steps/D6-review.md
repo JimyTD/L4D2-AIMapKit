@@ -5,7 +5,7 @@
 ## 做
 
 1. `kit page <n>`：生成整关评审页 `level.html`（给人看的单文件，agent 不读它）。页面上有路线展开条带：按距离把路线拉直，标出沿途的事件、物资、守点和玩法，用户靠它判断节奏。
-2. **盲审**：派一个**主模型档**的子 agent，不给任何上下文，只给评审页路径和三个问题：路线怎么走？每段玩什么？哪里看不懂？原话存进 `design/detail/L<nn>/BLIND-REVIEW.md`。分类结果同时写成 `BLIND-REVIEW.json`：`[{"id", "text", "kind": "design|data|dismissed|page", "decision"}]`，写完重跑 `kit spec <n>`，设计问题会进 `followups.json`（`kit status` 会提示交接清单过期）。
+2. **盲审**：派一个**主模型档**的子 agent，不给任何上下文，只给评审页路径和三个问题：路线怎么走？每段玩什么？哪里看不懂（包括玩家在游戏里能不能知道怎么做）？原话存进 `design/detail/L<nn>/BLIND-REVIEW.md`。分类结果同时写成 `BLIND-REVIEW.json`：`[{"id", "text", "kind": "design|data|dismissed|page", "decision"}]`，写完重跑 `kit spec <n>`，设计问题会进 `followups.json`（`kit status` 会提示交接清单过期）。
 3. **把盲审的每一条分进四类**：
    - **要用户定的设计问题**：留给用户，每条附建议，有选项列选项；
    - **数据错误**（写反、重复、描述过时）：核实后直接改，重跑核验；
