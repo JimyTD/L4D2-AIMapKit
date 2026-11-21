@@ -43,7 +43,7 @@ invalidated.json（导航要不要重做、受影响的试走项，带设计元�
 4. 贴图：VTF 7.4、尺寸 2 的幂、文字不镜像（算上缩放的正负号）、拉伸不超阈值。
 5. 依据：每个构件、布景组都有参照编号；第 1、2 档叙事痕迹都引用了设计数据；每项资源在 work/licenses.json 写明出处和许可。
 6. 环境：布光规则（设计里本该暗、写了理由的地方按理由放过）、灯具和光源对应 0 条错；每种空间类型都有音景；vrad 补丁 ≤ vrad_patch_max。
-7. 几何：无漏点；brushside、brush 不超 map_budget_ratio.goal 乘各自上限；坐标在 ±(16384 − map_margin_u) 以内；vis_ratio 低于 vis_ratio_max；覆盖检查通过。
+7. 几何：无漏点；编译日志没有 bounds out of range（vbsp 退出码仍是 0，但游戏拒绝加载）；brushside、brush 不超 map_budget_ratio.goal 乘各自上限；源数据坐标在 ±(16384 − map_margin_u) 以内，编译后 BSP 的世界包围盒在 ±16384 以内（vbsp 会把近轴的斜面吸附成轴向，细长的刷子可能在编译时变成无界）；vis_ratio 低于 vis_ratio_max；覆盖检查通过。
 8. 运行层：接线检查（目标、输入输出名）和事件对账通过；用到的实体类型都有原版用例或写了理由。
 9. 玩法实体真实存在：设计里每个玩法实体（载具、电梯、事件门、安全屋门、按钮，开放区的 event_door，结构体里 state 为 event_open 的门），在编译后的地图里都有对应类型的实体：会动的是会动的实体类型（func_tracktrain、func_movelinear、prop_door_rotating 等），玩家要站、要挡的有碰撞。判定：按 parts.json 的 key 找到实体，核对类名在这种物件的允许类名里（允许类名表写在生成器里，和 [G1](G1-intake.md) 的对表同一份）；prop_static、不带碰撞的 prop_dynamic、只有 logic_relay 或 logic_timer 的一律不算。
 10. 载具沿设计路线走：载具的 path_track 链按顺序经过设计路线的每个点（每点水平偏差不超过相邻 path_track 的间距），停车点和设计的停车点一一对应；把车体外包盒沿整条路径扫一遍，扫出的体积不与任何结构体的 brush、封路、围挡相交（地面和路面除外）。
