@@ -162,6 +162,7 @@ def run() -> int:
             bad += 0 if caught else 1
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+    bad += verify_samples()
     print("selftest: " + ("全部通过" if not bad else f"{bad} 项没通过"))
     return 1 if bad else 0
 
@@ -392,3 +393,74 @@ def status_checks(proj) -> int:
     expect("status：有压缩候选时 D1 要求拍板", "段压缩候选；待拍板" in out, out)
     return bad
 
+
+
+def verify_samples(only=None) -> int:
+    """kit verify against the known-bad maps (scripts/kitlib/vsamples.py): each must be reported by the checks it
+    names, the good map must pass. Needs the game and its vbsp; skipped (and said so) without them."""
+    import vsamples
+    g = game_dir()
+    vbsp = Path(g, "bin", "vbsp.exe") if g else None
+    if not g or not vbsp.exists():
+        print("NOTE 本机没找到游戏或 vbsp（Authoring Tools）：kit verify 的坏样本没跑")
+        return 0
+    try:
+        import srctools  # noqa: F401
+        import scipy  # noqa: F401
+    except ImportError:
+        print("NOTE 当前 python 没装 srctools 或 scipy：kit verify 的坏样本没跑（用项目的 python 跑 kit selftest）")
+        return 0
+    bad = 0
+    tmp, proj = fresh()
+    try:
+        (proj / "generator").mkdir()
+        (proj / "generator" / "gen.py").write_text("# sample generator\n", encoding="utf-8")
+        loc = json.loads((proj / "kit.local.json").read_text(encoding="utf-8"))
+        loc["verify"] = {"generator": ["generator"]}
+        (proj / "kit.local.json").write_text(json.dumps(loc), encoding="utf-8")
+        ld = proj / L
+        ld.mkdir(parents=True, exist_ok=True)
+        vsamples.design(ld)
+        import time as _t
+        for name, what, fn, must in [("good", "好样本", None, [])] + vsamples.SAMPLES:
+            if only and name not in only:
+                continue
+            _t.sleep(1.1)  # file times: the map must be newer than the design and the generator
+            (proj / "generator" / "gen.py").write_text("# sample generator\n", encoding="utf-8")
+            os.utime(ld / "spec.json")
+            os.utime(ld / "elements.json")
+            _t.sleep(1.1)
+            vsamples.build(proj, name, fn, vbsp, Path(g))
+            if name == "stale_vmf":
+                _t.sleep(1.1)
+                (proj / "generator" / "gen.py").write_text("# changed after the map was built\n", encoding="utf-8")
+            if name == "stale_bsp":
+                _t.sleep(1.1)
+                vm = next((proj / "build" / "L01").glob("*.vmf"))
+                vm.write_text(vm.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            code, out = kit(proj, "verify", "1", "--step", "G6")
+            try:
+                res = json.loads((proj / "work" / "L01" / "verify.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                res = None
+            if os.environ.get("KIT_SAMPLE_KEEP"):
+                keep = Path(os.environ["KIT_SAMPLE_KEEP"]) / name
+                shutil.rmtree(keep, ignore_errors=True)
+                shutil.copytree(proj / "work" / "L01", keep / "work")
+                shutil.copytree(proj / "build" / "L01", keep / "build")
+            if res is None or "Traceback" in out:
+                print(f"FAIL kit verify 样本 {name}：没跑完\n{out[-1500:]}")
+                bad += 1
+                continue
+            got = {f["check"] for f in res["findings"] if f["severity"] == "FAIL"}
+            if name == "good":
+                ok = res["passed"]
+                print(("OK   " if ok else "FAIL ") + "kit verify 好样本全过" + ("" if ok else "：" + "；".join(f"{f['check']} {f['what'][:90]}" for f in res["findings"] if f["severity"] == "FAIL")[:1500]))
+            else:
+                miss = [c for c in must if c not in got]
+                ok = not miss and code == 1
+                print(("OK   " if ok else "MISS ") + f"kit verify 坏样本 {name}（{what}）→ " + ("、".join(sorted(got)) if ok else f"缺 {'、'.join(miss)}，报出的是 {'、'.join(sorted(got)) or '无'}"))
+            bad += 0 if ok else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return bad
