@@ -1,7 +1,11 @@
-"""Fail if any tracked file mentions a project-specific keyword.
+"""Fail if any tracked file mentions a project-specific keyword or names a specific AI model.
 
 This repository is public and must stay free of any concrete map project's content. Keywords are listed
 one per line in scripts/forbidden.local.txt, which is git-ignored so the words themselves never get committed.
+
+Which AI model a project uses is that project's choice, so the Kit never names one: where it matters the Kit
+says it generically ("a weaker model may run the generation line"). MODEL_NAMES below is checked in every
+tracked file besides the local keywords.
 
     python scripts/check_clean.py            # scan tracked and staged files
     python scripts/check_clean.py --install  # install as a git pre-commit hook
@@ -9,11 +13,14 @@ one per line in scripts/forbidden.local.txt, which is git-ignored so the words t
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# AI model and vendor names (whole words, case-insensitive); the Kit stays model-neutral
+MODEL_NAMES = re.compile(r"\b(opus|sonnet|haiku|claude|gpt-?\d[\w.-]*|chatgpt|codex-?mini|o[1-4](-mini)?|gemini|hunyuan|hy\d|deepseek|qwen|llama|mistral|ttsw)\b", re.I)
 WORDS = ROOT / "scripts" / "forbidden.local.txt"
 HOOK = ROOT / ".git" / "hooks" / "pre-commit"
 
@@ -46,11 +53,13 @@ def main() -> int:
         for n, line in enumerate(text.splitlines(), 1):
             l = line.lower()
             hits += [f"{p.relative_to(ROOT).as_posix()}:{n}: [{w}] {line.strip()[:120]}" for w, x in zip(ws, low) if x in l]
+            if p.name != "check_clean.py":
+                hits += [f"{p.relative_to(ROOT).as_posix()}:{n}: [模型名 {m.group(0)}] {line.strip()[:120]}" for m in MODEL_NAMES.finditer(line)]
     if hits:
         print("project-specific content found; remove it before committing:")
         print("\n".join(hits))
         return 1
-    print(f"clean: {len(ws)} keywords, {len(files)} files")
+    print(f"clean: {len(ws)} keywords + model names, {len(files)} files")
     return 0
 
 
