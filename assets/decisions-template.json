@@ -1,5 +1,5 @@
 {
- "note": "待决定列表。脚本从这里读数值，不写死。status：引擎事实（Kit 预填，不讨论）| 暂定 | 已定。value 为 null 的项由 step 那一步定：写 value、why，改 status；暂定项写 verify（什么时候、怎么验证）。hint 是填法提示，不是答案。单位 u = Hammer 单位。",
+ "note": "待决定列表。脚本从这里读数值，不写死。status：引擎事实（Kit 预填，不讨论）| 暂定 | 已定。value 为 null 的项由 step 那一步定：写 value、why，改 status；暂定项写 verify（什么时候、怎么验证）。hint 是填法提示，不是答案。单位 u = Hammer 单位。 start 是 kit verify 在项目还没填这一项时用的起始值（报告里列为待补），不是答案。",
  "items": [
   {
    "id": "unit_cm",
@@ -160,6 +160,196 @@
    "status": "暂定",
    "step": "D5",
    "hint": "导演脚本尸潮的强度档 {\"small\": {...}, \"medium\": {...}, \"large\": {...}}，每档几波、每波多少只、额外几只特感；没有试玩依据时标暂定，交给用户试玩后调"
+  },
+  {
+   "id": "walk_drop_max_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G3",
+   "start": 120,
+   "hint": "kit verify 走路检查：一步最多往下跳多高还算能走（不受伤、能回头的另说）。原版楼梯和台阶都在 step_max 以内，路线上不该靠跳崖前进"
+  },
+  {
+   "id": "walk_corridor_m",
+   "value": null,
+   "unit": "m",
+   "status": "暂定",
+   "step": "G3",
+   "start": 6,
+   "hint": "kit verify 走路检查：设计路线两侧各算多宽是玩家可以走的范围（只在这个范围和建出来的空间里找路，不绕到范围外）"
+  },
+  {
+   "id": "model_overlap_max_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G6",
+   "start": 2,
+   "hint": "kit verify 摆放：两个模型的碰撞体最多互相插进多深"
+  },
+  {
+   "id": "model_brush_intersect_max_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G9",
+   "start": 2,
+   "hint": "kit verify 摆放：模型碰撞体最多插进墙、结构多深"
+  },
+  {
+   "id": "ground_snap_tol_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G9",
+   "start": 4,
+   "hint": "kit verify 摆放：落地的模型底面和下面的地面、台面最多差多少（悬空或陷地）"
+  },
+  {
+   "id": "hanging_models",
+   "value": null,
+   "unit": "模型路径通配",
+   "status": "暂定",
+   "step": "G6",
+   "start": [],
+   "hint": "kit verify 摆放：挂墙、吊顶、本该悬空的模型（不查悬空），如 models/props_lighting/*"
+  },
+  {
+   "id": "text_materials",
+   "value": null,
+   "unit": "材质路径通配",
+   "status": "暂定",
+   "step": "G5",
+   "start": [
+    "*sign*",
+    "*text*",
+    "*label*",
+    "*poster*",
+    "*banner*",
+    "*menu*",
+    "*plate*",
+    "*/doors/room_*"
+   ],
+   "hint": "kit verify 文字：哪些材质带文字（查镜像、缩放、贴花大小）。项目按自己的材质命名补"
+  },
+  {
+   "id": "texture_stretch_max",
+   "value": null,
+   "unit": "比例",
+   "status": "暂定",
+   "step": "G5",
+   "start": 0.25,
+   "hint": "kit verify 贴图：一个面上横竖缩放最多差多少"
+  },
+  {
+   "id": "model_tris_tiers",
+   "value": null,
+   "unit": "三角面",
+   "status": "暂定",
+   "step": "G5",
+   "start": {
+    "远景级": {
+     "max": 1500
+    },
+    "近景级": {
+     "max": 5000
+    },
+    "地标级": {
+     "max": 10000
+    }
+   },
+   "hint": "kit verify 模型：每档三角面上限；离路线 25 m 以内按最高档，以外按最低档"
+  },
+  {
+   "id": "vehicle_path_tol_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G4",
+   "start": 120,
+   "hint": "kit verify 载具：path_track 链离设计路线每个点最多多远"
+  },
+  {
+   "id": "verify_allow_classes",
+   "value": null,
+   "unit": "类名",
+   "status": "暂定",
+   "step": "G4",
+   "start": [],
+   "hint": "kit verify 原版战役没用过、但项目写了理由要用的实体类型"
+  },
+  {
+   "id": "vis_ratio_max",
+   "value": null,
+   "unit": "比例",
+   "status": "暂定",
+   "step": "G3",
+   "start": 0.5,
+   "hint": "kit verify 可见性：每个分区平均看得到的分区比例上限"
+  },
+  {
+   "id": "vrad_patch_max",
+   "value": null,
+   "unit": "个",
+   "status": "暂定",
+   "step": "G7",
+   "start": 600000,
+   "hint": "kit verify 光照：vrad 补丁数上限"
+  },
+  {
+   "id": "light_gap_max_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G7",
+   "start": 1200,
+   "hint": "kit verify 光照：路线上相邻两个光源的最大间距（路线点到最近光源超过一半就提醒）"
+  },
+  {
+   "id": "event_light_r_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G7",
+   "start": 400,
+   "hint": "kit verify 光照：互动物多远内要有光源"
+  },
+  {
+   "id": "light_fixture_models",
+   "value": null,
+   "unit": "模型路径通配",
+   "status": "暂定",
+   "step": "G7",
+   "start": [],
+   "hint": "kit verify 光照：哪些模型是灯具（空列表时不查有光没灯）"
+  },
+  {
+   "id": "light_fixture_r_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G7",
+   "start": 48,
+   "hint": "kit verify 光照：光源离灯具最多多远"
+  },
+  {
+   "id": "verify_dark_keys",
+   "value": null,
+   "unit": "设计元素 key 前缀",
+   "status": "暂定",
+   "step": "G7",
+   "start": [],
+   "hint": "kit verify 光照：设计本该暗的地方（不查灯距），每条在 manual-checks 写理由"
+  },
+  {
+   "id": "door_leaf_fit_tol_u",
+   "value": null,
+   "unit": "u",
+   "status": "暂定",
+   "step": "G9",
+   "start": 4,
+   "hint": "kit verify 门：设计本身就窄的门（squeeze、窗洞）量出的净宽、净高最多比设计小多少"
   }
  ]
 }

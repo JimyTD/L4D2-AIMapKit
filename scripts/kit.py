@@ -122,6 +122,9 @@ def cmd(a) -> int:
         from project import level_dir
         page.main(level_dir(a.level))
         return 0
+    if c == "verify":
+        import verify
+        return verify.run(a.level, a)
     if c == "selftest":
         import selftest
         return selftest.run()
@@ -195,6 +198,17 @@ def parser():
     x.add_argument("-v", "--verbose", action="store_true")
     x = s.add_parser("page", help="D6 整关评审页")
     x.add_argument("level", type=int)
+    x = s.add_parser("verify", help="G3–G9 通用验收：只读最终地图、设计数据和游戏文件，结果写 work/L<nn>/verify.json")
+    x.add_argument("level", type=int)
+    x.add_argument("--step", default="G9", help="跑到哪一步的检查（G3 G4 G5 G6 G7 G9），默认 G9 全部")
+    x.add_argument("--only", help="只跑这些组（逗号分隔：fresh,compile,walk,doors,logic,level,interact,entities,resources,text,models,placement,light,vis）")
+    x.add_argument("--bsp", help="最终 BSP（默认 build/L<nn>/ 里唯一的那张）")
+    x.add_argument("--vmf", help="编译它用的 VMF（默认和 BSP 同名）")
+    x.add_argument("--log", help="编译日志（默认和 BSP 同名的 .log）")
+    x.add_argument("--generator", action="append", help="生成器代码的目录或文件（默认 kit.local.json 的 verify.generator）")
+    x.add_argument("--set", action="append", help="这次运行临时用的待决定值 id=json，不写回项目")
+    x.add_argument("--out", help="结果目录（默认 work/L<nn>/）")
+    x.add_argument("-v", "--verbose", action="store_true")
     s.add_parser("selftest", help="Kit 自测（改脚本后跑）")
     return p
 
