@@ -23,6 +23,7 @@
 | 能直接走上的台阶 | 18 | `game/shared/movevars_shared.cpp` 的 `sv_stepsize`；本机 `server.dll` 里的默认值也是 18 |
 | 跳跃高度 | 21 | `game/shared/gamemovement.h` 的 `GAMEMOVEMENT_JUMP_HEIGHT` |
 | 幸存者跑速 | 220 单位/秒（约 5.6 m/s） | 社区竞技插件源码常量 `SURVIVOR_RUNSPEED 220.0`；不是 Valve 官方文档 |
+| 使用距离 | 96（眼睛到被按的东西） | 本机 `left4dead2/bin/server.dll` 里 `player_use_radius` 的默认值；playerclip 不挡使用射线，实心的笔刷、模型挡 |
 
 ## 地图上限
 

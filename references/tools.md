@@ -13,6 +13,7 @@
 | `kit game find <类名> [--map 图]` | 某个实体类在原版地图里怎么用：属性和输出连线（找玩法先例） |
 | `kit game measure <图> <笔刷实体类名 \| 模型路径片段>` | 量尺寸：笔刷实体取 bmodel 的包围盒，模型取 hull |
 | `kit game model <模型路径>` | 一个模型的尺寸，以及能不能做静态道具 |
+| `kit verify <关号>` | 生成线的通用验收，见 [verify.md](verify.md) |
 
 ## 游戏目录里有什么
 

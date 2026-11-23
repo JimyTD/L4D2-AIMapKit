@@ -23,7 +23,7 @@
 
 ## 完成
 
-vrad 补丁数 ≤ vrad_patch_max；布光规则、灯具和光源对应检查 0 条错；每种空间类型都有音景。这三项检查脚本做出来之前，由本步 agent 按规则逐条查，结果写进 `work/L<nn>/manual-checks.md`。
+`kit verify <关号> --step G7` 通过（[verify.md](../verify.md)）：跑过 vrad、补丁数 ≤ vrad_patch_max；跑过 vvis、可见比例 ≤ vis_ratio_max；有音景；布光提醒（路线和互动物附近有光、光源附近有灯具）逐条处理，设计本该暗的写进 verify_dark_keys 并在 manual-checks.md 写理由。生成线自己写的检查只作自查，不作完成依据。起点终点的暖光、每种空间类型对应的音景名，由本步 agent 按美术规范核对，结果写进 `work/L<nn>/manual-checks.md`。
 
 ## 常见坑
 

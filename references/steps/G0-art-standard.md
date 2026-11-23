@@ -16,12 +16,12 @@
    - **工具材质用途表**（G9 硬标准只认这一份）：trigger 只用在触发器；areaportal、hint、skip 只用在 G3 自动放的可见性 brush；clip、playerclip 只用在整块碰撞（楼梯斜坡、可玩范围外缘一圈、翻不过去的外包）；toolsskybox 只用在天空盒；nodraw 只用在看不见的面；整块 nodraw 的 brush 只允许是按钮薄板和地下的地基。
    - **模型精细档位**：分三档，每档写三角面范围、要不要 LOD。grades.json 里 landmark 为 true 的结构体内的物件和负责人点名的物件，算地标级；其余物件离本关路线（开放区 route 的 main 和 alts、结构体内的 route）25 m 以内的算近景级（和 [format/area.md](../format/area.md) 里“离路线 25 m 以内至少是外立面级”用同一个距离）；25 m 以外的、远景级结构体上的和天空盒里的，算远景级。
    - **音景对照表**：空间类型（结构体看 `spaces[].kind`，开放区看 `ground[].surface`）→ 原版 soundscape 名，每行写 `kit game find` 查到的先例。
-7. **生成线新增的待决定项**写进 `standards/decisions.json`（status 暂定，step 写首次用到的步骤，写 why 和 verify；首次填写和修改都归新增它的那条生成线）：model_tris_tiers、texture_stretch_max（G5）；vis_ratio_max（G3）；placement_yaw_tol_deg、placement_overlap_min、dressing_noclip_max_u（G6）；light_gap_max_u、event_light_r_u、lightmapscale_out、lightmapscale_in、vrad_patch_max、skybox_ring_m（G7）；ground_snap_tol_u、door_leaf_fit_tol_u、model_brush_intersect_max_u（G9）。正文里不写死数值。
+7. **生成线新增的待决定项**写进 `standards/decisions.json`（status 暂定，step 写首次用到的步骤，写 why 和 verify；首次填写和修改都归新增它的那条生成线）：model_tris_tiers、texture_stretch_max（G5）；vis_ratio_max（G3）；placement_yaw_tol_deg、placement_overlap_min、dressing_noclip_max_u（G6）；light_gap_max_u、event_light_r_u、lightmapscale_out、lightmapscale_in、vrad_patch_max、skybox_ring_m（G7）；ground_snap_tol_u、door_leaf_fit_tol_u、model_brush_intersect_max_u（G9）；以及 kit verify 读的其余各项（Kit 的 `assets/decisions-template.json` 里 hint 以“kit verify”开头的，如 walk_drop_max_u、walk_corridor_m、model_overlap_max_u、text_materials、hanging_models）。正文里不写死数值。项目还没有的项，kit verify 先用模板里的 start 值跑，在报告开头列为“待补”，生成线照这一条补上。
 
 ## 交给下一步
 
 - 规范每一节、每一条规则的固定 id。
-- 工程规则清单，每条写由哪一步、哪个脚本检查：预算由 G1、G3 的 vbsp 实测；摆放由 G6 的摆放核对；坐标约定由 G5 的模型编译后核对；工具材质用途由 G9 硬标准。脚本还没有的，写明在那之前由哪一步的 agent 按清单人工查。
+- 工程规则清单，每条写由哪一步、哪项检查查：预算、摆放的相交和悬空、文字朝向由 kit verify（[verify.md](../verify.md)）；坐标约定由 G5 的模型编译后核对；工具材质用途由 G9 硬标准第 2 条。kit verify 没有覆盖的，写明由哪一步的 agent 按清单人工查。
 
 ## 拍板
 

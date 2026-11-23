@@ -8,7 +8,7 @@ events.json（定稿）；spec 里物件的 kind、fires、opened_by、enabled_b
 
 ## 做
 
-1. 每个事件在主图里做一个 logic_relay（名字以 @ 开头），触发事件就是对它 Trigger。
+1. 每个事件在主图里做一个 logic_relay，名字是 `@ev_` 加事件 id（id 里字母数字下划线以外的字符换成下划线，`event:0` → `@ev_event_0`），触发事件就是对它 Trigger。设计元素的实体按 [verify.md](../verify.md) 的命名约定命名（结构体里的叫 `<结构体 id>-<元素 id>`），kit verify 靠名字把地图和设计对上。
 2. 事件 type 翻成原版做法：PanicEvent 交给导演；ScriptedPanicEvent 按 decisions.json 的 strength_table 取强度生成导演脚本；UnlockDoor 开锁；Alarm 警报加尸潮，到 until 停；Spawn 刷固定特感；Tank 按 count 刷 Tank（原版做法用 `kit game find` 查）；Hold 按 duration_s 计时，到时触发 then；Effect 由物件自己做。
 3. 物件 kind 按格式里的原版实体对照生成；新种类按 [G1](G1-intake.md) 的“加一种新东西的固定步骤”补。
 4. **只用原版战役实际用过的实体类型**：FGD 里有不等于能用（引擎里留着早期游戏的类型，在 L4D2 里不一定正常工作）。原版没有用例的不用；确实要用，写明理由，并在 playtest.json 加一条试走专门验证。原版有成熟整套做法的机关（电梯、载具、安全屋门、换关、终局），设计没有特殊要求时照原版的整套搭（实体组合、接线、按钮和门怎么放），不只是类型对得上；和原版不同的地方写理由。
@@ -40,11 +40,10 @@ G4 做完停一次，只交问题、不看实物，消息按 [review.md](../revi
 
 ## 完成
 
-- **接线检查**（编译后）：目标 0 条找不到；用 FGD 核对，每条输出名是源实体有的输出、输入名是目标实体有的输入。脚本扩好之前，由本步 agent 用 `kit game classes` 和 FGD 核对每种用到的实体类型的输入输出名，每种实体类型跑一次 `kit game find` 确认原版有用例，结果写进 `work/L<nn>/manual-checks.md`。
-- **事件对账**（编译后）：从实体和接线反推事件图，和 events.json 逐条对照（谁触发、触发后做什么）；锁着的门都有开锁路径；从起点到终点不会被打不开的门卡住。脚本做出来之前，由本步 agent 按 events.json 逐条人工对一遍，结果写进 manual-checks.md，这条不能空着。
+- **`kit verify <关号> --step G4` 通过**（[verify.md](../verify.md)，在编译后的地图上跑）：接线（目标存在、输出输入名在 FGD 里）、事件对账（每个事件有 relay、由设计里的触发物触发、只触发一次的输出不被提前用掉、事件类型做到了）、互动（必须按的东西从玩家站得到的地方按得到、锁着的门有开锁路径）、玩法实体是对应的类型、换关和临时终局，以及 G3 的各项。生成线自己写的检查只作自查，不作完成依据。
 - 锁着的门和按钮都有按了没反应时的提示，或在 manual-checks.md 写了不提示的理由。
-- 每个事件至少有一个触发物；用到的实体类型都有原版用例或写了理由。
-- 设计里每个玩法实体在地图里都是对应类型的实体；做不出的已按第 8 条写进 gaps.json，没有拿静态物或别的实体顶替。
+- 用到的实体类型都有原版用例或写了理由（kit verify 的 L6 提醒列出原版没用过的）。
+- 做不出的玩法实体已按第 8 条写进 gaps.json，没有拿静态物或别的实体顶替（kit verify 的 E1 会报出顶替）。
 - 交给 build 的跟进项都已写进 followups.closed.json，`kit spec` 显示为 closed。
 - 停顿点负责人答完，已写拍板登记行。
 

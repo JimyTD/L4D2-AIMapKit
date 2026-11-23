@@ -61,7 +61,7 @@ Kit 只放流程、格式、规则、脚本和模板，是只读的。项目的�
 | [G9](references/steps/G9-delivery.md) | 成品交付：硬标准全过，用户看本关新出现的类型 | 脚本 + 拍板 |
 | [G10](references/steps/G10-handover.md) | 人工任务（导航、试走）与反馈 | 脚本 + 拍板 |
 
-D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），每条线分三段、在固定接力点换会话；同时开发几关由用户在 P0 定，每关自己走完设计和生成。会话怎么分、谁开谁、问题怎么交回，见 [sessions.md](references/sessions.md)；子 agent 的规则见 [subagents.md](references/subagents.md)。生成线的目标是成品关卡，白盒只是内部中间产物；只有设计数据明确标为白盒关时才跳过美术步骤。生成器放在项目里，Kit 只放步骤页和检查规则。
+D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），每条线分三段、在固定接力点换会话；同时开发几关由用户在 P0 定，每关自己走完设计和生成。会话怎么分、谁开谁、问题怎么交回，见 [sessions.md](references/sessions.md)；子 agent 的规则见 [subagents.md](references/subagents.md)。生成线的目标是成品关卡，白盒只是内部中间产物；只有设计数据明确标为白盒关时才跳过美术步骤。生成器放在项目里，Kit 只放步骤页和检查规则。生成线每一步的完成门槛是 Kit 自带的通用验收 `kit verify`（[verify.md](references/verify.md)）：它只读最终地图、设计数据和游戏文件，和生成器不同源；生成线自己写的检查只作自查。
 
 ## 参考（按需读）
 
@@ -74,5 +74,6 @@ D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），�
 | [subagents.md](references/subagents.md) | 派子 agent 前读 |
 | [sessions.md](references/sessions.md) | 开会话、换会话、处理别的线交来的问题前读 |
 | [engine-facts.md](references/engine-facts.md) | 需要引擎数值时 |
+| [verify.md](references/verify.md) | 生成线：kit verify 查什么、为什么、报告怎么读 |
 | [tools.md](references/tools.md) | 读原版游戏资源；脚本没覆盖到或报错时 |
 | `docs/flow.html`、`docs/rework.html` | 给人看的流程说明和会话、返工说明，agent 不用读 |

@@ -2,6 +2,8 @@
 
 **目的**：用脚本列出这一版要负责人做的事和方法；收到反馈按坐标查回数据，分类处理。
 
+**试走只留机器查不了的**：走不走得通、门够不够宽、按钮按不按得到、事件顺序、换关、文字镜像、摆件穿插、缺资源这些 kit verify 已经在最终地图上查过（[verify.md](../verify.md)），试走不重查。试走项只写手感（跳跃、攀爬、走位舒不舒服）、光照好不好看、电脑队友和感染者的寻路和行为、声音、导演节奏、提示措辞，以及 decisions.json 里要试走确认的暂定标准。
+
 ## 读
 
 G9 交付的地图；`work/L<nn>/invalidated.json`；`work/L<nn>/playtest.json`；followups.json 里 to 为 playtest、status 为 open 的项（暂定标准）；项目的 HUMAN.md（只写通用方法）。
@@ -27,5 +29,6 @@ human-todo.json 里 result 没有 null；交给本线的问题都已关闭，交
 - 每张图的事件表、导航属性表、主路线手写在 HUMAN.md：设计一改就过期，没人发现。
 - “按坐标找数据”没有脚本：只能靠 AI 自己推。
 - 返工后让人整关重走。
+- 把 kit verify 能查的写进试走：负责人花时间验机器早该拦住的东西。试走里发现了这类问题，说明 kit verify 有缺口，告诉负责人是哪一项。
 - 暂定标准试走后写进 followups.closed.json，以后改成已定时 `kit spec` 报错。
 
