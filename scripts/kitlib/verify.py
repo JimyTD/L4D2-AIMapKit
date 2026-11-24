@@ -1385,7 +1385,7 @@ def check_order(c, md, design, graph):
             chain = " ；".join(vlogic.fmt_edge(ed) for ed in reversed(path))
             want = "、".join([f"{o}/{i}" for o, i, _ in allowed_obj] + [f"事件 {x}" for x in then_of.get(eid, [])])
             rep.add("L4", f"事件 {eid}（{ev.get('name', '')}）会被 {what} 触发，设计里触发它的是 {want}；链路：{chain}",
-                    "事件提前或被别的东西触发，玩法顺序乱掉（例：倒第一桶油卡车就开、树断了车不等人就走）；一次性的输出被提前用掉后，真正该触发时什么也不发生。",
+                    "事件提前或被别的东西触发，玩法顺序乱掉（例：多步互动的第一步就触发了最后的结果、要等人上车的地方不等人）；一次性的输出被提前用掉后，真正该触发时什么也不发生。",
                     f"去掉这条链路，只让 {want} 触发 {vlogic.relay_name(eid)}；要等多个条件时用 logic_branch 或 math_counter 汇合。",
                     key=f"events/event/-/{eid}", where=vmap_vec(origin["origin"]), entity=ent_ref(origin))
             break
