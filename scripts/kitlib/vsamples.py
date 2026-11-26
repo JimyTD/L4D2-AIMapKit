@@ -323,6 +323,20 @@ def stale_bsp(m):
     """Marker only: the runner touches the VMF after compiling."""
 
 
+def lights_at_waypoints(m):
+    """A light over every route point and none between: every point is lit, the stretch from x 720 to 1408 is not
+    (run with light_gap_max_u 600: the lights there are 688 apart)."""
+    for x in (128, 600, 720, 1408):
+        m.ent("light", _light="255 220 180 200", origin=f"{x} 384 200")
+
+
+def lights_evenly(m):
+    """Lights along the route every 400 units, within light_gap_max_u 600."""
+    for x in range(128, 1409, 400):
+        m.ent("light", _light="255 220 180 200", origin=f"{x} 384 200")
+    m.ent("light", _light="255 220 180 200", origin="1408 384 200")
+
+
 SAMPLES = [
     ("narrow_door", "门被砌窄过不去（门洞按小门扇补墙垛）", narrow_door, ["D1"]),
     ("mirrored_sign", "门牌文字镜像", mirrored_sign, ["T1"]),
@@ -350,10 +364,19 @@ SAMPLES = [
     ("instance_overlap", "主图和实例之间的摆件穿插（只在单个文件内比较会漏）", instance_overlap, ["P1"]),
     ("lift_button_in_doorway", "电梯按钮块挡在门口", lift_button_in_doorway, ["D1"]),
     ("stale_bsp", "VMF 改了没重新编译", stale_bsp, ["F2"]),
+    ("lights_at_waypoints", "灯只放在路线点上，两点之间一段暗（相邻灯距超标）", lights_at_waypoints, ["G2"]),
+    ("lights_evenly", "（G2 应不报）沿路线每 400 单位一盏灯", lights_evenly, []),
 ]
 
 # samples that must pass every check (a change that must not be reported)
 MUST_PASS = {"other_level_generator", "unused_decision"}
+
+# samples run with their own kit verify arguments instead of --step G6; "warn": the named checks count as found
+# when they warn; "absent": checks that must not report anything
+RUN = {
+    "lights_at_waypoints": {"args": ["--step", "G7", "--only", "light", "--set", "light_gap_max_u=600"], "warn": True},
+    "lights_evenly": {"args": ["--step", "G7", "--only", "light", "--set", "light_gap_max_u=600"], "absent": ["G2"]},
+}
 
 
 def build(proj: Path, name: str, mutate, vbsp: Path, game: Path):

@@ -454,7 +454,8 @@ def verify_samples(only=None) -> int:
                 _t.sleep(1.1)
                 vm = next((proj / "build" / "L01").glob("*.vmf"))
                 vm.write_text(vm.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-            code, out = kit(proj, "verify", "1", "--step", "G6")
+            run = vsamples.RUN.get(name, {})
+            code, out = kit(proj, "verify", "1", *(run.get("args") or ["--step", "G6"]))
             try:
                 res = json.loads((proj / "work" / "L01" / "verify.json").read_text(encoding="utf-8"))
             except (OSError, ValueError):
@@ -469,13 +470,20 @@ def verify_samples(only=None) -> int:
                 bad += 1
                 continue
             got = {f["check"] for f in res["findings"] if f["severity"] == "FAIL"}
-            if name == "good" or name in vsamples.MUST_PASS:
+            if run.get("warn"):
+                got |= {f["check"] for f in res["findings"] if f["severity"] == "WARN"}
+            if run.get("absent"):
+                hit = sorted({f["check"] for f in res["findings"]} & set(run["absent"]))
+                ok = not hit
+                print(("OK   " if ok else "FAIL ") + f"kit verify 样本 {name}（{what}）不报 {'、'.join(run['absent'])}"
+                      + ("" if ok else "：" + "；".join(f"{f['check']} {f['what'][:90]}" for f in res["findings"] if f["check"] in hit)[:800]))
+            elif name == "good" or name in vsamples.MUST_PASS:
                 ok = res["passed"]
                 print(("OK   " if ok else "FAIL ") + ("kit verify 好样本全过" if name == "good" else f"kit verify 应通过的样本 {name}（{what}）全过")
                       + ("" if ok else "：" + "；".join(f"{f['check']} {f['what'][:90]}" for f in res["findings"] if f["severity"] == "FAIL")[:1500]))
             else:
                 miss = [c for c in must if c not in got]
-                ok = not miss and code == 1
+                ok = not miss and (code == 1 or bool(run.get("warn")))
                 print(("OK   " if ok else "MISS ") + f"kit verify 坏样本 {name}（{what}）→ " + ("、".join(sorted(got)) if ok else f"缺 {'、'.join(miss)}，报出的是 {'、'.join(sorted(got)) or '无'}"))
             bad += 0 if ok else 1
     finally:

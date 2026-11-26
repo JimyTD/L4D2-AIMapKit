@@ -304,7 +304,7 @@
    "status": "暂定",
    "step": "G7",
    "start": 1200,
-   "hint": "kit verify 光照：路线上相邻两个光源的最大间距（路线点到最近光源超过一半就提醒）"
+   "hint": "kit verify 光照：沿路线相邻两个光源的最大间距。G2 沿路线折线每 1/8 间距取一点，每点离最近光源不超过它的一半（references/verify.md 的 G2，只有这一套口径）"
   },
   {
    "id": "event_light_r_u",

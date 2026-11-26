@@ -2012,13 +2012,38 @@ def check_light(c, md, design, runs):
     evr = float(c.dec("event_light_r_u"))
     dark = [k.lower() for k in c.dec("verify_dark_keys")]
     if design:
+        # one standard (references/verify.md G2): along the route, lights at most light_gap_max_u apart; measured as
+        # every point of the route line (at eye height, sampled every gap / 8) having a light within gap / 2
+        lines = {}
         for key, lab, p, kind in design.waypoints():
-            if kind != "route" or any(key.lower().startswith(k) for k in dark):
-                continue
-            dd = np.linalg.norm(L - p, axis=1).min() if len(L) else 1e9
-            if dd > gap / 2:
-                rep.add("G2", f"{lab} 离最近的光源 {dd * 0.0254:.0f} m（相邻光源间距上限 {gap * 0.0254:.0f} m）", "路线上太暗，玩家看不清路和感染者。",
-                        "补光源（配灯具）；这一段设计本该暗的，把它的 key 写进 decisions.json 的 verify_dark_keys 并写理由。", key=key, where=p, severity="WARN")
+            if kind == "route" and not any(key.lower().startswith(k) for k in dark):
+                lines.setdefault(key, []).append((lab, p))
+        step = gap / 8
+        for key, pts in lines.items():
+            samples = []
+            for (la, a), (_, b) in zip(pts, pts[1:]):
+                n = max(1, int(np.ceil(np.linalg.norm(b - a) / step)))
+                samples += [(la, a + (b - a) * t) for t in np.linspace(0, 1, n, endpoint=False)]
+            samples.append(pts[-1])
+            P = np.array([p for _, p in samples]) + [0, 0, EYE_H]
+            dd = np.linalg.norm(L[None, :, :] - P[:, None, :], axis=2).min(1) if len(L) else np.full(len(P), 1e9)
+            dark_s = dd > gap / 2
+            i = 0
+            while i < len(P):
+                if not dark_s[i]:
+                    i += 1
+                    continue
+                j = i
+                while j + 1 < len(P) and dark_s[j + 1]:
+                    j += 1
+                run = float(np.linalg.norm(np.diff(P[i:j + 1], axis=0), axis=1).sum())
+                k = i + int(np.argmax(dd[i:j + 1]))
+                rep.add("G2", f"{samples[i][0]} 起的一段路线（约 {(run + step) * 0.0254:.0f} m）离光源都超过 {gap / 2 * 0.0254:.0f} m："
+                              f"这一段两侧的光源间距超过上限 {gap * 0.0254:.0f} m（最暗处离最近光源 {dd[k] * 0.0254:.0f} m）",
+                        "路线上太暗，玩家看不清路和感染者。",
+                        "在这一段补光源（配灯具），沿路线相邻光源不超过上限；这一段设计本该暗的，把它的 key 写进 decisions.json 的 verify_dark_keys 并写理由。",
+                        key=key, where=P[k] - [0, 0, EYE_H], severity="WARN", extra={"dark_m": round((run + step) * 0.0254, 1)})
+                i = j + 1
         for key, owner, o, p, lv in design.objects():
             if p is None or not (o.get("fires") or o.get("kind") in ("button", "event_door", "saferoom_door")) or any(key.lower().startswith(k) for k in dark):
                 continue
