@@ -40,7 +40,7 @@ MAX_PLANES = 65536
 EPS_W = 0.05
 
 # step -> groups it adds (each step re-runs the groups of the steps before it)
-STEP_GROUPS = [("G3", ["fresh", "compile", "walk", "doors"]),
+STEP_GROUPS = [("G3", ["fresh", "compile", "geometry", "walk", "doors"]),
                ("G4", ["logic", "level", "interact", "entities", "supply", "hazard"]),
                ("G5", ["resources", "text", "models", "looks"]),
                ("G6", ["placement", "dressing"]),
@@ -85,6 +85,8 @@ for _cid, _g, _t in [
     ("C4", "compile", "笔刷、笔刷面、平面、实体在上限内"), ("C5", "compile", "vbsp 没有丢掉模型（加载失败、出界）"),
     ("C6", "compile", "说是完整编译的，日志里 vvis、vrad 都完整跑过（没用 -fast）"),
     ("C7", "compile", "完整编译的这份 VMF 先在快速档上过了 kit verify"),
+    ("B1", "geometry", "设计墙体和门洞轮廓与最终地图一致（没有删墙、挖空洞或撑大门洞）"),
+    ("B2", "geometry", "没有用模型缩放（modelscale != 1）绕过碰撞或塞进狭小空间"),
     ("W1", "walk", "从起点走到终点（站立或蹲伏碰撞体）"), ("W2", "walk", "设计路线上每个点都走得到"), ("W3", "walk", "必达点都走得到"),
     ("W4", "walk", "过道净宽不小于设计"),
     ("D1", "doors", "开门后门洞和门前 0.9 m 的净宽、净高不小于路线门最小尺寸"),
@@ -437,6 +439,247 @@ def check_compile(c, md, log):
                     "快速档没过就完整编译，问题要在完整编译以后再查一遍、再编一次。",
                     f"先让快速档的 kit verify 跑到 {c.step}、不加 --only，除“待完整编译”以外全过，再完整编译。")
     return runs
+
+
+# ---------------------------------------------------------------- design geometry consistency (B1, B2)
+
+def check_geometry(c, md, design):
+    """B1: final map must preserve designed interior/exterior walls and door openings without deleting walls,
+    carving large holes, or widening doors to pass checks.
+    B2: no non-door model may be scaled (modelscale / uniformscale != 1) to fit or bypass collision."""
+    import vmap
+    from shapely.geometry import LineString, Point, Polygon
+    from shapely.ops import unary_union
+    rep = c.rep
+    U = 1.0 / 0.0254
+
+    arch_solids = [
+        s for s in md.solids()
+        if (s.contents & vmap.C_SOLID)
+        and (s.src.get("kind") == "brush"
+             or (s.src.get("kind") == "brush_entity"
+                 and not str(s.src.get("entity", "")).lower().startswith(
+                     ("prop_", "func_door", "func_button", "func_elevator", "func_tracktrain", "func_movelinear"))))
+    ]
+    g_arch = vmap.Grid(arch_solids, 256)
+
+    def has_wall_at(pt):
+        lo, hi = pt - 2.0, pt + 2.0
+        for s in g_arch.query(lo, hi):
+            if vmap.box_hits(pt[None, :], [2.0, 2.0, 2.0], s, eps=0.05)[0]:
+                return True
+        return False
+
+    if design:
+        for sid, st in design.structs.items():
+            d = st["data"]
+            sh = d.get("shell") or {}
+            shell_ring = None
+            edges = sh.get("edges") or []
+            if edges and sh.get("wall_m"):
+                pts_ex = [design.s_xy(st, *e["from_m"]) for e in edges if e.get("from_m")]
+                if len(pts_ex) >= 3:
+                    try:
+                        fp = Polygon(pts_ex).buffer(0)
+                        wm_u = float(sh["wall_m"]) * U
+                        if fp.is_valid and fp.area > 100 and wm_u > 2.0:
+                            shell_ring = fp.difference(fp.buffer(-wm_u, join_style=2))
+                    except ValueError:
+                        shell_ring = None
+            if shell_ring is not None and not shell_ring.is_empty:
+                for op in sh.get("openings") or []:
+                    if op.get("access") == "none":
+                        continue
+                    seg_m = op.get("segment_m")
+                    if seg_m and len(seg_m) >= 2:
+                        ln = LineString([design.s_xy(st, *seg_m[0]), design.s_xy(st, *seg_m[1])])
+                        shell_ring = shell_ring.difference(ln.buffer(max(float(sh.get("wall_m", 0.24)) * U, 16.0), cap_style=2))
+
+            for fl in d.get("floors", []):
+                lv = fl["level"]
+                z_fl, h_fl = design.s_floor(st, lv)
+                z_mid = z_fl + min(48.0, h_fl * 0.45)
+
+                space_polys = []
+                for sp in fl.get("spaces", []):
+                    pts_m = sp.get("poly_m")
+                    if not pts_m and sp.get("rects_m"):
+                        r = sp["rects_m"][0]
+                        pts_m = [(r[0], r[1]), (r[2], r[1]), (r[2], r[3]), (r[0], r[3])]
+                    if pts_m and len(pts_m) >= 3:
+                        try:
+                            p = Polygon([design.s_xy(st, u, v) for u, v in pts_m]).buffer(0)
+                            if p.is_valid and not p.is_empty:
+                                space_polys.append(p)
+                        except ValueError:
+                            pass
+                spaces_union = unary_union(space_polys) if space_polys else Polygon()
+
+                door_excl = []
+                for dr in fl.get("doors", []):
+                    seg_m = dr.get("segment_m")
+                    if seg_m and len(seg_m) >= 2 and dr.get("state") in ("open", "event_open"):
+                        ln = LineString([design.s_xy(st, *seg_m[0]), design.s_xy(st, *seg_m[1])])
+                        door_excl.append(ln.buffer(max(float(fl.get("interior_wall_m", 0.2)) * U, 12.0), cap_style=2))
+                for vt in fl.get("void_through_m") or []:
+                    if vt.get("poly_m") and len(vt["poly_m"]) >= 3:
+                        try:
+                            door_excl.append(Polygon([design.s_xy(st, u, v) for u, v in vt["poly_m"]]).buffer(2.0))
+                        except ValueError:
+                            pass
+                excl_union = unary_union([spaces_union] + door_excl) if (space_polys or door_excl) else Polygon()
+
+                iw_polys = []
+                for idx_w, poly_m in enumerate(fl.get("interior_walls_m") or []):
+                    if len(poly_m) < 3:
+                        continue
+                    try:
+                        wp = Polygon([design.s_xy(st, u, v) for u, v in poly_m]).buffer(0)
+                    except ValueError:
+                        continue
+                    if not wp.is_valid or wp.area < 200:
+                        continue
+                    iw_polys.append(wp)
+                    check_wp = wp.difference(excl_union) if not excl_union.is_empty else wp
+                    core_wp = check_wp.buffer(-2.5)
+                    if core_wp.is_empty and check_wp.area > 400:
+                        core_wp = check_wp
+                    if core_wp.is_empty or core_wp.area < 200:
+                        continue
+                    rep.ran("B1")
+                    bx0, by0, bx1, by1 = core_wp.bounds
+                    step = max(24.0, min(64.0, math.sqrt(core_wp.area / 12.0)))
+                    pts = []
+                    x = bx0 + step * 0.5
+                    while x <= bx1 and len(pts) < 40:
+                        y = by0 + step * 0.5
+                        while y <= by1 and len(pts) < 40:
+                            if core_wp.contains(Point(x, y)):
+                                pts.append((x, y))
+                            y += step
+                        x += step
+                    if not pts:
+                        rp = core_wp.representative_point()
+                        pts = [(rp.x, rp.y)]
+                    missed = [pt for pt in pts if not has_wall_at(np.array([pt[0], pt[1], z_mid]))]
+                    if (len(pts) >= 2 and len(missed) / len(pts) > 0.45) or (len(pts) == 1 and len(missed) == 1 and wp.area > 600):
+                        mx, my = missed[0]
+                        rep.add("B1",
+                                f"结构体 {sid} {lv}F 的设计内墙缺失或被挖出大块空洞（{len(missed)}/{len(pts)} 个墙体采样点在最终地图里是空的）",
+                                "严禁为通过检查擅自删墙或在墙内挖洞；缺少设计内墙会破坏动线、掩体与可见性分区。",
+                                "按 spec.json 的 interior_walls_m 还原完整内墙；若设计冲突过不去，保持原墙并登记 gaps.json 交回设计。",
+                                key=f"{sid}/wall/{lv}/w_{idx_w}", where=np.array([mx, my, z_mid]))
+
+                design_walls = unary_union(iw_polys + ([shell_ring] if shell_ring is not None and not shell_ring.is_empty else []))
+                if not design_walls.is_empty:
+                    wall_core = design_walls.buffer(-1.5)
+                    for dr in fl.get("doors", []):
+                        if dr.get("state") not in ("open", "event_open") or dr.get("kind") in ("shutter",):
+                            continue
+                        seg_m = dr.get("segment_m")
+                        if not seg_m or len(seg_m) < 2:
+                            continue
+                        a = np.array(design.s_xy(st, *seg_m[0]))
+                        b = np.array(design.s_xy(st, *seg_m[1]))
+                        t = (b - a) / (np.linalg.norm(b - a) or 1.0)
+                        ctr = (a + b) / 2.0
+                        w_u = float(dr.get("width_m") or 0) * U
+                        h_u = float(dr.get("height_m") or 2.1) * U
+                        z_sill = z_fl + float(dr.get("sill_m") or 0) * U
+                        z_d = z_sill + min(48.0, h_u * 0.45)
+                        for side_name, sgn in (("一侧", -1.0), ("另一侧", 1.0)):
+                            side_pts = []
+                            for off in (8.0, 20.0, 32.0):
+                                q = ctr + t * sgn * (w_u / 2.0 + off)
+                                qp = Point(float(q[0]), float(q[1]))
+                                if wall_core.contains(qp) and (excl_union.is_empty or not excl_union.contains(qp)):
+                                    side_pts.append(q)
+                            if len(side_pts) >= 2:
+                                rep.ran("B1")
+                                if all(not has_wall_at(np.array([q[0], q[1], z_d])) for q in side_pts):
+                                    q0 = side_pts[0]
+                                    rep.add("B1",
+                                            f"门 {sid}-{dr['id']} {side_name}的设计实心墙被挖空或门洞被撑大超出设计宽度 {w_u:.0f} u",
+                                            "严禁为通过 D1/W3/W4 检查把门洞撑大或在门口往墙里挖大块空洞。",
+                                            f"把门洞宽度收回到设计的 {dr.get('width_m', 0):.2f} m（{w_u:.0f} u），还原门口两侧实心墙；过不去时登记 gaps.json 交回设计。",
+                                            key=f"{sid}/door/{lv}/{dr['id']}", where=np.array([q0[0], q0[1], z_d]))
+                                    break
+
+    reported_b2 = set()
+    for e in md.ents:
+        mdl = e["model"] or ""
+        if not mdl.lower().endswith(".mdl"):
+            continue
+        cls = e["classname"].lower()
+        if cls.startswith("prop_door"):
+            continue
+        for sk in ("modelscale", "uniformscale"):
+            val = e[sk]
+            if not val:
+                continue
+            try:
+                sc = float(val)
+            except ValueError:
+                continue
+            if abs(sc - 1.0) > 0.02:
+                rep.ran("B2")
+                p = vmap_vec(e["origin"])
+                sig = (cls, mdl.lower(), tuple(round(float(x), 1) for x in p))
+                reported_b2.add(sig)
+                rep.add("B2",
+                        f"实体 {cls}（{mdl}）使用了缩放 {sk}={sc:g}（只允许 1.0）",
+                        "严禁用 modelscale 缩小模型来绕过碰撞或塞进狭小空间，也不得通过缩放改变设计物件尺寸。",
+                        "去掉缩放（设回 1.0）或换用合适尺寸的模型；若设计空间确实放不下，保留原几何并登记 gaps.json 交回设计。",
+                        key=design.locate(p) if design else None, where=p, entity=ent_ref(e), extra={sk: sc})
+    for i, p in enumerate(md.bsp.props):
+        sc = p.scaling
+        vals = (float(sc),) if isinstance(sc, (int, float)) else (float(sc.x), float(sc.y), float(sc.z))
+        if any(abs(v - 1.0) > 0.02 for v in vals):
+            rep.ran("B2")
+            org = np.array([p.origin.x, p.origin.y, p.origin.z])
+            sig = ("prop_static", p.model.lower(), tuple(round(float(x), 1) for x in org))
+            reported_b2.add(sig)
+            rep.add("B2",
+                    f"静态道具 {p.model} 使用了缩放 {vals}（只允许 1.0）",
+                    "严禁用缩放模型来绕过碰撞或塞进狭小空间。",
+                    "取消缩放；确实放不下时登记 gaps.json 交回设计。",
+                    key=design.locate(org) if design else None, where=org, entity={"class": "prop_static", "model": p.model, "index": i})
+    if c.vmf_path and c.vmf_path.exists():
+        from srctools.vmf import VMF
+        for vp in [c.vmf_path] + instance_files(c.vmf_path):
+            if not vp.exists():
+                continue
+            try:
+                v = VMF.parse(vp.read_text(encoding="utf-8", errors="ignore"))
+            except Exception:
+                continue
+            for e in v.entities:
+                cls = (e["classname"] or "").lower()
+                mdl = (e["model"] or "")
+                if cls.startswith("prop_door") or not mdl.lower().endswith(".mdl"):
+                    continue
+                for sk in ("modelscale", "uniformscale"):
+                    val = e[sk]
+                    if not val:
+                        continue
+                    try:
+                        sc = float(val)
+                    except ValueError:
+                        continue
+                    if abs(sc - 1.0) > 0.02:
+                        org = vmap_vec(e["origin"])
+                        sig = (cls, mdl.lower(), tuple(round(float(x), 1) for x in org))
+                        if sig in reported_b2:
+                            continue
+                        rep.ran("B2")
+                        reported_b2.add(sig)
+                        rep.add("B2",
+                                f"VMF 里的 {cls}（{mdl}）写了缩放 {sk}={sc:g}（只允许 1.0）",
+                                "严禁用 modelscale 缩放模型来塞进空间或绕过碰撞。",
+                                "去掉 VMF 里的缩放键值（设回 1.0）。",
+                                key=design.locate(org) if design else None, where=org, entity={"class": cls, "model": mdl})
+    rep.ran("B1")
+    rep.ran("B2")
 
 
 # ---------------------------------------------------------------- resources, text, models
@@ -2427,6 +2670,8 @@ def run(level, a) -> int:
     if "fresh" in groups:
         check_fresh(c, md, [spec_p, el_p, root() / "standards" / "decisions.json"], spec)
     runs = check_compile(c, md, log_text) if "compile" in groups else vmap.last_runs(log_text)
+    if "geometry" in groups:
+        check_geometry(c, md, design)
     graph = vlogic.Graph(md)
     W = reach = sim = start = None
     if {"walk", "doors", "interact"} & set(groups):

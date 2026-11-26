@@ -16,6 +16,7 @@
 5. **3D 天空盒和远景**：从地理数据取可玩范围外一圈（宽度是 skybox_ring_m）的建筑轮廓和地形，按远景级自动生成；虚构项目按 `sources/geodata/world.json` 里同一圈的轮廓。不靠 AI 自己想。
 6. **光照密度**：室外大面 lightmapscale_out，室内 lightmapscale_in。
 7. **音景**按美术规范的对照表：每种空间类型放对应的原版 soundscape。会响的物件：设计数据里没有声音字段的，同样不从中文推，登记进 fallbacks.json。
+8. **不改设计几何**：环境、可见性或布光调优不得删改设计墙体、挖大块空洞或用 `modelscale` 缩放模型；可见性或光照确与设计冲突时登记 `gaps.json` 交回设计。
 
 ## 交给下一步
 

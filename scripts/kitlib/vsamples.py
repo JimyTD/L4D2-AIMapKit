@@ -148,6 +148,11 @@ def design(level_dir: Path, level: int = 1):
         "structures": [{"id": "A", "origin_hammer": [0, 0, 0], "angles_hammer": [0, 0, 0], "z0_m": 0, "data": {
             "id": "A", "frame": {"origin": [0, 0], "u_angle_deg": 0}, "storeys": [{"level": 1, "elevation_m": 0, "height_m": 4}],
             "floors": [{"level": 1, "elevation_m": 0, "height_m": LEVEL_H * U, "spaces": [], "route_m": [],
+                        "interior_wall_m": round(32 * U, 3),
+                        "interior_walls_m": [
+                            [to_m(WALL_X0, 0), to_m(WALL_X1, 0), to_m(WALL_X1, DOOR_Y0), to_m(WALL_X0, DOOR_Y0)],
+                            [to_m(WALL_X0, DOOR_Y0 + DOOR_W), to_m(WALL_X1, DOOR_Y0 + DOOR_W), to_m(WALL_X1, 768), to_m(WALL_X0, 768)],
+                        ],
                         "doors": [{"id": "d_mid", "between": ["west", "east"], "state": "open", "kind": "door",
                                    "segment_m": [to_m(door_c[0], DOOR_Y0), to_m(door_c[0], DOOR_Y0 + DOOR_W)],
                                    "width_m": round(DOOR_W * U, 3), "height_m": round(112 * U, 3), "sill_m": 0}]}],
@@ -421,6 +426,22 @@ def hazard_covered(m):
     m.box((1100, 48, 0), (1300, 200, 64), mat="tools/toolstrigger", ent=th)
 
 
+def carved_door_wall(m):
+    """To bypass W3/D1, the wall south of the door is deleted/carved into a huge opening (missing interior wall)."""
+    for s in list(m.v.brushes):
+        lo, hi = s.get_bbox()
+        if abs(lo.x - WALL_X0) < 1 and abs(hi.x - WALL_X1) < 1 and hi.y <= DOOR_Y0 + 1:
+            m.v.brushes.remove(s)
+            m.box((WALL_X0, 0, 0), (WALL_X1, 120, LEVEL_H), mat="brick/brick_ext_07")
+            break
+
+
+def scaled_prop(m):
+    """A prop_dynamic scaled down with modelscale=0.7 to squeeze in and bypass collision."""
+    m.ent("prop_dynamic", targetname="yard-o_crate_small", model=CRATE, origin="400 600 0", angles="0 0 0",
+          solid="6", modelscale="0.7")
+
+
 _HAZARD_GROUND_TYPES = json.dumps([
     {"id": "road", "walkable": True, "elev_m": 0},
     {"id": "grass", "walkable": True, "elev_m": 0},
@@ -470,6 +491,8 @@ SAMPLES = [
     ("hazard_missing_trigger", "致死深水区上方缺 trigger_hurt", hazard_missing_trigger, ["H1"]),
     ("hazard_half_covered", "致死深水区上方 trigger_hurt 只盖了一半", hazard_half_covered, ["H1"]),
     ("hazard_covered", "（应通过）致死深水区上方 trigger_hurt 盖满且伤害参数一致", hazard_covered, []),
+    ("carved_door_wall", "为过通行检查把门口一侧内墙挖出大块空洞（缺失设计内墙）", carved_door_wall, ["B1"]),
+    ("scaled_prop", "把模型 modelscale 缩到 0.7 绕过碰撞", scaled_prop, ["B2"]),
 ]
 
 # samples that must pass every check (a change that must not be reported)
@@ -494,6 +517,8 @@ RUN = {
     "hazard_missing_trigger": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
     "hazard_half_covered": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
     "hazard_covered": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
+    "carved_door_wall": {"args": ["--step", "G3"]},
+    "scaled_prop": {"args": ["--step", "G3"]},
 }
 
 
