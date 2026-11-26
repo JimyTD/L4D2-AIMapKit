@@ -1,0 +1,57 @@
+{
+  "id": "weapon_spawn_physics_support",
+  "steps": [
+    "G4",
+    "G6"
+  ],
+  "classes": [
+    "weapon_spawn",
+    "weapon_item_spawn",
+    "weapon_first_aid_kit_spawn",
+    "weapon_ammo_spawn",
+    "upgrade_spawn",
+    "upgrade_laser_sight"
+  ],
+  "tags": [
+    "supply",
+    "weapon_spawn",
+    "spawnflags",
+    "float",
+    "support"
+  ],
+  "when": "摆放武器、医疗包、弹药、投掷物与升级包刷点，避免刷点在游戏里悬空",
+  "rules": [
+    "L4D2 的 weapon_*_spawn、weapon_spawn、weapon_item_spawn、upgrade_* 默认不启用物理下落（WeaponSpawnSingle spawnflags bit 1 = Enable Physics 默认为 0；weapon_item_spawn 与独立 upgrade_ammo_*/upgrade_laser_sight 甚至无物理开关）：未开物理下落时刷点进游戏会永远浮在原地。",
+    "有支撑家具（桌面、床面、货架层板、箱顶）时，刷点底面 Z 必须取支撑物真实可见顶面高度（并与支撑物绑定移动/删除）；没有支撑家具时必须直接贴在下方真实地面上，严禁手写 31~40 u 的悬空高度。",
+    "若用 pick:1 的多选一单件物品，可用 weapon_item_spawn 并开启对应 itemN 开关或 melee_weapon；若开 spawnflags=1（Enable Physics），仍须确保下方 96 u 内有可靠落点。"
+  ],
+  "anti_patterns": [
+    "按假想桌面高度（如 z=36 u）放置 weapon_spawn / weapon_first_aid_kit_spawn 且设 spawnflags=2，但下方没有桌子。",
+    "weapon_item_spawn 忘了打开对应的 itemN 开关导致刷出别的东西或缺失设计补给。"
+  ],
+  "invariants": [
+    {
+      "check": "S1",
+      "rule": "设计 item_spawn 附近 supply_match_r_u 内存在匹配刷点且 count 达标"
+    },
+    {
+      "check": "S2",
+      "rule": "所有补给与武器刷点底面落在真实可见承载面上（或明确开 spawnflags=1 且下方 96 u 内有落点）"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c1m1_hotel",
+      "entity": "weapon_item_spawn",
+      "origin": "924.127 5274.94 2698.01",
+      "keys": {
+        "item4": "1",
+        "item5": "1",
+        "item11": "1",
+        "item12": "1",
+        "item13": "1"
+      },
+      "notes": "FGD WeaponSpawnSingle: spawnflags 1='Enable Physics' 默认 0, 2='Must Exist'; c1m1_hotel 实测 weapon_first_aid_kit_spawn (420 5719 2887.87, sf=3) 贴合 table_kitchen.mdl 可见顶面 2883.1 u，weapon_pain_pills_spawn (2000.34 5117.25 2489.05) 贴合 ashtray_stand001.mdl 2488.8 u"
+    }
+  ]
+}

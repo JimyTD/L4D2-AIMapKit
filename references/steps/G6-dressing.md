@@ -5,6 +5,7 @@
 ## 读
 
 G2 的参照板；G5 的模型清单 `work/models.json`；美术规范的摆放规则；kinds.json 里 need 含 dressing 的元素（space、atmosphere、interior）；结构体的室内意图（`interiors`，在 .build.json 里）；开放区和结构体的空间、路线、门。
+摆放无碰撞装饰、贴花招牌或补给刷点前，先按需渐进查询知识库：`kit kb list --step G6` 或 `kit kb search <实体类名/关键词>`，命中后 `kit kb show <id>`；未覆盖机制用 `kit game` 查实。
 
 ## 做
 

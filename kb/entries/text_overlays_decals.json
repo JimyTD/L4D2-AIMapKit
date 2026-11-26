@@ -1,0 +1,78 @@
+{
+  "id": "text_overlays_decals",
+  "steps": [
+    "G5",
+    "G6"
+  ],
+  "classes": [
+    "info_overlay",
+    "infodecal",
+    "worldspawn"
+  ],
+  "tags": [
+    "text",
+    "sign",
+    "mirror",
+    "overlay",
+    "decal"
+  ],
+  "when": "在墙面、招牌或标识牌上贴带文字的材质、info_overlay 或 infodecal",
+  "rules": [
+    "笔刷面与 info_overlay 必须保证贴图正向不镜像：BSP 面顶点按正面顺时针排列，朝外法线为顶点绕向法线取反；u 轴（向右）叉乘 v 轴（向下）点乘朝外法线必须为负（info_overlay 满足 (BasisU × BasisV) · BasisNormal 与 (EndU-StartU)*(EndV-StartV) 符号一致）。",
+    "显示文字的面板长宽比应按位图有效内容比例设置（避免 UV 拉伸或一张牌重复平铺/截断）；文字材质表列入 decisions.json 的 text_materials。",
+    "infodecal 投射尺寸等于贴图像素尺寸乘 VMT 里的 $decalscale，必须小于承载 brush 面，且 infodecal 不能贴到模型上（会穿模投射到后面墙上），模型招牌只能改模型贴图或放在 brush 面板上。"
+  ],
+  "anti_patterns": [
+    "用负 uaxis/vaxis scale 或倒置 StartU/EndU 翻转文字，导致游戏里左右镜像。",
+    "拿 srctools 的 Side.normal() 直接当朝外法线（它指向笔刷内部）导致正反判反。",
+    "对 prop_static/prop_dynamic 做的牌子打 infodecal，或面板比 $decalscale×像素 小导致文字被裁切。"
+  ],
+  "invariants": [
+    {
+      "check": "T1",
+      "rule": "所有匹配 text_materials 的面与 overlay 不镜像"
+    },
+    {
+      "check": "T2",
+      "rule": "文字在承载面上完整铺放 1 次，不重复、不超界、不截断"
+    },
+    {
+      "check": "M2",
+      "rule": "横竖缩放差 <= texture_stretch_max"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c1m1_hotel",
+      "entity": "info_overlay",
+      "origin": "1520 5695.97 2341.04",
+      "keys": {
+        "material": "decals/sign_biohazard_00",
+        "u_min": 1.0,
+        "u_max": 0.0,
+        "v_min": 0.0,
+        "v_max": 1.0,
+        "basis_u": "0 1 0",
+        "basis_v": "0 0 -1",
+        "normal": "-1 0 0"
+      },
+      "notes": "VMT decals/sign_biohazard_00 含 $decalscale '.15'；(BasisU × BasisV)·normal = (-1,0,0)·(-1,0,0) = +1 且 (EndU-StartU)*(EndV-StartV) = (-1)*(+1) = -1，二者符号校验与 verify.py T1 口径一致"
+    },
+    {
+      "map": "c1m2_streets",
+      "entity": "info_overlay",
+      "origin": "-6640 -2498.11 590.88",
+      "keys": {
+        "material": "signs/sign_grocery_01",
+        "u_min": 0.0,
+        "u_max": 1.0,
+        "v_min": 1.0,
+        "v_max": 0.0,
+        "basis_u": "0 1 0",
+        "basis_v": "0 0 1",
+        "normal": "1 0 0"
+      },
+      "notes": "VMT signs/hotel_sign003 仅 LightmappedGeneric，无 $decalscale"
+    }
+  ]
+}

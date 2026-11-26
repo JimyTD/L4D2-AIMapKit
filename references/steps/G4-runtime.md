@@ -5,6 +5,7 @@
 ## 读
 
 events.json（定稿）；spec 里物件的 kind、fires、opened_by、enabled_by、items、when 等字段；followups.json 里 to 为 build、status 为 open 的项（玩法先例待核）。
+接线与放置实体前，先按需渐进查询知识库：`kit kb list --step G4` 或 `kit kb search <实体类名/关键词>`，命中后 `kit kb show <id>`；知识库未覆盖的原版机关用 `kit game find/measure/model` 在本机原版地图查实，并按同格式（`kb/index.jsonl` + `kb/entries/<id>.json`）沉淀。
 
 ## 做
 

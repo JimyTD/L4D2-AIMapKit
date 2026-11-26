@@ -3,6 +3,7 @@
 **目的**：把每段开放区的范围、地面、构件、封路、边界、刷怪口和衔接写成数据。
 
 动手前读 [rules.md](../rules.md)。格式见 [format/area.md](../format/area.md)。
+遇到载具、收集物、水体减速与致死地面等 L4D2 实体机制时，先按需渐进查询知识库：`kit kb list --step D3` 或 `kit kb search <词/类名>`，命中后再 `kit kb show <id>`；库里未覆盖的原版机制用 `kit game` 查实。
 
 ## 做
 

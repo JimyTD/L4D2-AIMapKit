@@ -75,6 +75,7 @@ D0 之后每关一条设计线（D1–D7）和一条生成线（G1–G10），�
 | [subagents.md](references/subagents.md) | 派子 agent 前读 |
 | [sessions.md](references/sessions.md) | 开会话、换会话、处理别的线交来的问题前读 |
 | [engine-facts.md](references/engine-facts.md) | 需要引擎数值时 |
+| [kb/index.jsonl](kb/index.jsonl) | 查 L4D2 实体机制、机关组合与原版实测规则：先 `kit kb list --step <步>` 或 `kit kb search <词/类名>` 看一行索引，再用 `kit kb show <id>` 按需加载完整条目；未覆盖的原版机制用 `kit game find/measure/model` 查实后按同格式沉淀 |
 | [verify.md](references/verify.md) | 生成线：kit verify 查什么、为什么、报告怎么读 |
 | [release.md](references/release.md) | 用户要求发布时 |
 | [tools.md](references/tools.md) | 读原版游戏资源；脚本没覆盖到或报错时 |

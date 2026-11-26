@@ -1,0 +1,76 @@
+{
+  "id": "elevator",
+  "steps": [
+    "D2",
+    "G4"
+  ],
+  "classes": [
+    "func_elevator",
+    "info_elevator_floor",
+    "func_button",
+    "func_movelinear",
+    "func_door",
+    "func_nav_blocker",
+    "trigger_push"
+  ],
+  "tags": [
+    "elevator",
+    "vertical",
+    "door",
+    "button",
+    "anti-block"
+  ],
+  "when": "搭建或接线竖向升降梯、停靠层、电梯门与防挡路触发",
+  "rules": [
+    "主实体用有碰撞的 func_elevator（设 top、bottom、speed、acceleration），每层停靠点配同名 info_elevator_floor。",
+    "轿厢门和井道门用成对 func_movelinear 或 func_door；起动前先关门（OnFullyClosed -> elevator.MoveToFloor(<floor>)），到达后开对应层门（OnReachedBottom / OnReachedTop）。",
+    "配 func_nav_blocker（门关时 BlockNav，到达开门后 UnblockNav）及门缝 trigger_push（关门/起动瞬间 Enable 推开挡门站位的人）。",
+    "呼叫/起动按钮放在玩家站位与电梯之间、不被门框或模型遮挡，触发后 Kill 或 Lock 防重复触发。"
+  ],
+  "anti_patterns": [
+    "把 func_elevator 换成不带碰撞的 prop_dynamic 加计时 relay，或没有 info_elevator_floor 导致 MoveToFloor 无效。",
+    "开门按钮或井道防挡块放在门洞中心导致通行检查 D1 / W1 失败，或轿厢未关门即移动让玩家卡出井道。"
+  ],
+  "invariants": [
+    {
+      "check": "E1",
+      "rule": "func_elevator 必须带真实碰撞体（非静态模型或无碰撞实体）"
+    },
+    {
+      "check": "L1/L2",
+      "rule": "MoveToFloor(<floor_name>) 参数必须匹配同图 info_elevator_floor 的 targetname"
+    },
+    {
+      "check": "I1",
+      "rule": "func_button 在玩家可达站位 96 u 内且无实心遮挡"
+    },
+    {
+      "check": "D1",
+      "rule": "电梯门洞净宽及前后 0.9 m 不得被按钮/阻挡体挤占"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c1m1_hotel",
+      "entity": "func_elevator elevator_1",
+      "origin": "2168 5812.5 2460",
+      "keys": {
+        "top": "2168 5848 2464",
+        "bottom": "2168 5848 1216",
+        "speed": "55"
+      },
+      "notes": "配套 info_elevator_floor top(2168 5848 2464) / stop1(2168 5848 1184)、双门 func_movelinear elevator_1_door1/2、elevator_push_trigger(trigger_push)、elevator_top_navblock/elevator_bottom_navblock"
+    },
+    {
+      "map": "c1m4_atrium",
+      "entity": "func_elevator elevator",
+      "origin": "-4043 -3404 532",
+      "keys": {
+        "top": "-4080 -3390.74 540",
+        "bottom": "-4080 -3390.74 0",
+        "speed": "20"
+      },
+      "notes": "button_elev_3rdfloor OnPressed -> door_elevator_top.Close() + push_elevator.Enable(); door_elevator_top OnFullyClosed -> elevator.MoveToFloor(bottom); elevator OnReachedBottom -> door_elevator.Open() + navblocker_elevator_bottom.UnblockNav()"
+    }
+  ]
+}

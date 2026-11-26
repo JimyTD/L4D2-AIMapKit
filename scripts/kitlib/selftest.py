@@ -154,6 +154,7 @@ def run() -> int:
         bad += status_checks(proj)
         bad += extension_checks(proj)
         bad += legacy_approval_checks(proj)
+        bad += kb_checks(proj)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     for what, rel, fn, must in CASES:
@@ -406,6 +407,59 @@ def status_checks(proj) -> int:
     expect("status：有压缩候选时 D1 要求拍板", "段压缩候选；待拍板" in out, out)
     return bad
 
+
+
+def kb_checks(proj) -> int:
+    """Verify kb/index.jsonl + kb/entries/*.json integrity, required vanilla evidence, and kit kb CLI."""
+    import kb as kb_mod
+
+    bad = 0
+
+    def expect(what, passed, detail=""):
+        nonlocal bad
+        print(("OK   " if passed else "FAIL ") + f"kb：{what}" + ("" if passed else f"\n{detail[:600]}"))
+        bad += 0 if passed else 1
+
+    required_ids = {
+        "elevator", "changelevel_temp_finale", "saferoom_door", "vehicle_tracktrain",
+        "scavenge_respawn_items", "door_clearance_envelope", "text_overlays_decals",
+        "vbsp_snapvector_sliver", "noclip_decoration_alignment", "weapon_spawn_physics_support",
+        "water_slow_and_lethal",
+    }
+    rows = kb_mod.load_index()
+    idx_ids = [r["id"] for r in rows]
+    entry_files = {p.stem for p in kb_mod.ENTRIES_DIR.glob("*.json")}
+    expect("索引与条目文件一一对应且包含首批 11 项",
+           len(idx_ids) == len(set(idx_ids)) and set(idx_ids) == entry_files and required_ids <= entry_files,
+           f"idx={idx_ids} files={sorted(entry_files)}")
+    bad_entries = []
+    for r in rows:
+        e = kb_mod.load_entry(r["id"])
+        ev = e.get("evidence") or []
+        ev_ok = bool(ev) and all(isinstance(x, dict) and (x.get("map") or x.get("source")) and x.get("notes") for x in ev)
+        if not (e.get("id") == r["id"] and e.get("steps") == r.get("steps") and e.get("classes") == r.get("classes")
+                and e.get("tags") == r.get("tags") and e.get("when") == r.get("when")
+                and e.get("rules") and e.get("anti_patterns") and e.get("invariants") and ev_ok):
+            bad_entries.append(r["id"])
+    expect("每条结构化字段与实测原版证据非空且和索引一致", not bad_entries, f"异常条目={bad_entries}")
+
+    code_l, out_l = kit(proj, "kb", "list")
+    code_ls, out_ls = kit(proj, "kb", "list", "--step", "G4")
+    expect("kit kb list 与按步骤过滤正常输出",
+           code_l == 0 and len(out_l.splitlines()) >= 11 and code_ls == 0 and "elevator" in out_ls and "vbsp_snapvector_sliver" not in out_ls,
+           out_l + "\n" + out_ls)
+    code_s, out_s = kit(proj, "kb", "search", "func_elevator")
+    code_s2, out_s2 = kit(proj, "kb", "search", "weapon_spawn")
+    expect("kit kb search 按类名/关键词命中",
+           code_s == 0 and "elevator" in out_s and code_s2 == 0 and "weapon_spawn_physics_support" in out_s2,
+           out_s + "\n" + out_s2)
+    code_sh, out_sh = kit(proj, "kb", "show", "elevator")
+    code_shj, out_shj = kit(proj, "kb", "show", "water_slow_and_lethal", "--format", "json")
+    code_miss, out_miss = kit(proj, "kb", "show", "nonexistent_topic_id")
+    expect("kit kb show 正常输出紧凑/JSON 条目且缺条目按 KitError 退出",
+           code_sh == 0 and "c1m1_hotel" in out_sh and code_shj == 0 and "c3m1_plankcountry" in out_shj and code_miss == 2 and "Traceback" not in out_miss,
+           out_sh + "\n" + out_shj + "\n" + out_miss)
+    return bad
 
 
 def verify_samples(only=None) -> int:

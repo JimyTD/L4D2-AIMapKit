@@ -1,0 +1,70 @@
+{
+  "id": "vehicle_tracktrain",
+  "steps": [
+    "D3",
+    "G4"
+  ],
+  "classes": [
+    "func_tracktrain",
+    "path_track",
+    "trigger_multiple",
+    "trigger_push",
+    "func_button"
+  ],
+  "tags": [
+    "vehicle",
+    "tracktrain",
+    "boarding",
+    "bots",
+    "stragglers"
+  ],
+  "when": "制作可乘坐移动载具/摆渡平台、上车等待判定与防电脑队友卡住/掉队",
+  "rules": [
+    "载具本体必须是有碰撞的 func_tracktrain（brush 实体），沿首尾相接的 path_track 链行驶（target 指向首节点，每个 path_track 节点设下一个 target，可触发 OnPass）。",
+    "上车判定用覆盖车厢/站台的 trigger_multiple（entireteam=2），或先开按钮/触发等真人/全队到位再解锁起步；需要发车时立即关闭上车门（func_door.Close）并用 trigger_push 清理门口挡门人。",
+    "载具沿途应保持地板平整无高台阶、门开口大于通行下限并及时切换 func_nav_blocker，防止 AI 电脑队友卡在车外或掉队；若允许掉队传送则配合触发器回传。"
+  ],
+  "anti_patterns": [
+    "把可乘坐的 func_tracktrain 换成不会动也不带载具碰撞的 prop_dynamic + 计时器。",
+    "path_track 链偏离设计路线或缺少首尾节点；发车不关门不设推开触发导致电脑队友卡死发车。"
+  ],
+  "invariants": [
+    {
+      "check": "E1",
+      "rule": "vehicle 对应实体必须是有碰撞体的 func_tracktrain"
+    },
+    {
+      "check": "E2",
+      "rule": "path_track 链必须含 >=2 个相连节点且各点距设计路线 <= vehicle_path_tol_u"
+    },
+    {
+      "check": "W1/W2",
+      "rule": "载具停靠点可上下且路径可达"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c3m1_plankcountry",
+      "entity": "func_tracktrain ferry_tram",
+      "origin": "-4496 6064 19",
+      "keys": {
+        "target": "ferry_path_1",
+        "startspeed": "20",
+        "spawnflags": "16",
+        "orientationtype": "1"
+      },
+      "notes": "配套 path_track ferry_path_1(-4496 6064 19) -> ferry_path_2(-5248 6064 19)；trigger_multiple ferry_tram_button_trigger(entireteam=2) OnEntireTeamStartTouch -> ferry_tram_button.Unlock()、OnEntireTeamEndTouch -> Lock()；ferry_tram_push(trigger_push) 推开门口阻塞者；ferry_door_left/right_entrance(func_door) 关门保护"
+    },
+    {
+      "map": "c12m3_bridge",
+      "entity": "func_tracktrain train_engine_tracktrain",
+      "origin": "7576 -13478 64",
+      "keys": {
+        "target": "train_engine_path1",
+        "startspeed": "175",
+        "spawnflags": "536"
+      },
+      "notes": "path_track 链驱动多段火车并同步开关 train_bridge_pre_blocker (func_nav_blocker)"
+    }
+  ]
+}

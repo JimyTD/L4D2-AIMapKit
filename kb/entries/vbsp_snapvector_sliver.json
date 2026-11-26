@@ -1,0 +1,43 @@
+{
+  "id": "vbsp_snapvector_sliver",
+  "steps": [
+    "G3"
+  ],
+  "classes": [
+    "worldspawn",
+    "func_detail"
+  ],
+  "tags": [
+    "vbsp",
+    "SnapVector",
+    "bounds_out_of_range",
+    "sliver",
+    "precision"
+  ],
+  "when": "切分非正交、斜角或细长建筑笔刷时，避免 vbsp 编译出现 bounds out of range",
+  "rules": [
+    "vbsp 的 SnapVector 对近轴向平面法线（两分量绝对值接近 0，阈值 NORMAL_EPSILON = 1e-5）会把法线吸附成纯轴向，但不会重新调整平面 dist。",
+    "若一个仅 1~2 u 宽、上千单位长的细长三角楔形或细刺刷子（sliver）有近轴向斜边，法线被吸附成轴向后平面的相交点会发散到无穷远，导致 vbsp 报错 Brush <n>: bounds out of range（vbsp 仍返回退出码 0，但引擎拒绝加载地图报 Map coordinate extents are too large）。",
+    "生成斜墙、斜边裁剪、墙角接缝时，禁止切出极窄楔形/细刺余料（最小厚度与最短边保持整数网格 >= 2~4 u，尽量对齐 1 u 网格或把斜接缝合到主刷子里）。"
+  ],
+  "anti_patterns": [
+    "用浮点坐标切墙留出 1 u 宽、上千 u 长的细长三角边条。",
+    "只检查 vbsp 进程退出码是否为 0，不检查日志里的 bounds out of range。"
+  ],
+  "invariants": [
+    {
+      "check": "C2",
+      "rule": "vbsp 编译日志中不能出现 Brush <n>: bounds out of range"
+    },
+    {
+      "check": "C3",
+      "rule": "编译后世界包围盒必须在 ±16384 u 内"
+    }
+  ],
+  "evidence": [
+    {
+      "source": "Source SDK / vbsp SnapVector (NORMAL_EPSILON = 1e-5)",
+      "notes": "由 kit selftest 样本 sliver 实测复现：1 u 宽、1266 u 长的近轴向楔形刷子经本机 vbsp.exe 编译后退出码为 0，但日志写出 Brush ...: bounds out of range"
+    }
+  ]
+}

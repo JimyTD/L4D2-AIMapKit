@@ -5,6 +5,7 @@
 ## 读
 
 spec 里的结构体、开放区、总图；美术规范的预算规则。
+遇到门洞斜墙切割、安全屋门、细刺刷子（`vbsp` `SnapVector`）或水体地面机制时，先按需渐进查询知识库：`kit kb list --step G3` 或 `kit kb search <词/类名>`，命中后再 `kit kb show <id>`；未覆盖机制用 `kit game` 查实。
 
 ## 做
 

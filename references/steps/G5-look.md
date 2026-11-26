@@ -5,6 +5,7 @@
 ## 读
 
 G2 的参照板 `work/refs/refs.json`（外观类型、自制清单）；G3 的构件记录 `build/L<nn>/parts.json`（G4 已并入实体记录）；美术规范（材质、模型、摆放、标识）。
+做文字材质、贴花或材质投影前，先按需渐进查询知识库：`kit kb list --step G5` 或 `kit kb search <实体类名/关键词>`，命中后 `kit kb show <id>`；未覆盖机制用 `kit game` 查实。
 
 ## 做
 

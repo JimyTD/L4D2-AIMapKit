@@ -1,0 +1,57 @@
+{
+  "id": "scavenge_respawn_items",
+  "steps": [
+    "D2",
+    "D3",
+    "G4"
+  ],
+  "classes": [
+    "weapon_scavenge_item_spawn",
+    "weapon_gascan_spawn"
+  ],
+  "tags": [
+    "scavenge",
+    "gascan",
+    "softlock",
+    "respawn"
+  ],
+  "when": "放置收集/灌油/关键任务道具，避免一次性道具损毁或丢弃导致卡关死档",
+  "rules": [
+    "关键任务油桶或清道夫收集物必须用 weapon_scavenge_item_spawn（配套 SpawnItem 输入与 OnItemPickedUp 输出），且可按需要开启高亮（glowstate=3）与 Must Exist（spawnflags=2）；它被打爆或丢进不可达区时可通过 SpawnItem 重新刷出防死档。",
+    "weapon_gascan_spawn 是一次性普通油桶刷点，点燃或爆炸消耗后不会自动按任务计数补刷，只用于非必过环境引爆物或普通战术油桶。"
+  ],
+  "anti_patterns": [
+    "用 weapon_gascan_spawn 充当推进/机关必需的燃料油桶，玩家提前打爆即全图软锁死档。"
+  ],
+  "invariants": [
+    {
+      "check": "S1/L6",
+      "rule": "需要防消耗软锁的任务收集物应使用 weapon_scavenge_item_spawn 而非一次性 weapon_gascan_spawn"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c10m3_ranchhouse",
+      "entity": "weapon_scavenge_item_spawn gascans_scavenge",
+      "origin": "-9893 -3730 -43.281",
+      "keys": {
+        "model": "models/props_junk/gascan001a.mdl",
+        "spawnflags": "2",
+        "solid": "0",
+        "glowstate": "3"
+      },
+      "notes": "FGD weapon_scavenge_item_spawn 提供 SpawnItem 输入与 OnItemPickedUp 输出，专用于可重刷任务收集物"
+    },
+    {
+      "map": "c14m1_junkyard",
+      "entity": "weapon_gascan_spawn",
+      "origin": "-1128 1890.21 -45.2807",
+      "keys": {
+        "model": "models/props_junk/gascan001a.mdl",
+        "spawnflags": "0",
+        "solid": "6"
+      },
+      "notes": "普通一次性环境油桶，无 SpawnItem 输入"
+    }
+  ]
+}

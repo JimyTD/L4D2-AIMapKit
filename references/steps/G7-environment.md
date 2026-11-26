@@ -6,6 +6,7 @@
 
 - 每关的时间和天气：读规划源文件 `design/plan/levels/L<n>.json` 的 time、weather（[format/plan.md](../format/plan.md)）。没有这两个字段的，读 DESIGN.md 本关一节，并在问题清单登记交给总控，把值补进源文件（这只是转写 P3 拍过板的内容，P3/L<n> 和 P4 因此显示的“拍板后已修改”按 [review.md](../review.md) 在下一次拍板时一并登记）。
 - G6 的灯具位置清单；G2 的参照板；美术规范。
+- 遇到雾效、天气、实体参数等原版机制时，先按需渐进查询知识库：`kit kb list` 或 `kit kb search <实体类名/关键词>`，命中后 `kit kb show <id>`；未覆盖的用 `kit game find/measure/model` 查实后按同格式沉淀。
 
 ## 做
 

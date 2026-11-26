@@ -1,0 +1,53 @@
+{
+  "id": "door_clearance_envelope",
+  "steps": [
+    "D2",
+    "G3",
+    "G6"
+  ],
+  "classes": [
+    "prop_door_rotating",
+    "prop_door_rotating_checkpoint"
+  ],
+  "tags": [
+    "door",
+    "clearance",
+    "angled_wall",
+    "doormain01"
+  ],
+  "when": "设计门洞净宽、选择门扇模型、切割斜墙门洞与布置门前净空",
+  "rules": [
+    "原版常用木门 models/props_doors/doormain01.mdl 尺寸为 9.0 × 56.3 × 104.5 u（doormain01_small.mdl 为 9.0 × 51.1 × 107.2 u），安全屋门 checkpoint_door_01.mdl 为 9.8 × 68.4 × 105.0 u；设计门洞净宽必须 >= route_door_w_min。",
+    "门洞按设计宽度切穿墙体全厚：若墙体斜放（非正交 90°），门洞切割盒必须按墙体局部法线与切向旋转对齐并略微超出墙厚，确保斜墙两侧真正切通、没有斜角残边卡人。",
+    "门扇宽应与门洞匹配（或做双扇），打开后贴墙；门平面前后 0.9 m（约 35.4 u）内不得放按钮柱、桌椅、阻挡体。"
+  ],
+  "anti_patterns": [
+    "先放窄门扇再在门洞里补砌墙垛把门洞缩窄。",
+    "斜墙用轴向矩形去切门洞，导致墙体一侧没切穿留下一条薄墙或锐角。",
+    "为过 D1/W1 检查而把门口旁设计内墙挖成大空洞。"
+  ],
+  "invariants": [
+    {
+      "check": "D1",
+      "rule": "任一开门方向打开后门洞平面及前后 0.9 m 净宽 >= route_door_w_min、净高 >= route_door_h_min"
+    },
+    {
+      "check": "B1",
+      "rule": "开门宽度之外的设计内墙保持完整，不得挖大块空洞"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c5m1_waterfront",
+      "entity": "prop_door_rotating",
+      "origin": "-2580 -244 -316.21",
+      "keys": {
+        "model": "models/props_doors/doormain01_small.mdl",
+        "distance": "90",
+        "opendir": "0",
+        "spawnflags": "8192"
+      },
+      "notes": "game model 实测 doormain01.mdl = [9.0, 56.3, 104.5] u，doormain01_small.mdl = [9.0, 51.1, 107.2] u"
+    }
+  ]
+}

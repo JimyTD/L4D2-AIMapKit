@@ -3,6 +3,7 @@
 **目的**：把每个可进入的结构体写成生成能直接照着搭的数据：先外壳，再竖向通道，最后只写需要的内部。
 
 动手前读 [rules.md](../rules.md)。格式见 [format/structure.md](../format/structure.md)。
+遇到门洞净宽、安全屋门、电梯、收集物等 L4D2 实体机制时，先按需渐进查询知识库：`kit kb list --step D2` 或 `kit kb search <词/类名>`，命中后再 `kit kb show <id>`；库里未覆盖的原版机制用 `kit game` 查实。
 
 ## 做
 

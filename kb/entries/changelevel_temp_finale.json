@@ -1,0 +1,67 @@
+{
+  "id": "changelevel_temp_finale",
+  "steps": [
+    "G4",
+    "G9"
+  ],
+  "classes": [
+    "info_changelevel",
+    "info_landmark",
+    "trigger_finale",
+    "trigger_multiple",
+    "trigger_once"
+  ],
+  "tags": [
+    "changelevel",
+    "landmark",
+    "finale",
+    "campaign",
+    "temp_finale"
+  ],
+  "when": "制作关间换关、配置 landmark，或后续关尚未完成时做临时终局",
+  "rules": [
+    "换关体积用 info_changelevel，map 填包内下一关地图名，绝不可指向当前图自身（指向当前图会导致引擎可能不生成换关实体）。",
+    "info_changelevel 的 landmark 必须在当前图和目标图各有一枚同名 info_landmark，且放在两关共用的安全屋对应位置（用于跨关搬运幸存者与物资）。",
+    "战役包内最后一关（含后续关尚未做出的阶段）必须做临时终局：终点安全屋放置 trigger_finale（type=0），并配 trigger_multiple（entireteam=2）在 OnEntireTeamStartTouch 时触发 FinaleEscapeFinished，不要擅自添加无线电、守点波次或救援载具。"
+  ],
+  "anti_patterns": [
+    "单关测试时把 info_changelevel.map 写成本图名字。",
+    "后续关未建时留着指向不存在地图的 info_changelevel，或加了设计里没有的无线电守点。"
+  ],
+  "invariants": [
+    {
+      "check": "V1",
+      "rule": "info_changelevel.map != 当前地图名，且两张图均存在同名 info_landmark"
+    },
+    {
+      "check": "V2",
+      "rule": "包内最后一关存在 trigger_finale 且有 entireteam=2 的全员到达触发区接 FinaleEscapeFinished"
+    },
+    {
+      "check": "A2/A3",
+      "rule": "kit release 校验整包换关链条连贯且末关为临时终局"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c1m1_hotel",
+      "entity": "info_changelevel c1m1_c1m2_changelevel",
+      "origin": "",
+      "keys": {
+        "map": "c1m2_streets",
+        "landmark": "c1m1_c1m2_landmark",
+        "spawnflags": "0"
+      },
+      "notes": "同名 info_landmark c1m1_c1m2_landmark 位于 c1m1_hotel(2136 4472 1248) 与 c1m2_streets(2504 5128 512)"
+    },
+    {
+      "map": "c5m5_bridge",
+      "entity": "trigger_multiple trigger_heli",
+      "origin": "7370 3834 251.5",
+      "keys": {
+        "entireteam": "2"
+      },
+      "notes": "OnEntireTeamStartTouch 触发结局继电器 relay_outro_finish -> finale.FinaleEscapeFinished()；FGD trigger_finale 确认 input FinaleEscapeFinished 直接判胜"
+    }
+  ]
+}

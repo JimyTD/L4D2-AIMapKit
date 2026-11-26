@@ -1,0 +1,50 @@
+{
+  "id": "noclip_decoration_alignment",
+  "steps": [
+    "G6"
+  ],
+  "classes": [
+    "prop_dynamic",
+    "prop_static"
+  ],
+  "tags": [
+    "noclip",
+    "decoration",
+    "vvd",
+    "vtx",
+    "visible_mesh",
+    "support"
+  ],
+  "when": "摆放无碰撞装饰模型（solid=0 / spawnflags=256），对齐家具层板、台面与邻近物",
+  "rules": [
+    "小型装饰或无需阻挡玩家的摆件设为无碰撞（prop_dynamic solid=0 或 spawnflags=256，或 prop_static solidity=0）；但无碰撞只免除物理阻挡，视觉上依然必须精确贴合下方支撑物或地面。",
+    "摆放位置和 Z 高度必须从支撑模型真实可见网格（VVD + DX90.VTX）推算的台面/层板顶面得出，严禁手写固定高度；支撑物位移、旋转或删除时，上面所有装饰同步跟随或删除。",
+    "无碰撞装饰不得侧向插进有碰撞家具或墙体中心（成丛植物/连排围栏除外）；静态有碰撞模型若 .phy 底高于可见网格底，贴地以可见网格底为准。"
+  ],
+  "anti_patterns": [
+    "认为无碰撞就不必对齐高度和边距，结果装饰悬浮在半空、穿进层板或插进旁边的箱子/柜子。",
+    "支撑家具已删或位置移动，装饰留在原坐标变成悬空。"
+  ],
+  "invariants": [
+    {
+      "check": "P4",
+      "rule": "可见网格底面落在真实可见承载面上（误差 <= ground_snap_tol_u），不被层板横穿"
+    },
+    {
+      "check": "P5",
+      "rule": "无碰撞装饰侧向不插进有碰撞模型超过 model_overlap_max_u，中心不在实心墙体内"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c1m1_hotel",
+      "entity": "prop_dynamic elevator_panel",
+      "origin": "2244 5721 2520.05",
+      "keys": {
+        "solid": "0",
+        "model": "models/props_urban/elevator_buttons001.mdl"
+      },
+      "notes": "无碰撞装饰实测设 solid=0；kit selftest 用 shelves_metal.mdl（可见层板顶 5/31/57/79 u）与 cardboard_box01.mdl、desk_metal.mdl（.phy 比可见脚底高 6.8 u）验证 P4/P5"
+    }
+  ]
+}

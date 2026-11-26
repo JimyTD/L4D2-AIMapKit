@@ -131,6 +131,13 @@ def cmd(a) -> int:
     if c == "release":
         import release
         return release.run(a)
+    if c == "kb":
+        import kb
+        if a.sub == "list":
+            return kb.list_cmd(a.step)
+        if a.sub == "search":
+            return kb.search_cmd(a.query, a.step)
+        return kb.show_cmd(a.ids, a.format)
     if c == "selftest":
         import selftest
         return selftest.run()
@@ -226,6 +233,16 @@ def parser():
     x.add_argument("--notes", help="这一版的更新说明（写进 release/CHANGELOG.md）")
     x.add_argument("--dry-run", action="store_true", help="只检查，不打包、不装、不改版本号")
     x.add_argument("--addons", help="装到哪个目录（默认 <游戏>/left4dead2/addons）")
+    x = s.add_parser("kb", help="面向 AI 的 L4D2 知识库（渐进加载：list/search 看紧凑索引，show 看单条完整规则与原版证据）")
+    ss = x.add_subparsers(dest="sub", required=True)
+    y = ss.add_parser("list", help="列知识库紧凑索引（可按步骤过滤）")
+    y.add_argument("--step", help="只列适用该步骤的条目（如 D2、G3、G4、G5、G6）")
+    y = ss.add_parser("search", help="按查询词/实体类名/关键词检索匹配条目摘要")
+    y.add_argument("query", nargs="+", help="查询词、实体类名或标签")
+    y.add_argument("--step", help="限定适用步骤")
+    y = ss.add_parser("show", help="输出一条或多条知识的完整结构化规则、反例、不变量与原版证据")
+    y.add_argument("ids", nargs="+", help="条目 id（从 list 或 search 取得）")
+    y.add_argument("--format", choices=("compact", "json"), default="compact", help="输出格式（默认紧凑可读，json 为完整机器结构）")
     s.add_parser("selftest", help="Kit 自测（改脚本后跑）")
     return p
 

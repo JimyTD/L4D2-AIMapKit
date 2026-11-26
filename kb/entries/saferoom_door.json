@@ -1,0 +1,66 @@
+{
+  "id": "saferoom_door",
+  "steps": [
+    "D2",
+    "G3",
+    "G4"
+  ],
+  "classes": [
+    "prop_door_rotating_checkpoint",
+    "info_landmark",
+    "prop_door_rotating"
+  ],
+  "tags": [
+    "saferoom",
+    "door",
+    "checkpoint",
+    "spawnpos"
+  ],
+  "when": "放置起点/终点安全屋门及其朝向、初始开关状态和导航隔离",
+  "rules": [
+    "安全屋门必须用专用实体 prop_door_rotating_checkpoint，不能用普通 prop_door_rotating 冒充。",
+    "起点安全屋出口门 spawnpos 设为 0（关闭，等待玩家开门触发离开安全区）；终点安全屋入口门在开局/前段可用，一般设 spawnpos=1/2（Open）并由玩家关门锁定换关或保持可关。",
+    "常用原版门板模型为 models/props_doors/checkpoint_door_01.mdl（厚9.8 × 宽68.4 × 高105.0 u）或 checkpoint_door_02.mdl / checkpoint_door_-02.mdl，distance=90，spawnflags 包含 8192（Use opens），门轴 axis 与 origin 对齐合页侧。"
+  ],
+  "anti_patterns": [
+    "终点或起点安全屋用了普通 prop_door_rotating，导致安全屋判定、关门换关或导航隔离失效。",
+    "门前 0.9 m 内摆补给箱或桌椅挡住开门扇扫掠路径，或门洞按窄门扇收窄。"
+  ],
+  "invariants": [
+    {
+      "check": "E1",
+      "rule": "saferoom_door 必须对应 prop_door_rotating_checkpoint"
+    },
+    {
+      "check": "D1",
+      "rule": "门洞打开后净宽 >= route_door_w_min，门前后 0.9 m 无阻塞"
+    }
+  ],
+  "evidence": [
+    {
+      "map": "c1m1_hotel",
+      "entity": "prop_door_rotating_checkpoint checkpoint_entrance",
+      "origin": "1832 4618 1236.37",
+      "keys": {
+        "model": "models/props_doors/checkpoint_door_-02.mdl",
+        "spawnpos": "2",
+        "spawnflags": "8192",
+        "distance": "90",
+        "speed": "200",
+        "hardware": "1"
+      },
+      "notes": "起点安全屋门实测；models/props_doors/checkpoint_door_-02.mdl 尺寸 9.3 × 58.3 × 105.8 u"
+    },
+    {
+      "map": "c1m2_streets",
+      "entity": "prop_door_rotating_checkpoint checkpoint_exit",
+      "origin": "2294 4942 500.367",
+      "keys": {
+        "model": "models/props_doors/checkpoint_door_01.mdl",
+        "spawnflags": "8192",
+        "distance": "90"
+      },
+      "notes": "终点安全屋门实测；checkpoint_door_01.mdl 尺寸 9.8 × 68.4 × 105.0 u"
+    }
+  ]
+}
