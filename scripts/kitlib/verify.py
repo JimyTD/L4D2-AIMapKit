@@ -1892,7 +1892,7 @@ def check_level(c, md, design):
 
 # ---------------------------------------------------------------- placement
 
-def check_placement(c, md, design):
+def check_placement(c, md, design, settled=None):
     """Models against models and structure in the final map. vbsp has already merged the main map and every
     func_instance into one world, so main-map props against instance props are compared like any others.
     A model resting on another (its bottom at the other's top, within ground_snap_tol_u) is not an overlap; two
@@ -1998,6 +1998,11 @@ def check_placement(c, md, design):
             continue
         gap = lo[2] - best if best is not None else None
         if (gap is None or gap > snap) and not touches_wall(ss, g_brush):
+            is_phys = (ss[0].src.get("kind") == "prop_entity"
+                       and str(ss[0].src.get("entity", "")).lower().startswith("prop_physics"))
+            vis_lo = settled.get(g) if settled else None
+            if not is_phys and vis_lo is not None and vis_lo < lo[2] - 0.1:
+                continue
             p = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
             rep.add("P3", (f"{ss[0].src.get('model')} 悬空：底面比下面的地面或台面高 {gap:.0f} 单位（容许 {snap:.0f}）" if gap is not None else
                            f"{ss[0].src.get('model')} 下面 512 单位内没有能放它的东西"),
@@ -2067,7 +2072,7 @@ def check_visible(c, md, design):
         return B
 
     def on_support(i, m):
-        """(problem, support, depth) for P4 or None."""
+        """((problem, support, depth) or None, settled_on_surface: bool) for P4."""
         lo, hi = m["lo"], m["hi"]
         z0, height = lo[2], hi[2] - lo[2]
         small = (hi - lo).max() < 48
@@ -2090,22 +2095,23 @@ def check_visible(c, md, design):
                or (small and not is_brush(t[2]) and not t[2].get("terrain"))]
         if bad and len({k for _, k, _ in bad}) * 4 > len(B):
             d, _, x = max(bad, key=lambda t: t[0])
-            return (f"{m['src'].get('model')} 看得见的底面陷进{label(x)} {d:.0f} 单位（容许 {snap:.0f}）",
+            return ((f"{m['src'].get('model')} 看得见的底面陷进{label(x)} {d:.0f} 单位（容许 {snap:.0f}）",
                     "看起来半截埋进地面或台面；碰撞体贴着地面不等于看得见的模型也在地面上。",
-                    "按看得见的模型底面把它抬到承载面上（碰撞体底面比网格底面高的模型，按网格算高度）。"), x, d
+                    "按看得见的模型底面把它抬到承载面上（碰撞体底面比网格底面高的模型，按网格算高度）。"), x, d), False
         model = (m["src"].get("model") or "").lower()
+        best = max(rest) if rest else None
+        gap = z0 - best if best is not None else None
+        on_surf = held or (gap is not None and gap <= snap)
         if not held and not any(fnmatch.fnmatch(model, pat) for pat in hang):
-            best = max(rest) if rest else None
-            gap = z0 - best if best is not None else None
             if (gap is None or gap > snap) and not mounted(m, g_brush):
-                return ((f"{m['src'].get('model')} 悬空：看得见的底面比下面的地面、台面、层板高 {gap:.0f} 单位（容许 {snap:.0f}）" if gap is not None else
+                return (((f"{m['src'].get('model')} 悬空：看得见的底面比下面的地面、台面、层板高 {gap:.0f} 单位（容许 {snap:.0f}）" if gap is not None else
                          f"{m['src'].get('model')} 下面 512 单位内没有承载面"),
                         "悬空的东西一眼就假；没有碰撞的装饰也一样看得见。常见原因：支撑它的家具被删了它还在，或高度是手写的、没按支撑物的层板算。",
-                        "按支撑物看得见的层板、台面顶面定高度（G6 第 3 条）；支撑物删了就一起删；挂墙、吊顶的写进 hanging_models。"), None, gap
+                        "按支撑物看得见的层板、台面顶面定高度（G6 第 3 条）；支撑物删了就一起删；挂墙、吊顶的写进 hanging_models。"), None, gap), False
         # a board, a shelf or a table top through a small item's body: a horizontal slab of something else that lies
         # wholly inside the item's height on a quarter of the lines through it at least
         if not small:
-            return None
+            return None, on_surf
         P = vmap.ray_points(lo, hi, 2)
         own = spans(m, P, 2)
         body = max(1, sum(1 for sp in own if sp))
@@ -2121,10 +2127,10 @@ def check_visible(c, md, design):
                 lines += found
             if hit and lines * 4 >= body:
                 a, b = hit
-                return (f"{label(x)} 在 z {a:.0f}–{b:.0f} 横穿 {m['src'].get('model')}",
+                return ((f"{label(x)} 在 z {a:.0f}–{b:.0f} 横穿 {m['src'].get('model')}",
                         "层板、台面从东西的身体中间穿过去：东西放在了两层层板之间，或支撑物挪了它没跟着挪。",
-                        "把它放到支撑物某一层看得见的顶面上（G6 第 3 条），XY 跟着支撑物的位置和朝向走。"), x, b - a
-        return None
+                        "把它放到支撑物某一层看得见的顶面上（G6 第 3 条），XY 跟着支撑物的位置和朝向走。"), x, b - a), False
+        return None, on_surf
 
     def clipping(i, m):
         """[(other, depth)] for P5: a decoration without collision side by side in a wall or in a model with collision.
@@ -2162,16 +2168,20 @@ def check_visible(c, md, design):
                 out.append((x, d, (ilo + ihi) / 2))
         return out
 
+    settled = {}
     for i, m in enumerate(vis):
         size = m["hi"] - m["lo"]
         if size.max() > 1024 or size.min() < 0.5:
             continue  # whole buildings and flat cards are structure, not things set on a surface
-        r = on_support(i, m)
+        r, on_surf = on_support(i, m)
         if r is not None:
             (what, why, fix), x, d = r
             p = np.array([(m["lo"][0] + m["hi"][0]) / 2, (m["lo"][1] + m["hi"][1]) / 2, m["lo"][2]])
             ent = {"model": ref(m)} if x is None else {"model": ref(m), "support": ref(x)}
             rep.add("P4", what, why, fix, key=here(p), where=p, entity=ent, extra={"depth": round(float(d), 1) if d is not None else None})
+        elif on_surf:
+            s = m["src"]
+            settled[(s.get("kind"), s.get("index"), s.get("hammerid"))] = float(m["lo"][2])
         if m["solid"]:
             continue
         for x, d, p in clipping(i, m):
@@ -2180,6 +2190,7 @@ def check_visible(c, md, design):
                            f"不做碰撞的 {m['src'].get('model')} 插进 {label(x)} {d:.0f} 单位（容许 {lim:.0f}）"),
                     "没有碰撞只是玩家穿得过去，看起来照样穿模。", "按看得见的模型挪开：贴墙摆的背面贴着墙面，放在家具旁的不插进家具。",
                     key=here(p), where=p, entity={"model": ref(m), "other": ref(x)}, extra={"depth": round(float(d), 1)})
+    return settled
 
 
 def mounted(m, g_brush):
@@ -2444,8 +2455,8 @@ def run(level, a) -> int:
     if "models" in groups:
         check_models(c, md, design)
     if "placement" in groups:
-        check_placement(c, md, design)
-        check_visible(c, md, design)
+        settled = check_visible(c, md, design)
+        check_placement(c, md, design, settled)
     if "looks" in groups:
         check_looks(c, md, design)
     if "dressing" in groups:

@@ -126,12 +126,28 @@ ITEM_SPAWN_KEYS = {
     "pain_pills": ("item4", 1),
     "pills": ("item4", 1),
     "pipe_bomb": ("item5", 1),
+    "gascan": ("item8", 0),
     "adrenaline": ("item11", 1),
     "defibrillator": ("item12", 0),
     "vomitjar": ("item13", 0),
     "chainsaw": ("item16", 0),
     "grenade_launcher": ("item17", 0),
     "m60": ("item18", 0),
+}
+ENT_TO_ITEM_SPAWN_KEY = {
+    "weapon_ammo_spawn": ("item1", 1),
+    "weapon_first_aid_kit_spawn": ("item2", 0),
+    "weapon_first_aid_kit": ("item2", 0),
+    "weapon_molotov_spawn": ("item3", 1),
+    "weapon_pain_pills_spawn": ("item4", 1),
+    "weapon_pipe_bomb_spawn": ("item5", 1),
+    "weapon_gascan_spawn": ("item8", 0),
+    "weapon_adrenaline_spawn": ("item11", 1),
+    "weapon_defibrillator_spawn": ("item12", 0),
+    "weapon_vomitjar_spawn": ("item13", 0),
+    "weapon_chainsaw_spawn": ("item16", 0),
+    "weapon_grenade_launcher_spawn": ("item17", 0),
+    "weapon_rifle_m60_spawn": ("item18", 0),
 }
 
 
@@ -243,6 +259,21 @@ def ent_matches_item(ent, want_ent: str, want_opt: str) -> bool:
     if we in (PRIMARY_ENTS | PISTOL_ENTS) and cls == "weapon_spawn":
         sel = (ent["weapon_selection"] or "any_primary").strip().lower()
         return sel == we[:-6]
+    if cls == "weapon_item_spawn":
+        if we in ENT_TO_ITEM_SPAWN_KEY:
+            k, default = ENT_TO_ITEM_SPAWN_KEY[we]
+            val = ent[k]
+            try:
+                return (int(val) if val not in (None, "") else default) > 0
+            except ValueError:
+                return False
+        if we == "weapon_melee_spawn":
+            mw = (ent["melee_weapon"] or "").strip().lower()
+            if not mw:
+                return False
+            if not wo or mw == "any":
+                return True
+            return bool({t.strip() for t in wo.split(",")} & {x.strip() for x in mw.split(",")})
     return False
 
 
