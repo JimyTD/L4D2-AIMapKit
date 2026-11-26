@@ -12,6 +12,10 @@ Geometry facts used here (checked on the installed game, 2026-11):
     and angles at run time (a func_button with angles 0 -155 0 has axis-aligned planes in the BSP).
   - Model collision is the .phy file: one or more convex pieces, vertices in metres, axes (x, -z, y) relative to
     the model; a model without .phy has no collision unless solidity is "bounding box".
+  - What the player sees of a model is its render mesh: vertices in the .vvd (LOD 0, after the fixup table),
+    triangles in the .dx90.vtx, mapped through the .mdl's body parts (model vertexindex / 48 + mesh vertexoffset
+    + the strip group vertex's origMeshVertID). Collision and mesh are separate: a crate's .phy can sit higher
+    than its mesh, and a decoration with solid 0 has a mesh and no collision at all.
   - Face winding in the BSP is clockwise seen from the front, so the outward normal is minus the winding normal.
 """
 
@@ -292,6 +296,176 @@ def vtx_tris(data: bytes):
     return None
 
 
+def vvd_verts(data: bytes):
+    """LOD 0 vertex positions of a .vvd file (model units and axes), fixups applied."""
+    if not data or data[:4] != b"IDSV":
+        return None
+    n0, = struct.unpack_from("<i", data, 16)
+    nfix, fixoff, vstart = struct.unpack_from("<iii", data, 48)
+
+    def block(start, num):
+        return np.frombuffer(data, dtype=np.float32, count=num * 12, offset=vstart + start * 48).reshape(num, 12)[:, 4:7]
+    if not nfix:
+        return block(0, n0).astype(float)
+    out = [block(src, num) for lod, src, num in (struct.unpack_from("<iii", data, fixoff + i * 12) for i in range(nfix)) if lod >= 0]
+    return np.vstack(out).astype(float) if out else np.zeros((0, 3))
+
+
+def mdl_meshes(data: bytes):
+    """{(body part, model): [first .vvd vertex of each mesh]} from a .mdl file."""
+    nbp, bpi = struct.unpack_from("<ii", data, 232)
+    out = {}
+    for b in range(nbp):
+        bp = bpi + b * 16
+        _, nm, _, mi = struct.unpack_from("<iiii", data, bp)
+        for m in range(nm):
+            mp = bp + mi + m * 148
+            nmesh, meshi, _, vindex = struct.unpack_from("<iiii", data, mp + 72)
+            out[(b, m)] = [vindex // 48 + struct.unpack_from("<i", data, mp + meshi + k * 116 + 12)[0] for k in range(nmesh)]
+    return out
+
+
+VTX_VERT = np.dtype([("bw", "u1", 3), ("nb", "u1"), ("orig", "<u2"), ("bone", "u1", 3)])
+
+
+JITTER = np.array([0.0137, 0.0071, 0.0029])  # keeps sample lines off shared triangle edges
+
+
+def axis_hits(V, T, P, axis=2):
+    """Where the lines through points P along one axis cross the triangles T of V: array (len(P), len(T)) of the
+    coordinate along that axis, nan where a line misses a triangle."""
+    a, b = [i for i in range(3) if i != axis]
+    if not len(T) or not len(P):
+        return np.full((len(P), len(T)), np.nan)
+    A, B, C = V[T[:, 0]], V[T[:, 1]], V[T[:, 2]]
+    x, y = P[:, a][:, None], P[:, b][:, None]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        d = (B[:, b] - C[:, b]) * (A[:, a] - C[:, a]) + (C[:, a] - B[:, a]) * (A[:, b] - C[:, b])
+        l1 = ((B[:, b] - C[:, b]) * (x - C[:, a]) + (C[:, a] - B[:, a]) * (y - C[:, b])) / d
+        l2 = ((C[:, b] - A[:, b]) * (x - C[:, a]) + (A[:, a] - C[:, a]) * (y - C[:, b])) / d
+        l3 = 1 - l1 - l2
+        z = l1 * A[:, axis] + l2 * B[:, axis] + l3 * C[:, axis]
+    hit = (np.abs(d) > 1e-9) & (l1 >= 0) & (l2 >= 0) & (l3 >= 0)
+    return np.where(hit, z, np.nan)
+
+
+def near_tris(V, T, lo, hi):
+    """Triangles of T whose box overlaps the box lo..hi."""
+    if not len(T):
+        return T
+    tv = V[T]
+    keep = (tv.min(1) <= hi).all(1) & (tv.max(1) >= lo).all(1)
+    return T[keep]
+
+
+def mesh_inside(V, T, P):
+    """For points P: (inside, depth, axis). A point is inside a mesh when at least four of the six axis rays from it
+    cross the mesh an odd number of times (open meshes such as a crate without a bottom still count); depth is the
+    distance to the nearest crossing along those rays, axis the axis it was found on."""
+    n = len(P)
+    odd = np.zeros(n, int)
+    depth = np.full(n, np.inf)
+    ax = np.zeros(n, int)
+    for k in range(3):
+        H = axis_hits(V, T, P, k) - P[:, k][:, None]
+        for sgn in (1, -1):
+            Hs = np.where(sgn * H > 0, sgn * H, np.nan)
+            cnt = (~np.isnan(Hs)).sum(1)
+            odd += cnt % 2
+            with np.errstate(all="ignore"):
+                m = np.where(cnt % 2 == 1, np.nanmin(np.where(np.isnan(Hs), np.inf, Hs), axis=1), np.inf)
+            better = m < depth
+            depth = np.where(better, m, depth)
+            ax = np.where(better, k, ax)
+    return odd >= 4, depth, ax
+
+
+def mesh_spans(V, T, P, axis, lo):
+    """Per point of P, the spans [(a, b), ...] along one axis where the line through it is inside the mesh: the
+    sorted crossings paired up. Meshes are often open where nobody looks (no bottom under a crate), so an odd
+    number of crossings starts with the mesh's own lower bound lo on that axis."""
+    H = axis_hits(V, T, P + JITTER, axis)
+    out = []
+    for row in H:
+        z = np.unique(np.round(row[~np.isnan(row)], 2))
+        if len(z) % 2:
+            z = np.r_[min(lo, z[0]), z]
+        out.append([(z[i], z[i + 1]) for i in range(0, len(z) - 1, 2)])
+    return out
+
+
+def solid_spans(s, P, axis):
+    """Per point of P, the span along one axis where the line through it is inside convex solid s ([] or [(a, b)])."""
+    n, d = s.planes[:, :3], s.planes[:, 3]
+    Q = P + JITTER
+    base = d[None, :] - Q @ n.T + Q[:, axis][:, None] * n[:, axis][None, :]
+    nk = n[:, axis]
+    out = []
+    for row in base:
+        par = np.abs(nk) < 1e-9
+        if (row[par] < 0).any():
+            out.append([])
+            continue
+        t = row[~par] / nk[~par]
+        up, dn = t[nk[~par] > 0], t[nk[~par] < 0]
+        a, b = (dn.max() if len(dn) else -1e9), (up.min() if len(up) else 1e9)
+        out.append([(a, b)] if b > a else [])
+    return out
+
+
+def ray_points(lo, hi, axis, n=6):
+    """n x n lines along one axis through the box lo..hi (inset half a unit)."""
+    a, b = [i for i in range(3) if i != axis]
+    P = np.zeros((n * n, 3))
+    g = np.meshgrid(np.linspace(lo[a] + 0.5, hi[a] - 0.5, n), np.linspace(lo[b] + 0.5, hi[b] - 0.5, n))
+    P[:, a], P[:, b], P[:, axis] = g[0].ravel(), g[1].ravel(), lo[axis]
+    return P
+
+
+def mesh_tris(mdl: bytes, vvd: bytes, vtx: bytes):
+    """(vertices Nx3, triangles Mx3) of the default body (model 0 of each body part), LOD 0, model space."""
+    V = vvd_verts(vvd)
+    if V is None or not len(V):
+        return None
+    meshes = mdl_meshes(mdl)
+    nbp, bpo = struct.unpack_from("<ii", vtx, 28)
+    for sgsize in (33, 25):
+        tris, good = [], True
+        try:
+            for b in range(nbp):
+                bp = bpo + b * 8
+                nm, mo = struct.unpack_from("<ii", vtx, bp)
+                if nm < 1:
+                    continue
+                mp = bp + mo
+                nl, lo = struct.unpack_from("<ii", vtx, mp)
+                if nl < 1:
+                    continue
+                lp = mp + lo
+                nmesh, mso = struct.unpack_from("<ii", vtx, lp)
+                starts = meshes.get((b, 0), [])
+                for k in range(nmesh):
+                    hp = lp + mso + k * 9
+                    nsg, sgo = struct.unpack_from("<ii", vtx, hp)
+                    base = starts[k] if k < len(starts) else 0
+                    for g in range(nsg):
+                        gp = hp + sgo + g * sgsize
+                        nv, vo, ni, io = struct.unpack_from("<iiii", vtx, gp)
+                        if nv < 0 or ni < 0 or ni % 3:
+                            raise ValueError("strip group")
+                        orig = np.frombuffer(vtx, dtype=VTX_VERT, count=nv, offset=gp + vo)["orig"].astype(np.int64)
+                        idx = np.frombuffer(vtx, dtype=np.uint16, count=ni, offset=gp + io).astype(np.int64)
+                        if len(idx) and idx.max() >= nv:
+                            raise ValueError("index")
+                        tris.append((orig[idx] + base).reshape(-1, 3))
+        except (struct.error, ValueError):
+            good = False
+        if good:
+            T = np.vstack(tris) if tris else np.zeros((0, 3), dtype=np.int64)
+            return V, T[(T < len(V)).all(1)]
+    return None
+
+
 class Content:
     """Files the game can load for this map: the BSP's packed files first, then the game's content directories."""
 
@@ -360,6 +534,11 @@ class Content:
                 res = {"hull_lo": np.array(list(md.hull_min), float), "hull_hi": np.array(list(md.hull_max), float),
                        "pieces": pieces, "static_ok": Flags.static_prop in md.flags and "prop_data" not in (md.keyvalues or ""),
                        "tris": vtx_tris(vt) if vt else None, "materials": mats}
+                vv = files.get(p[:-4] + ".vvd")
+                try:
+                    res["mesh"] = mesh_tris(data, vv, vt) if vv and vt else None
+                except Exception:  # an unreadable mesh only means the visible-mesh checks skip this model
+                    res["mesh"] = None
             except Exception as e:  # a broken model is reported as such, not as a crash
                 res = {"broken": f"{type(e).__name__}: {e}"}
         self._models[p] = res
@@ -452,6 +631,7 @@ class MapData:
                 self.by_name.setdefault(e["targetname"].lower(), []).append(e)
         self.content = Content(self.bsp)
         self._solids = None
+        self._visible = None
         self.notes = []
 
     # -- entities
@@ -580,6 +760,72 @@ class MapData:
             s.group = e
             out.append(s)
         self._solids = out
+        return out
+
+    def visible_models(self):
+        """Every placed model as the player sees it, with or without collision: [{"src", "verts" (world),
+        "tris", "lo", "hi", "solid"}]. Door leaves are left out (D1 measures them)."""
+        if self._visible is not None:
+            return self._visible
+        out = []
+
+        def add(mdl, o, M, src, solid):
+            mi = self.content.model(mdl)
+            if not mi or "broken" in mi or not mi.get("mesh"):
+                return
+            V, T = mi["mesh"]
+            if not len(T):
+                return
+            W = V @ M + o
+            used = W[np.unique(T)]
+            phys = model_box(mi, o, M)[0][2] if solid and mi.get("pieces") else None
+            out.append({"src": src, "verts": W, "tris": T, "lo": used.min(0), "hi": used.max(0), "solid": solid, "phys_lo": phys})
+        for i, p in enumerate(self.bsp.props):
+            o = np.array([p.origin.x, p.origin.y, p.origin.z])
+            add(p.model, o, rot((p.angles.pitch, p.angles.yaw, p.angles.roll)),
+                {"kind": "prop_static", "model": p.model, "index": i, "origin": [round(x, 1) for x in o]}, int(p.solidity) != 0)
+        for e in self.ents:
+            cls, mdl = e["classname"], e["model"]
+            if not mdl.endswith(".mdl") or not cls.startswith("prop_") or cls.startswith("prop_door"):
+                continue
+            o = vec(e["origin"])
+            solid = not (cls.startswith("prop_dynamic") and (e["solid"] == "0" or int(e["spawnflags"] or 0) & 256))
+            add(mdl, o, rot(e["angles"] or "0 0 0"), {"kind": "prop_entity", "entity": cls, "name": e["targetname"], "model": mdl,
+                                                       "hammerid": e["hammerid"], "origin": [round(x, 1) for x in o]}, solid)
+        self._visible = out
+        return out
+
+    def displacements(self):
+        """Displacement surfaces (terrain) as meshes, in the same form as visible_models() (src kind
+        "displacement"): ddispinfo_t gives the start corner, the first vertex and the power; the vertex (x, y) is the
+        face's corner quad interpolated (rows from the start corner along the first edge) plus its offset vector."""
+        from srctools.bsp import BSP_LUMPS
+        di = self.bsp.lumps[BSP_LUMPS.DISPINFO].data
+        dv = np.frombuffer(self.bsp.lumps[BSP_LUMPS.DISP_VERTS].data, dtype=np.float32).reshape(-1, 5)
+        out = []
+        for i in range(len(di) // 176):
+            sx, sy, sz, vs, _, pw = struct.unpack_from("<3fiii", di, i * 176)
+            face, = struct.unpack_from("<H", di, i * 176 + 36)
+            if face >= len(self.bsp.faces):
+                continue
+            C = np.array([[e.a.x, e.a.y, e.a.z] for e in self.bsp.faces[face].edges], float)
+            if len(C) != 4:
+                continue
+            C = np.roll(C, -int(np.argmin(np.linalg.norm(C - [sx, sy, sz], axis=1))), axis=0)
+            n = 2 ** pw + 1
+            t = np.linspace(0, 1, n)
+            Lr = C[0] + (C[1] - C[0]) * t[:, None]
+            Rr = C[3] + (C[2] - C[3]) * t[:, None]
+            base = Lr[:, None, :] + (Rr - Lr)[:, None, :] * t[None, :, None]
+            v = dv[vs:vs + n * n]
+            if len(v) < n * n:
+                continue
+            W = (base.reshape(-1, 3) + v[:, :3] * v[:, 3:4]).astype(float)
+            idx = np.arange(n * n).reshape(n, n)
+            a, b, c, d = idx[:-1, :-1].ravel(), idx[1:, :-1].ravel(), idx[1:, 1:].ravel(), idx[:-1, 1:].ravel()
+            T = np.vstack([np.c_[a, b, c], np.c_[a, c, d]])
+            out.append({"src": {"kind": "displacement", "face": face}, "verts": W, "tris": T, "lo": W.min(0), "hi": W.max(0),
+                        "solid": True, "terrain": True})
         return out
 
     # -- faces with their outward normal and texture axes

@@ -23,6 +23,9 @@ from pathlib import Path
 TABLE = "models/props_interiors/table_cafeteria.mdl"   # collision 54 x 54 x 36, origin on the floor
 CHAIR = "models/props_furniture/hotel_chair.mdl"       # collision 28 x 17 x 43
 CRATE = "models/props_crates/static_crate_40.mdl"  # 42 x 42 x 42, static
+SHELF = "models/props/cs_office/shelves_metal.mdl"  # visible boards' tops at z 5, 31, 57, 79; footprint x ±14, y ±32
+PARCEL = "models/props/cs_office/cardboard_box01.mdl"  # visible mesh x, y ±12.5, z 0..19.3
+DESK = "models/props_interiors/desk_metal.mdl"   # collision bottom 6.8 above the visible mesh's bottom
 DOOR = "models/props_doors/checkpoint_door_01.mdl"     # leaf 60 wide (y 0..60 when closed), hinge at origin, 105 tall centred
 SIGN = "signs/hotel_sign003"                           # 512 x 512, text
 
@@ -210,6 +213,27 @@ def floating_and_sunk(m):
     m.ent("prop_static", model=CRATE, origin="80 600 40", angles="0 0 0", solid="6")
 
 
+def shelf_removed(m):
+    """A parcel without collision (prop_dynamic, solid 0) left at shelf height after the shelf was taken out."""
+    m.ent("prop_dynamic", model=PARCEL, origin="400 600 31", angles="0 0 0", solid="0")
+
+
+def parcel_between_boards(m):
+    """A shelf and a parcel placed at a hand-written height between its boards: the board at 31 passes through it."""
+    m.ent("prop_static", model=SHELF, origin="400 600 0", angles="0 0 0", solid="6")
+    m.ent("prop_dynamic", model=PARCEL, origin="400 600 15", angles="0 0 0", solid="0")
+
+
+def mesh_sunk(m):
+    """A desk whose collision bottom rests on the floor while its visible legs are 6.8 units into it."""
+    m.ent("prop_static", model=DESK, origin="400 600 -6.8", angles="0 0 0", solid="6")
+
+
+def decoration_in_crate(m):
+    """A parcel without collision pushed 10 units into the side of a crate."""
+    m.ent("prop_dynamic", model=PARCEL, origin="62 40 0", angles="0 0 0", solid="0")
+
+
 def self_changelevel(m):
     for e in list(m.v.entities):
         if e["classname"] in ("trigger_finale",) or e["targetname"] == "end_room":
@@ -294,6 +318,10 @@ SAMPLES = [
     ("sliver", "细刺刷子：vbsp 吸附后无界，游戏拒绝加载", sliver, ["C2"]),
     ("stacked_furniture", "室内摆件互相穿插（桌子叠在桌子上）", stacked_furniture, ["P1"]),
     ("floating", "箱子悬空", floating_and_sunk, ["P3"]),
+    ("shelf_removed", "货架删了，不做碰撞的包裹还留在原来的高度", shelf_removed, ["P4"]),
+    ("parcel_between_boards", "包裹按手写高度放在两层层板之间，层板穿过包裹", parcel_between_boards, ["P4"]),
+    ("mesh_sunk", "碰撞底面贴地，看得见的模型陷进地面", mesh_sunk, ["P4"]),
+    ("decoration_in_crate", "不做碰撞的装饰插进旁边的箱子", decoration_in_crate, ["P5"]),
     ("self_changelevel", "换关指回本图", self_changelevel, ["V1"]),
     ("early_event", "一次性输出被提前消耗（事件被别的东西先触发）", early_event, ["L4"]),
     ("bad_io", "输入名写错、目标不存在", bad_io, ["L1", "L2"]),

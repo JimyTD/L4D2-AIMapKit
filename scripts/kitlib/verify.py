@@ -90,6 +90,8 @@ for _cid, _g, _t in [
     ("T1", "text", "文字不镜像"), ("T2", "text", "文字不超出承载面、不重复、不被截断"),
     ("M1", "models", "模型三角面数在档位内"), ("M2", "models", "贴图不拉伸"),
     ("P1", "placement", "模型和模型不相交"), ("P2", "placement", "模型不穿进墙和地面"), ("P3", "placement", "模型不悬空"),
+    ("P4", "placement", "看得见的模型落在承载面上：不悬空、不陷进地面台面、层板不穿过它（有没有碰撞都查）"),
+    ("P5", "placement", "不做碰撞的装饰模型不和别的模型、墙穿插"),
     ("G1", "light", "跑过 vrad，补丁数在上限内"), ("G2", "light", "路线上光源间距不超标，事件触发物附近有光"),
     ("G3", "light", "光源附近有灯具（没有有光没灯）"), ("G4", "light", "有音景"),
     ("X1", "vis", "跑过 vvis，可见比例在上限内"),
@@ -1728,6 +1730,186 @@ def touches_wall(ss, g_brush):
     return False
 
 
+def check_visible(c, md, design):
+    """P4, P5 on what the player sees: every model's render mesh (with or without collision) against the visible
+    brushes, the terrain (displacements) and the other models' render meshes. Measured along lines through the
+    model: where a line is inside a mesh is its crossings paired up (vmap.mesh_spans)."""
+    import vmap
+    rep = c.rep
+    snap = float(c.dec("ground_snap_tol_u"))
+    pen_max = float(c.dec("model_overlap_max_u"))
+    wall_max = float(c.dec("model_brush_intersect_max_u"))
+    hang = [p.lower() for p in c.dec("hanging_models")]
+    vis = md.visible_models()
+    terrain = md.displacements()
+    # brushes the player sees: a brush with tool textures (nodraw, clip, trigger ...) on every face is not a surface
+    brushes = [s for s in md.solids() if s.src.get("kind") in ("brush", "brush_entity") and s.contents & vmap.C_SOLID
+               and not (s.src.get("materials") and all(str(t).lower().startswith("tools/") for t in s.src["materials"]))]
+    g_brush = vmap.Grid(brushes, 256)
+    meshes = vis + terrain
+    g_mesh = vmap.Grid([vmap.Solid(vmap.axial(m["lo"], m["hi"]), m["lo"], m["hi"], 0, m["src"]) for m in meshes], 128)
+    rep.ran("P4", len(vis))
+    rep.ran("P5", sum(1 for m in vis if not m["solid"]))
+    here = lambda p: design.locate(p) if design else None  # noqa: E731
+    is_brush = lambda x: isinstance(x, vmap.Solid)  # noqa: E731
+    box = lambda x: (x.lo, x.hi) if is_brush(x) else (x["lo"], x["hi"])  # noqa: E731
+
+    def label(x):
+        return "结构" if is_brush(x) else "地形" if x.get("terrain") else str(x["src"].get("model"))
+
+    def ref(x):
+        return solid_ref(x) if is_brush(x) else {k: v for k, v in x["src"].items() if v not in (None, "", [])}
+
+    def near(i, lo, hi):
+        return g_brush.query(lo, hi) + [meshes[b.idx] for b in g_mesh.query(lo, hi) if b.idx != i]
+
+    def spans(x, P, axis):
+        if is_brush(x):
+            return vmap.solid_spans(x, P, axis)
+        pad = np.array([1e5 if k == axis else 1.0 for k in range(3)])
+        T = vmap.near_tris(x["verts"], x["tris"], P.min(0) - pad, P.max(0) + pad)
+        return vmap.mesh_spans(x["verts"], T, P, axis, x["lo"][axis])
+
+    def bottom_points(m):
+        V = m["verts"]
+        used = V[np.unique(m["tris"])]
+        bot = used[used[:, 2] <= m["lo"][2] + 1]
+        if len(bot) > 48:
+            bot = bot[np.linspace(0, len(bot) - 1, 48).astype(int)]
+        B = bot.copy()
+        B[:, :2] += np.sign(used[:, :2].mean(0) - B[:, :2]) * 0.5  # just inside the model's own bottom edge
+        return B
+
+    def on_support(i, m):
+        """(problem, support, depth) for P4 or None."""
+        lo, hi = m["lo"], m["hi"]
+        z0, height = lo[2], hi[2] - lo[2]
+        small = (hi - lo).max() < 48
+        B = bottom_points(m)
+        cands = near(i, np.r_[lo[:2] - 1, z0 - 512], np.r_[hi[:2] + 1, hi[2]])
+        rest, sunk, held = [], [], False
+        for x in cands:
+            for k, sp in enumerate(spans(x, B, 2)):
+                for a, b in sp:
+                    if b <= z0 + snap:
+                        rest.append(b)
+                    elif a <= z0 + snap and (is_brush(x) or x["solid"]):
+                        held = True  # its bottom is in something: set into the ground, or sunk (below)
+                        if b - z0 <= height / 2:
+                            sunk.append((b - z0, k, x))  # in a floor, a top or a terrain, not beside a wall
+        # planted on purpose (trees, posts, fences set into the ground, as the original maps do) is not sunk; sunk is
+        # a model standing on its collision while its visible bottom is below the surface, or a small item set into a
+        # piece of furniture
+        bad = [t for t in sunk if (m["phys_lo"] is not None and m["phys_lo"] >= z0 + t[0] - snap)
+               or (small and not is_brush(t[2]) and not t[2].get("terrain"))]
+        if bad and len({k for _, k, _ in bad}) * 4 > len(B):
+            d, _, x = max(bad, key=lambda t: t[0])
+            return (f"{m['src'].get('model')} 看得见的底面陷进{label(x)} {d:.0f} 单位（容许 {snap:.0f}）",
+                    "看起来半截埋进地面或台面；碰撞体贴着地面不等于看得见的模型也在地面上。",
+                    "按看得见的模型底面把它抬到承载面上（碰撞体底面比网格底面高的模型，按网格算高度）。"), x, d
+        model = (m["src"].get("model") or "").lower()
+        if not held and not any(fnmatch.fnmatch(model, pat) for pat in hang):
+            best = max(rest) if rest else None
+            gap = z0 - best if best is not None else None
+            if (gap is None or gap > snap) and not mounted(m, g_brush):
+                return ((f"{m['src'].get('model')} 悬空：看得见的底面比下面的地面、台面、层板高 {gap:.0f} 单位（容许 {snap:.0f}）" if gap is not None else
+                         f"{m['src'].get('model')} 下面 512 单位内没有承载面"),
+                        "悬空的东西一眼就假；没有碰撞的装饰也一样看得见。常见原因：支撑它的家具被删了它还在，或高度是手写的、没按支撑物的层板算。",
+                        "按支撑物看得见的层板、台面顶面定高度（G6 第 6 条）；支撑物删了就一起删；挂墙、吊顶的写进 hanging_models。"), None, gap
+        # a board, a shelf or a table top through a small item's body: a horizontal slab of something else that lies
+        # wholly inside the item's height on a quarter of the lines through it at least
+        if not small:
+            return None
+        P = vmap.ray_points(lo, hi, 2)
+        own = spans(m, P, 2)
+        body = max(1, sum(1 for sp in own if sp))
+        for x in cands:
+            if not is_brush(x) and x.get("terrain"):
+                continue
+            hit, lines = None, 0
+            for k, sp in enumerate(spans(x, P, 2)):
+                found = False
+                for a, b in sp:
+                    if b - a >= 0.25 and a > z0 + snap and any(a > oa + 1 and b < ob - 1 for oa, ob in own[k]):
+                        hit, found = (a, b), True
+                lines += found
+            if hit and lines * 4 >= body:
+                a, b = hit
+                return (f"{label(x)} 在 z {a:.0f}–{b:.0f} 横穿 {m['src'].get('model')}",
+                        "层板、台面从东西的身体中间穿过去：东西放在了两层层板之间，或支撑物挪了它没跟着挪。",
+                        "把它放到支撑物某一层看得见的顶面上（G6 第 6 条），XY 跟着支撑物的位置和朝向走。"), x, b - a
+        return None
+
+    def clipping(i, m):
+        """[(other, depth)] for P5: a decoration without collision side by side in a wall or in a model with collision.
+        Depth along each axis is the longest stretch of a line inside both; the clip depth is the smallest of the three
+        (how far they would have to move apart). Shallowest upward is resting or sinking, which P4 measures."""
+        lo, hi = m["lo"], m["hi"]
+        out = []
+        for x in near(i, lo - 1, hi + 1):
+            if not is_brush(x) and (not x["solid"] or x.get("terrain")):
+                continue  # decorations among themselves (foliage clumps, fence runs) overlap by design; terrain is P4's
+            xl, xh = box(x)
+            ilo, ihi = np.maximum(lo, xl), np.minimum(hi, xh)
+            if (ihi - ilo <= 0.5).any():
+                continue
+            if is_brush(x):
+                # the original maps set debris and pipes a little into walls and hang door and window frames across
+                # them; what is wrong is a thing whose middle is in the wall
+                ctr = (lo + hi) / 2
+                if not vmap.point_in(ctr[None, :], x, 0.5)[0]:
+                    continue
+                ax = int(np.argmin(xh - xl))
+                out.append((x, float(min(hi[ax], xh[ax]) - max(lo[ax], xl[ax])), ctr))
+                continue
+            depth = []
+            for axis in range(3):
+                P = vmap.ray_points(ilo, ihi, axis, 5)
+                best = 0.0
+                for sa, sb in zip(spans(m, P, axis), spans(x, P, axis)):
+                    for a, b in sa:
+                        for e, f in sb:
+                            best = max(best, min(b, f) - max(a, e))
+                depth.append(best)
+            d = min(depth)
+            if d > pen_max and int(np.argmin(depth)) != 2:
+                out.append((x, d, (ilo + ihi) / 2))
+        return out
+
+    for i, m in enumerate(vis):
+        size = m["hi"] - m["lo"]
+        if size.max() > 1024 or size.min() < 0.5:
+            continue  # whole buildings and flat cards are structure, not things set on a surface
+        r = on_support(i, m)
+        if r is not None:
+            (what, why, fix), x, d = r
+            p = np.array([(m["lo"][0] + m["hi"][0]) / 2, (m["lo"][1] + m["hi"][1]) / 2, m["lo"][2]])
+            ent = {"model": ref(m)} if x is None else {"model": ref(m), "support": ref(x)}
+            rep.add("P4", what, why, fix, key=here(p), where=p, entity=ent, extra={"depth": round(float(d), 1) if d is not None else None})
+        if m["solid"]:
+            continue
+        for x, d, p in clipping(i, m):
+            lim = wall_max if is_brush(x) else pen_max
+            rep.add("P5", (f"不做碰撞的 {m['src'].get('model')} 的中心在墙或结构里（插进 {d:.0f} 单位）" if is_brush(x) else
+                           f"不做碰撞的 {m['src'].get('model')} 插进 {label(x)} {d:.0f} 单位（容许 {lim:.0f}）"),
+                    "没有碰撞只是玩家穿得过去，看起来照样穿模。", "按看得见的模型挪开：贴墙摆的背面贴着墙面，放在家具旁的不插进家具。",
+                    key=here(p), where=p, entity={"model": ref(m), "other": ref(x)}, extra={"depth": round(float(d), 1)})
+
+
+def mounted(m, g_brush):
+    """Hung on a wall or a ceiling, by the visible mesh's box: a brush beside it (not under it) within 2 units, the
+    rule P3 uses, or a brush right above its top."""
+    import vmap
+    lo, hi = m["lo"], m["hi"]
+    box = vmap.Solid(vmap.axial(lo, hi), lo, hi, 0, m["src"])
+    for b in g_brush.query(lo - 2, hi + 2):
+        if vmap.overlap(box, b)[0] <= -2:
+            continue
+        if (b.hi[2] > lo[2] + 4 and b.lo[2] < hi[2] - 4) or abs(b.lo[2] - hi[2]) <= 2:
+            return True
+    return False
+
+
 # ---------------------------------------------------------------- light, sound, vis
 
 def check_light(c, md, design, runs):
@@ -1887,6 +2069,7 @@ def run(level, a) -> int:
         check_models(c, md, design)
     if "placement" in groups:
         check_placement(c, md, design)
+        check_visible(c, md, design)
     if "light" in groups:
         check_light(c, md, design, runs)
     if "vis" in groups:
