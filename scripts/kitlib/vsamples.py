@@ -151,7 +151,13 @@ def design(level_dir: Path, level: int = 1):
             "cores": [], "objects": [], "route": {"path": [], "must_reach": [], "must_not_reach": []}}}],
         "areas": [{"id": "yard", "data": {
             "id": "yard", "area": [[0, 0], to_m(1536, 0), to_m(1536, 768), to_m(0, 768)],
-            "ground": [{"id": "G1", "surface": "road", "elev_m": 0, "polys": [[[0, 0], to_m(1536, 0), to_m(1536, 768), to_m(0, 768)]]}],
+                "ground": [
+                    {"id": "G1", "surface": "road", "elev_m": 0,
+                     "polys": [{"shell": [[0, 0], to_m(1536, 0), to_m(1536, 768), to_m(0, 768)],
+                                "holes": [[to_m(1100, 48), to_m(1300, 48), to_m(1300, 200), to_m(1100, 200)]]}]},
+                    {"id": "G2", "surface": "pond", "elev_m": 0,
+                     "polys": [[to_m(1100, 48), to_m(1300, 48), to_m(1300, 200), to_m(1100, 200)]]},
+                ],
             "route": {"main": [to_m(128, 384), to_m(600, 384), to_m(720, 384), to_m(1408, 384)], "alts": [],
                       "must_reach": {"墙后": to_m(1000, 200)}, "must_not_reach": {}},
             "objects": [{"id": "o_btn", "kind": "button", "at": to_m(WALL_X0 - 2, 300), "z_m": round(56 * U, 3), "fires": ["ev_btn"],
@@ -378,6 +384,32 @@ def missing_supply(m):
     m.v.entities[:] = [e for e in m.v.entities if e["classname"] != "weapon_spawn"]
 
 
+def hazard_missing_trigger(m):
+    """Marker only: pond G2 is marked lethal (hazard) in ground_types, with no trigger_hurt above it."""
+
+
+def hazard_half_covered(m):
+    """A trigger_hurt (damage 500, damagetype 16384) covers only the west half of pond G2."""
+    th = m.ent("trigger_hurt", targetname="pond_hurt", damage="500", damagecap="500", damagetype="16384",
+               damagemodel="0", spawnflags="3")
+    m.box((1100, 48, 0), (1200, 200, 64), mat="tools/toolstrigger", ent=th)
+
+
+def hazard_covered(m):
+    """A trigger_hurt (damage 500, damagetype 16384) covers all of pond G2."""
+    th = m.ent("trigger_hurt", targetname="pond_hurt", damage="500", damagecap="500", damagetype="16384",
+               damagemodel="0", spawnflags="3")
+    m.box((1100, 48, 0), (1300, 200, 64), mat="tools/toolstrigger", ent=th)
+
+
+_HAZARD_GROUND_TYPES = json.dumps([
+    {"id": "road", "walkable": True, "elev_m": 0},
+    {"id": "grass", "walkable": True, "elev_m": 0},
+    {"id": "pond", "walkable": False, "elev_m": -0.5, "move": 0.6,
+     "hazard": {"trigger": "trigger_hurt", "damage": 500, "damagetype": 16384}},
+], ensure_ascii=False)
+
+
 SAMPLES = [
     ("narrow_door", "门被砌窄过不去（门洞按小门扇补墙垛）", narrow_door, ["D1"]),
     ("mirrored_sign", "门牌文字镜像", mirrored_sign, ["T1"]),
@@ -414,10 +446,13 @@ SAMPLES = [
     ("fast_called_full", "快速编译的图当完整编译交", fast_called_full, ["C6"]),
     ("quick_pending", "（不报 G1、X1）快速档上补丁数、可见比例待完整编译", quick_pending, []),
     ("missing_supply", "设计写了起点安全屋主武器，地图里没放对应的武器刷点", missing_supply, ["S1"]),
+    ("hazard_missing_trigger", "致死深水区上方缺 trigger_hurt", hazard_missing_trigger, ["H1"]),
+    ("hazard_half_covered", "致死深水区上方 trigger_hurt 只盖了一半", hazard_half_covered, ["H1"]),
+    ("hazard_covered", "（应通过）致死深水区上方 trigger_hurt 盖满且伤害参数一致", hazard_covered, []),
 ]
 
 # samples that must pass every check (a change that must not be reported)
-MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick"}
+MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick", "hazard_covered"}
 
 # samples run with their own kit verify arguments instead of --step G6; "warn": the named checks count as found
 # when they warn; "absent": checks that must not report anything; "compile": run vvis and vrad after vbsp
@@ -434,6 +469,9 @@ RUN = {
     "quick_pending": {"args": ["--step", "G7", "--only", "light,vis", "--set", "vrad_patch_max=1", "--set", "vis_ratio_max=0.01"],
                       "compile": "quick", "absent": ["G1", "X1"], "pending": ["G1", "X1"]},
     "missing_supply": {"args": ["--step", "G4"]},
+    "hazard_missing_trigger": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
+    "hazard_half_covered": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
+    "hazard_covered": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
 }
 
 

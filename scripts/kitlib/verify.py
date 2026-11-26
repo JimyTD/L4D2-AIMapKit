@@ -41,7 +41,7 @@ EPS_W = 0.05
 
 # step -> groups it adds (each step re-runs the groups of the steps before it)
 STEP_GROUPS = [("G3", ["fresh", "compile", "walk", "doors"]),
-               ("G4", ["logic", "level", "interact", "entities", "supply"]),
+               ("G4", ["logic", "level", "interact", "entities", "supply", "hazard"]),
                ("G5", ["resources", "text", "models", "looks"]),
                ("G6", ["placement", "dressing"]),
                ("G7", ["light", "vis"]),
@@ -94,6 +94,7 @@ for _cid, _g, _t in [
     ("L6", "logic", "用到的实体类型原版战役用过"),
     ("E1", "entities", "设计里的玩法实体在地图里是对应的类型（会动、有碰撞）"), ("E2", "entities", "载具沿设计路线走"),
     ("S1", "supply", "设计里写的基础补给点位（种类和数量）在地图里有对应刷点"),
+    ("H1", "hazard", "标为致死的地面上方被对应的伤害触发区盖满"),
     ("V1", "level", "换关不指回本图，两边 landmark 同名都在"), ("V2", "level", "已做出的最后一关是临时终局"),
     ("R1", "resources", "没有缺失或 0 字节的资源"), ("R2", "resources", "自制贴图是 VTF 7.4、尺寸是 2 的幂"),
     ("T1", "text", "文字不镜像"), ("T2", "text", "文字不超出承载面、不重复、不被截断"),
@@ -1751,6 +1752,104 @@ def check_supply(c, md, design):
                     f"在设计点位 {r_u:.0f} u 内放齐对应类名的补给实体并设好 count（当前附近：{found}）。", key=key, where=p)
 
 
+def check_hazard(c, md, design):
+    """H1: ground zones whose ground_types entry declares hazard must be covered from above by matching trigger_hurt
+    (or declared trigger) brush entities with matching damage and damagetype."""
+    from shapely.geometry import MultiPoint, Polygon
+    from shapely.ops import unary_union
+    rep = c.rep
+    if not design:
+        return
+    surfaces = {g["id"]: g for g in c.dec("ground_types")}
+    hazards = {k: v["hazard"] for k, v in surfaces.items() if isinstance(v.get("hazard"), dict)}
+    if not hazards:
+        return
+    U = 1.0 / 0.0254
+    ox, oy, g0 = design.ox, design.oy, design.ground0
+
+    def to_h_poly(p):
+        def ring_h(pts):
+            return [((x - ox) * U, (y - oy) * U) for x, y in pts]
+        if isinstance(p, dict):
+            return Polygon(ring_h(p["shell"]), [ring_h(h) for h in p.get("holes", [])])
+        return Polygon(ring_h(p))
+
+    trig_cache = {}
+
+    def triggers_for(trig_cls):
+        k = trig_cls.lower()
+        if k not in trig_cache:
+            items = []
+            for ent, sols in md.entity_solids(k):
+                if str(ent["StartDisabled"] or "0") == "1":
+                    continue
+                polys = []
+                for s in sols:
+                    pts2d = s.vertices()[:, :2]
+                    if len(pts2d) >= 3:
+                        hp = MultiPoint(pts2d).convex_hull
+                        if hp.is_valid and hp.area > 0:
+                            polys.append((hp, float(s.lo[2]), float(s.hi[2])))
+                if polys:
+                    try:
+                        dmg = float(ent["damage"] or 0)
+                    except ValueError:
+                        dmg = 0.0
+                    try:
+                        dt = int(ent["damagetype"] or 0)
+                    except ValueError:
+                        dt = 0
+                    items.append((ent, dmg, dt, polys))
+            trig_cache[k] = items
+        return trig_cache[k]
+
+    for aid, a in design.areas.items():
+        for gz in a["data"].get("ground", []):
+            surf = gz.get("surface")
+            hz = hazards.get(surf)
+            if not hz:
+                continue
+            rep.ran("H1")
+            g_poly = unary_union([to_h_poly(p) for p in gz.get("polys", [])])
+            if not g_poly.is_valid or g_poly.area <= 0:
+                continue
+            elev_m = gz.get("elev_m")
+            if elev_m is None:
+                elev_m = surfaces[surf].get("elev_m", g0)
+            z_u = float(elev_m or 0) * U
+            trig_cls = str(hz.get("trigger") or "trigger_hurt")
+            want_dmg = float(hz.get("damage") or 0)
+            want_dt = hz.get("damagetype")
+            key = f"{aid}/ground/-/{gz['id']}"
+            matched_polys = []
+            for ent, dmg, dt, polys in triggers_for(trig_cls):
+                if want_dmg and dmg < want_dmg:
+                    continue
+                if want_dt is not None and dt != int(want_dt):
+                    continue
+                for hp, lo_z, hi_z in polys:
+                    if hi_z > z_u + 4.0 and lo_z <= z_u + 36.0:
+                        matched_polys.append(hp)
+            if not matched_polys:
+                rp = g_poly.representative_point()
+                rep.add("H1",
+                        f"{key}（致死地面 {surf}）上方没有匹配的 {trig_cls}（要求 damage ≥ {want_dmg:g}、damagetype {want_dt}）",
+                        "设计标为致死的地面如果没放对应伤害触发区，玩家掉进去死不了，卡死或脱出。",
+                        f"在 {gz['id']} 上方盖满 {trig_cls}（damage {want_dmg:g}、damagetype {want_dt}；原版参考 c3m1_plankcountry 的 death_trigger）。",
+                        key=key, where=[rp.x, rp.y, z_u])
+                continue
+            cov_union = unary_union(matched_polys)
+            cov = g_poly.intersection(cov_union).area / g_poly.area
+            if cov < 0.98:
+                gap = g_poly.difference(cov_union)
+                rp = gap.representative_point() if not gap.is_empty else g_poly.representative_point()
+                rep.add("H1",
+                        f"{key}（致死地面 {surf}）上方 {trig_cls} 只覆盖了 {cov:.0%}，还有未覆盖区域",
+                        "伤害触发区只盖了一部分时，玩家落到未覆盖的角落不会受伤。",
+                        f"把 {trig_cls} 的笔刷扩大到完全盖满 {gz['id']}（≥ 98%，当前缺口附近坐标已标出）。",
+                        key=key, where=[rp.x, rp.y, z_u])
+
+
 def check_level(c, md, design):
     from srctools.bsp import BSP
     rep = c.rep
@@ -2334,6 +2433,8 @@ def run(level, a) -> int:
         check_entities(c, md, design)
     if "supply" in groups:
         check_supply(c, md, design)
+    if "hazard" in groups:
+        check_hazard(c, md, design)
     if "level" in groups:
         check_level(c, md, design)
     if "resources" in groups:

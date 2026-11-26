@@ -22,7 +22,7 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--build quick|full] [--only 组,
 
 - 默认找 `build/L<nn>/` 里唯一的 BSP，VMF、日志和它同名（`.vmf`、`.log`；日志是 vbsp、vvis、vrad 的输出按顺序追加的那一份）。
 - `--step` 跑到哪一步为止的全部检查（每一步都把前面步骤的检查重跑一遍）：G3 新旧、编译、走路、门；G4 加接线、换关、互动、玩法实体；G5 加资源、文字、模型和贴图、外观；G6 加摆放、摆件；G7 加光照、音景、可见性；G9 全部。
-- `--step` 跑到哪一步为止的全部检查（每一步都把前面步骤的检查重跑一遍）：G3 新旧、编译、走路、门；G4 加接线、补给、换关、互动、玩法实体；G5 加资源、文字、模型和贴图、外观；G6 加摆放、摆件；G7 加光照、音景、可见性；G9 全部。
+- `--step` 跑到哪一步为止的全部检查（每一步都把前面步骤的检查重跑一遍）：G3 新旧、编译、走路、门；G4 加接线、补给、致死地面、换关、互动、玩法实体；G5 加资源、文字、模型和贴图、外观；G6 加摆放、摆件；G7 加光照、音景、可见性；G9 全部。
 - `--build` 说明这张图是快速编译还是完整编译，不写时按日志判断（见下面“快速档和完整编译”）。
 - 结果写进固定文件 `work/L<nn>/verify.json`（机器读）和 `work/L<nn>/VERIFY.md`（人读），每次覆盖。退出码 0 是通过，1 是有错误。
 - 生成器在哪写在 `kit.local.json`，公共部分和每关自己的部分分开写：`"verify": {"generator": {"common": ["<公共部分的目录或文件>"], "levels": {"L01": ["<只给 L01 用的文件>"], "L02": […]}}}`（路径相对项目根）。只写一个列表的，整份算公共部分。
@@ -116,6 +116,10 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--build quick|full] [--only 组,
 ### 补给（supply，G4 起）
 
 - **S1 设计里写的基础补给点位在地图里有对应刷点**：`spec.json` 里每个 `item_spawn` 物件附近 `supply_match_r_u` 内有对应类名的补给实体（`weapon_*_spawn`、`weapon_spawn`、`weapon_item_spawn` 等），且实体 `count` 之和不少于设计数量。设计层面的安全屋和大事件前下限（`supply_base`）由 `kit spec` 核验。
+
+### 致死地面（hazard，G4 起）
+
+- **H1 标为致死的地面上方被对应的伤害触发区盖满**：`decisions.json` 的 `ground_types` 里写了 `hazard`（`trigger`、`damage`、`damagetype`）的地面类型，设计里对应的每个地面分区上方都必须被未禁用的对应伤害触发区（如 `trigger_hurt`，且 `damage` 和 `damagetype` 符合设定）覆盖满（≥ 98%）。原版参考：`c3m1_plankcountry` 的 `death_trigger`（`damage 500`、`damagetype 16384`、`spawnflags 3`）。
 
 ### 资源（resources，G5 起）
 

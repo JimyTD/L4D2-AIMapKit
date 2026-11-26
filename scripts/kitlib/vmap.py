@@ -762,6 +762,34 @@ class MapData:
         self._solids = out
         return out
 
+    def entity_solids(self, classname: str):
+        """Brush solids of all entities with the given classname (including non-solid triggers), as [(ent, [Solid, ...])]."""
+        from srctools.bsp import VisLeaf
+        want = classname.lower()
+        out = []
+        for ent, bm in self.bsp.bmodels.items():
+            if ent is self.bsp.ents.spawn or ent["classname"].lower() != want:
+                continue
+            st, brs = [bm.node], {}
+            while st:
+                x = st.pop()
+                if isinstance(x, VisLeaf):
+                    for br in x.brushes:
+                        brs[id(br)] = br
+                else:
+                    st += [x.child_neg, x.child_pos]
+            o, M = vec(ent["origin"]), rot(ent["angles"] or "0 0 0")
+            sols = []
+            for br in brs.values():
+                s = self._brush_solid(br, {"kind": "brush_entity", "entity": ent["classname"], "name": ent["targetname"],
+                                           "hammerid": ent["hammerid"], "origin": [round(x, 1) for x in o]}, M, o)
+                if s is not None:
+                    s.group = ent
+                    sols.append(s)
+            if sols:
+                out.append((ent, sols))
+        return out
+
     def visible_models(self):
         """Every placed model as the player sees it, with or without collision: [{"src", "verts" (world),
         "tris", "lo", "hi", "solid"}]. Door leaves are left out (D1 measures them)."""

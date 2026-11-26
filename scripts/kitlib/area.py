@@ -250,6 +250,23 @@ def check(spec, world, dec, srcs, plan_level):
         ok("边界", "主路线终点刚出出口（3 m 内）", any(LineString([s["from"], s["to"]]).distance(Point(spec["route"]["main"][-1])) <= 3.0 for s in exits))
 
     # ---- ground ----
+    for gdef in need("ground_types"):
+        mv = gdef.get("move")
+        if mv is not None:
+            mv_ok = (isinstance(mv, (int, float)) and 0 < mv <= 1) or (
+                isinstance(mv, dict) and isinstance(mv.get("factor"), (int, float)) and 0 < mv["factor"] <= 1
+            )
+            ok("地面", f"地面类型 {gdef['id']} move 写法合法（0 < 倍率 ≤ 1）", mv_ok, str(mv))
+        hz = gdef.get("hazard")
+        if hz is not None:
+            hz_ok = (
+                isinstance(hz, dict)
+                and isinstance(hz.get("trigger"), str) and hz["trigger"].startswith("trigger_")
+                and isinstance(hz.get("damage"), (int, float)) and hz["damage"] > 0
+                and isinstance(hz.get("damagetype"), int)
+            )
+            ok("地面", f"地面类型 {gdef['id']} hazard 写法合法（trigger、damage > 0、damagetype）", hz_ok,
+               json.dumps(hz, ensure_ascii=False))
     footprints = unary_union([b.geom for b in world.buildings if b.geom.geom_type == "Polygon" and b.geom.intersects(area)])
     open_ground = area.difference(footprints)
     gpolys = []

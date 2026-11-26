@@ -5,7 +5,7 @@
 ## 做
 
 1. **尺度目标**：用 `kit game measure <原版地图> <笔刷实体类名或模型路径>` 量原版地图的同类空间，包括走廊、门、楼梯、层高、封路高度。量完写进待决定列表里 `step: "D0"` 的项，依据写进 `why`（如 `game:c1m1_hotel ...`），标“暂定”。最低值只给有意做窄的地方用，常规空间按量到的目标做。用法见 [tools.md](../tools.md)。
-2. **地面类型清单** `ground_types`：这张地图用哪几种地面，每种写 `id`、能不能走（`walkable`）、默认标高。
+2. **地面类型清单** `ground_types`：这张地图用哪几种地面，每种写 `id`、能不能走（`walkable`）、默认标高，以及可选的减速（`move`：移速倍率）和致死（`hazard`：`{"trigger": "trigger_hurt", "damage", "damagetype"}`；原版深水致死参考 `c3m1_plankcountry` 的 `death_trigger`，damage 500、damagetype 16384）。
 3. **共享结构体**：`kit status` 按规划数据自动列出多关都用到的结构体（衔接安全屋、多关都穿过的），以及“谁先用到谁写”。写入关写外壳和它自己用到的部分；后一关不改写入关的文件，要走得更深就在自己关里写扩展文件（[format/structure.md](../format/structure.md) 的“扩展文件”）。照它的结果写进 `PROJECT.md` 的“共享结构体”。
 4. **并行主线**：同时开发几关在 P0 已经问过（`kit.local.json` 的 `max_parallel_lines`）。每关的设计线分三段，第一批设计① 由总控开，在 `PROJECT.md` 的“主线分工”登记每一关现在第几段、归哪个会话。分段、接力和开会话的规则见 [sessions.md](../sessions.md)。
 

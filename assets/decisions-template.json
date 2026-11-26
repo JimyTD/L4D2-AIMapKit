@@ -168,7 +168,7 @@
    "unit": "",
    "status": "暂定",
    "step": "D0",
-   "hint": "本项目的地面类型清单 [{\"id\", \"name\", \"walkable\": true|false, \"elev_m\"}]。例：城市有车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石"
+  "hint": "本项目的地面类型清单 [{\"id\", \"name\", \"walkable\": true|false, \"elev_m\", 可选 \"move\": 移速倍率(0~1), 可选 \"hazard\": {\"trigger\": \"trigger_hurt\", \"damage\": 500, \"damagetype\": 16384}}]。例：城市有车行路、铺装、草地、树池、水面；雪山可能是雪、冰、岩石"
   },
   {
    "id": "strength_table",
