@@ -21,7 +21,7 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--build quick|full] [--only 组,
 ```
 
 - 默认找 `build/L<nn>/` 里唯一的 BSP，VMF、日志和它同名（`.vmf`、`.log`；日志是 vbsp、vvis、vrad 的输出按顺序追加的那一份）。
-- `--step` 跑到哪一步为止的全部检查（每一步都把前面步骤的检查重跑一遍）：G3 新旧、编译、设计几何一致性、走路、门；G4 加接线、补给、致死地面、换关、互动、玩法实体；G5 加资源、文字、模型和贴图、外观；G6 加摆放、摆件；G7 加光照、音景、可见性；G9 全部。
+- `--step` 跑到哪一步为止的全部检查（每一步都把前面步骤的检查重跑一遍）：G3 新旧、编译、`.prt` 可见性代价预警、设计几何一致性、走路、门；G4 加接线、补给、致死地面、换关、互动、玩法实体；G5 加资源、文字、模型和贴图、外观；G6 加摆放、摆件；G7 加光照、音景、可见性；G9 全部。
 - `--build` 说明这张图是快速编译还是完整编译，不写时按日志判断（见下面“快速档和完整编译”）。
 - 结果写进固定文件 `work/L<nn>/verify.json`（机器读）和 `work/L<nn>/VERIFY.md`（人读），每次覆盖。退出码 0 是通过，1 是有错误。
 - 生成器在哪写在 `kit.local.json`，公共部分和每关自己的部分分开写：`"verify": {"generator": {"common": ["<公共部分的目录或文件>"], "levels": {"L01": ["<只给 L01 用的文件>"], "L02": […]}}}`（路径相对项目根）。只写一个列表的，整份算公共部分。
@@ -35,6 +35,7 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--build quick|full] [--only 组,
 - **先快速档**：G3–G7 每一步、G9 交付、发布之前，先把带外观和摆件的地图快速编译（vvis、vrad 都 -fast），跑 `kit verify <关号> --step <这一步> --build quick`。除了下面标“待完整编译”的项，全部通过才开始完整编译。结果另存一份 `work/L<nn>/verify-quick.json`。
 - **待完整编译**：只有完整编译才能判的项（C6、C7、G1 补丁数、X1 可见比例）在快速档上标“待完整编译”，不算错也不算过，verify.json 的 `pending_full` 列出它们，VERIFY.md 的结果栏写“待完整编译”。
 - **快速档要是真的地图**：外观（Q1）和摆件（Q2）在快速档上同样查，白盒的、没摆件的快速档直接报错，不能拿不完整的地图过关。
+- **完整 `vvis` 前 `.prt` 膨胀预警（X2）**：即使在 `--build quick` 阶段，也会读取地图同名 `.prt` 文件统计 cluster、portal、高连接度簇与最大 portal 面积，并与上一次保存的基线 `work/L<nn>/prt-baseline.json` 对比；一旦暴涨或局部碎 portal 聚集就立即发出 `WARN`，避免等几个小时完整 `vvis` 超时后才发现切碎了 world brush。
 - **再完整编译**：完整编译后跑 `kit verify <关号> --step <这一步> --build full`（不加 --only），这时 C7 要求同一份 VMF（含实例文件，按内容比）先在快速档上过了同一步或更后一步的检查，C6 要求日志里 vvis、vrad 都真的完整跑过。
 
 怎么从日志判断：完整 vvis 在 BasePortalVis 之后还跑 PortalFlow（两段进度条），-fast 只有第一段；完整 vrad 会细分补丁（patches after subdivision 比 before 多），-fast 不细分。只看日志里最后一次 vvis、vrad。
@@ -179,6 +180,7 @@ P1–P3 量的是碰撞体（.phy）。玩家看到的是渲染网格（.vvd 顶
 ### 可见性（vis，G7 起）
 
 - **X1 跑过 vvis，平均可见比例不超 vis_ratio_max**（待完整编译：-fast 的可见性是粗估）。
+- **X2 完整 `vvis` 前 `.prt` 膨胀预警（G3 起，`compile` 组即可触发，`--build quick` 就查，提醒）**：读取地图同名的 `.prt` 文件（解析 cluster 数、portal 数、每个 portal 多边形面积与中心坐标、每簇相邻度），把摘要保存/对比于 `work/L<nn>/prt-baseline.json`。对比上一版基线若 `numportals`、最大 portal 面积或高连接度簇数明显上涨，或发现局部空间网格内聚集大量小/碎 world portal 时，发出 `WARN` 并在报告列出异常 portal 最集中的 Hammer 坐标和对应的设计结构体/元素，提示检查是否误切了 world brush 或漏转 `func_detail`。
 
 ## 机器查不了、留给试走的
 

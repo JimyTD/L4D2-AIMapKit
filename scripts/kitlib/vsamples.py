@@ -442,6 +442,15 @@ def scaled_prop(m):
           solid="6", modelscale="0.7")
 
 
+def prt_bloat(m):
+    """World-brush grid left in worldspawn instead of func_detail, chopping the east yard into dozens of tiny world portals."""
+    for ix in range(4):
+        for iy in range(4):
+            x0 = 900 + ix * 48
+            y0 = 300 + iy * 48
+            m.box((x0, y0, 0), (x0 + 16, y0 + 16, 128), mat="brick/brick_ext_07")
+
+
 _HAZARD_GROUND_TYPES = json.dumps([
     {"id": "road", "walkable": True, "elev_m": 0},
     {"id": "grass", "walkable": True, "elev_m": 0},
@@ -493,6 +502,7 @@ SAMPLES = [
     ("hazard_covered", "（应通过）致死深水区上方 trigger_hurt 盖满且伤害参数一致", hazard_covered, []),
     ("carved_door_wall", "为过通行检查把门口一侧内墙挖出大块空洞（缺失设计内墙）", carved_door_wall, ["B1"]),
     ("scaled_prop", "把模型 modelscale 缩到 0.7 绕过碰撞", scaled_prop, ["B2"]),
+    ("prt_bloat", "漏转 func_detail 导致局部 world portal 暴涨（X2 预警）", prt_bloat, ["X2"]),
 ]
 
 # samples that must pass every check (a change that must not be reported)
@@ -519,6 +529,7 @@ RUN = {
     "hazard_covered": {"args": ["--step", "G4", "--set", f"ground_types={_HAZARD_GROUND_TYPES}"]},
     "carved_door_wall": {"args": ["--step", "G3"]},
     "scaled_prop": {"args": ["--step", "G3"]},
+    "prt_bloat": {"args": ["--step", "G3", "--only", "compile", "--build", "quick"], "compile": "quick", "warn": True},
 }
 
 

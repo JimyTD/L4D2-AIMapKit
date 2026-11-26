@@ -444,6 +444,17 @@ def verify_samples(only=None) -> int:
             _t.sleep(1.1)
             bsp = vsamples.build(proj, name, fn, vbsp, Path(g))
             run = vsamples.RUN.get(name, {})
+            if name == "prt_bloat":
+                # first run good map on --build quick to establish prt-baseline.json, then recompile bloated map
+                good_bsp = vsamples.build(proj, "good_base", None, vbsp, Path(g))
+                vsamples.compile_rest(good_bsp, Path(g), fast=True)
+                code0, out0 = kit(proj, "verify", "1", "--step", "G3", "--only", "compile", "--build", "quick")
+                if code0 != 0 or not (proj / "work" / "L01" / "prt-baseline.json").exists():
+                    print(f"FAIL kit verify 样本 {name}：基线没建出来\n{out0[-800:]}")
+                    bad += 1
+                    continue
+                _t.sleep(1.1)
+                bsp = vsamples.build(proj, name, fn, vbsp, Path(g))
             if run.get("quick_first"):
                 vsamples.compile_rest(bsp, Path(g), fast=True)
                 code, out = kit(proj, "verify", "1", "--step", "G6", "--build", "quick")
