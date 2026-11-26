@@ -97,6 +97,7 @@ for _cid, _g, _t in [
     ("L6", "logic", "用到的实体类型原版战役用过"),
     ("E1", "entities", "设计里的玩法实体在地图里是对应的类型（会动、有碰撞）"), ("E2", "entities", "载具沿设计路线走"),
     ("S1", "supply", "设计里写的基础补给点位（种类和数量）在地图里有对应刷点"),
+    ("S2", "supply", "补给和武器刷点落在真实承载面上，不悬空不陷地（未开物理下落时必须贴合下方可见表面）"),
     ("H1", "hazard", "标为致死的地面上方被对应的伤害触发区盖满"),
     ("V1", "level", "换关不指回本图，两边 landmark 同名都在"), ("V2", "level", "已做出的最后一关是临时终局"),
     ("R1", "resources", "没有缺失或 0 字节的资源"), ("R2", "resources", "自制贴图是 VTF 7.4、尺寸是 2 的幂"),
@@ -2112,11 +2113,59 @@ def find_map(name):
     return p if p.exists() else None
 
 
+SUPPLY_FGD_MODELS = {
+    "upgrade_ammo_explosive": "models/props/terror/exploding_ammo.mdl",
+    "upgrade_ammo_incendiary": "models/props/terror/incendiary_ammo.mdl",
+    "upgrade_laser_sight": "models/w_models/Weapons/w_laser_sights.mdl",
+    "weapon_pistol_spawn": "models/w_models/Weapons/w_pistol_a.mdl",
+    "weapon_pistol_magnum_spawn": "models/w_models/Weapons/w_desert_eagle.mdl",
+    "weapon_smg_spawn": "models/w_models/Weapons/w_smg_uzi.mdl",
+    "weapon_pumpshotgun_spawn": "models/w_models/Weapons/w_shotgun.mdl",
+    "weapon_autoshotgun_spawn": "models/w_models/Weapons/w_autoshot_m4super.mdl",
+    "weapon_rifle_spawn": "models/w_models/Weapons/w_rifle_m16a2.mdl",
+    "weapon_hunting_rifle_spawn": "models/w_models/Weapons/w_sniper_mini14.mdl",
+    "weapon_smg_silenced_spawn": "models/w_models/Weapons/w_smg_a.mdl",
+    "weapon_shotgun_chrome_spawn": "models/w_models/Weapons/w_pumpshotgun_A.mdl",
+    "weapon_shotgun_spas_spawn": "models/w_models/Weapons/w_shotgun_spas.mdl",
+    "weapon_rifle_desert_spawn": "models/w_models/Weapons/w_rifle_B.mdl",
+    "weapon_rifle_ak47_spawn": "models/w_models/Weapons/w_rifle_ak47.mdl",
+    "weapon_sniper_military_spawn": "models/w_models/Weapons/w_sniper_military.mdl",
+    "weapon_chainsaw_spawn": "models/weapons/melee/w_chainsaw.mdl",
+    "weapon_grenade_launcher_spawn": "models/w_models/weapons/w_grenade_launcher.mdl",
+    "weapon_rifle_m60_spawn": "models/w_models/Weapons/w_m60.mdl",
+    "weapon_smg_mp5_spawn": "models/w_models/Weapons/w_smg_mp5.mdl",
+    "weapon_rifle_sg552_spawn": "models/w_models/Weapons/w_rifle_sg552.mdl",
+    "weapon_sniper_awp_spawn": "models/w_models/Weapons/w_sniper_awp.mdl",
+    "weapon_sniper_scout_spawn": "models/w_models/Weapons/w_sniper_scout.mdl",
+    "weapon_pipe_bomb_spawn": "models/w_models/weapons/w_eq_pipebomb.mdl",
+    "weapon_molotov_spawn": "models/w_models/weapons/w_eq_molotov.mdl",
+    "weapon_vomitjar_spawn": "models/w_models/weapons/w_eq_bile_flask.mdl",
+    "weapon_first_aid_kit_spawn": "models/w_models/weapons/w_eq_Medkit.mdl",
+    "weapon_pain_pills_spawn": "models/w_models/weapons/w_eq_painpills.mdl",
+    "weapon_adrenaline_spawn": "models/w_models/weapons/w_eq_adrenaline.mdl",
+    "weapon_defibrillator_spawn": "models/w_models/weapons/w_eq_defibrillator.mdl",
+    "weapon_gascan_spawn": "models/props_junk/gascan001a.mdl",
+    "weapon_upgradepack_incendiary_spawn": "models/w_models/weapons/w_eq_incendiary_ammopack.mdl",
+    "weapon_upgradepack_explosive_spawn": "models/w_models/weapons/w_eq_explosive_ammopack.mdl",
+    "weapon_first_aid_kit": "models/w_models/weapons/w_eq_Medkit.mdl",
+    "weapon_grenade_launcher": "models/w_models/weapons/w_grenade_launcher.mdl",
+    "weapon_scavenge_item_spawn": "models/props_junk/gascan001a.mdl",
+    "weapon_spawn": "models/w_models/Weapons/w_rifle_m16a2.mdl",
+    "weapon_melee_spawn": "models/weapons/melee/w_fireaxe.mdl",
+    "weapon_ammo_spawn": "models/props/terror/ammo_stack.mdl",
+}
+SUPPLY_PLACEMENT_ENTITIES = set(SUPPLY_FGD_MODELS) | {"weapon_item_spawn", "upgrade_spawn"}
+SUPPLY_PHYSICS_CAPABLE = SUPPLY_PLACEMENT_ENTITIES - {
+    "weapon_item_spawn", "upgrade_ammo_explosive", "upgrade_ammo_incendiary", "upgrade_laser_sight"
+}
+
+
 def check_supply(c, md, design):
     """S1: every designed item_spawn (special/easter_egg aside, or checked if placed) has matching supply entities
     near its designed point whose total count reaches the designed count."""
     import fmt
     rep = c.rep
+    check_supply_support(c, md, design)
     if not design:
         return
     r_u = float(c.dec("supply_match_r_u"))
@@ -2151,6 +2200,131 @@ def check_supply(c, md, design):
             rep.add("S1", f"{key} 设计要求的补给在地图里不够或缺失（{miss}）",
                     "设计里安全屋、大事件前和路线上的补给刷点（weapon_*_spawn、weapon_spawn 等）数量和种类要按设计做进地图。",
                     f"在设计点位 {r_u:.0f} u 内放齐对应类名的补给实体并设好 count（当前附近：{found}）。", key=key, where=p)
+
+
+def check_supply_support(c, md, design):
+    """S2: every weapon/supply/upgrade spawn entity must rest on a real visible surface (floor, table, shelf, crate),
+    not floating or sunk. Physics drop (spawnflags & 1 on FGD-capable classes) only relaxes floating when a real
+    landing surface exists within 96 u below."""
+    import vmap
+    rep = c.rep
+    snap = float(c.dec("ground_snap_tol_u"))
+    sp_ents = [e for e in md.ents if e["classname"].lower() in SUPPLY_PLACEMENT_ENTITIES]
+    if not sp_ents:
+        return
+    vis = md.visible_models()
+    terrain = md.displacements()
+    brushes = [s for s in md.solids() if s.src.get("kind") in ("brush", "brush_entity") and s.contents & vmap.C_SOLID
+               and not (s.src.get("materials") and all(str(t).lower().startswith("tools/") for t in s.src["materials"]))]
+    g_brush = vmap.Grid(brushes, 256)
+    meshes = vis + terrain
+    g_mesh = vmap.Grid([vmap.Solid(vmap.axial(m["lo"], m["hi"]), m["lo"], m["hi"], 0, m["src"]) for m in meshes], 128)
+    is_brush = lambda x: isinstance(x, vmap.Solid)  # noqa: E731
+    label = lambda x: "结构" if is_brush(x) else "地形" if x.get("terrain") else str(x["src"].get("model"))  # noqa: E731
+    ref = lambda x: solid_ref(x) if is_brush(x) else {k: v for k, v in x["src"].items() if v not in (None, "", [])}  # noqa: E731
+
+    def spans(x, P, axis):
+        if is_brush(x):
+            return vmap.solid_spans(x, P, axis)
+        pad = np.array([1e5 if k == axis else 1.0 for k in range(3)])
+        T = vmap.near_tris(x["verts"], x["tris"], P.min(0) - pad, P.max(0) + pad)
+        return vmap.mesh_spans(x["verts"], T, P, axis, x["lo"][axis])
+
+    for e in sp_ents:
+        rep.ran("S2")
+        cls = e["classname"].lower()
+        o = vmap.vec(e["origin"])
+        M = vmap.rot(e["angles"] or "0 0 0")
+        mdl_key = e["model"] if (e["model"] or "").lower().endswith(".mdl") else SUPPLY_FGD_MODELS.get(cls)
+        mi = md.content.model(mdl_key) if mdl_key else None
+        mesh_obj = None
+        if mi and "broken" not in mi and mi.get("mesh") and len(mi["mesh"][1]):
+            V, T = mi["mesh"]
+            W = V @ M + o
+            used = W[np.unique(T)]
+            lo, hi = used.min(0), used.max(0)
+            bot = used[used[:, 2] <= lo[2] + 1.0]
+            if len(bot) > 32:
+                bot = bot[np.linspace(0, len(bot) - 1, 32).astype(int)]
+            B = bot.copy()
+            B[:, :2] += np.sign(used[:, :2].mean(0) - B[:, :2]) * 0.5
+            mesh_obj = {"verts": W, "tris": T, "lo": lo, "hi": hi}
+        else:
+            lo = o + np.array([-6.0, -6.0, 0.0])
+            hi = o + np.array([6.0, 6.0, 8.0])
+            B = np.array([
+                o,
+                o + np.array([-4.0, -4.0, 0.0]),
+                o + np.array([4.0, -4.0, 0.0]),
+                o + np.array([-4.0, 4.0, 0.0]),
+                o + np.array([4.0, 4.0, 0.0]),
+            ])
+        z0, height = float(lo[2]), float(hi[2] - lo[2])
+        try:
+            flags = int(e["spawnflags"] or 0)
+        except ValueError:
+            flags = 0
+        physics_on = (cls in SUPPLY_PHYSICS_CAPABLE) and bool(flags & 1)
+        q_lo = np.r_[lo[:2] - 1.0, z0 - 512.0]
+        q_hi = np.r_[hi[:2] + 1.0, hi[2] + 1.0]
+        cands = g_brush.query(q_lo, q_hi) + [meshes[b.idx] for b in g_mesh.query(q_lo, q_hi)]
+        rest, sunk = [], []
+        for x in cands:
+            for k, sp in enumerate(spans(x, B, 2)):
+                for a, b in sp:
+                    if b <= z0 + snap:
+                        rest.append(b)
+                    elif a <= z0 + snap and (is_brush(x) or x["solid"]):
+                        if b - z0 <= max(height, 4.0) + snap or (a <= z0 and b >= hi[2]):
+                            sunk.append((b - z0, k, x))
+        key = design.locate(o) if design else None
+        if sunk and len({k for _, k, _ in sunk}) * 4 > len(B):
+            d, _, sx = max(sunk, key=lambda t: t[0])
+            rep.add("S2", f"补给刷点 {cls}（{mdl_key or '标准包络'}）底面陷进{label(sx)} {d:.1f} 单位（允许 {snap:.0f}）",
+                    "补给刷点陷进桌面、货架或地面里，既穿模又可能导致拾取或视觉异常。",
+                    "把刷点 Z 抬高到支撑物真实可见顶面（或地面）上，或按 G6 第 3 条从支撑模型重新推算高度。",
+                    key=key, where=o, entity={"supply": ent_ref(e), "support": ref(sx)}, extra={"depth": round(float(d), 1)})
+            continue
+        if mesh_obj is not None:
+            P = vmap.ray_points(lo, hi, 2)
+            own = spans(mesh_obj, P, 2)
+            body = max(1, sum(1 for sp in own if sp))
+            pierced = None
+            for x in cands:
+                if not is_brush(x) and x.get("terrain"):
+                    continue
+                hit, lines = None, 0
+                for k, sp in enumerate(spans(x, P, 2)):
+                    found = False
+                    for a, b in sp:
+                        if b - a >= 0.25 and a > z0 + snap and any(a > oa + 1 and b < ob - 1 for oa, ob in own[k]):
+                            hit, found = (a, b), True
+                    lines += found
+                if hit and lines * 4 >= body:
+                    pierced = (x, hit)
+                    break
+            if pierced:
+                sx, (a, b) = pierced
+                rep.add("S2", f"{label(sx)} 在 z {a:.0f}–{b:.0f} 横穿补给刷点 {cls}",
+                        "桌面或层板从补给物件中间穿过去，通常是手写高度落在层板之间或支撑物挪动后刷点没跟着变。",
+                        "放到支撑物某一层真实可见顶面上（G4/G6 规则）。",
+                        key=key, where=o, entity={"supply": ent_ref(e), "support": ref(sx)})
+                continue
+        best = max(rest) if rest else None
+        gap = z0 - best if best is not None else None
+        if physics_on:
+            if gap is None or gap > 96.0:
+                rep.add("S2", (f"补给刷点 {cls} 即使开了物理下落（spawnflags={flags}），下方最近落点也在 {gap:.1f} 单位以下（超 96 u）"
+                               if gap is not None else f"补给刷点 {cls} 下方 512 单位内没有可落地的可见表面"),
+                        "落差过大或下方没有支撑地面/桌面，物品会掉进深坑或穿出预期位置。",
+                        "放到下方真实可见承载面上，或确保下方 96 u 内有地面/桌面落点。",
+                        key=key, where=o, entity=ent_ref(e), extra={"gap": round(float(gap), 1) if gap is not None else None})
+        elif gap is None or gap > snap:
+            rep.add("S2", (f"补给刷点 {cls}（spawnflags={flags}，未开物理下落）悬空，底面离下方最近承载面高 {gap:.1f} 单位（允许 {snap:.0f}）"
+                           if gap is not None else f"补给刷点 {cls} 下方 512 单位内没有承载面"),
+                    "L4D2 武器/补给刷点在未开启物理下落（spawnflags=1）时进游戏会一直浮在半空，例如按桌面高度摆了刷点但下方没有桌子。",
+                    "若有支撑家具则取支撑物真实可见层板/台面顶面高度（支撑物删了跟着删），无支撑家具则直接贴下方真实地面。",
+                    key=key, where=o, entity=ent_ref(e), extra={"gap": round(float(gap), 1) if gap is not None else None})
 
 
 def check_hazard(c, md, design):

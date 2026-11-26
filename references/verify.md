@@ -123,6 +123,7 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--build quick|full] [--only 组,
 ### 补给（supply，G4 起）
 
 - **S1 设计里写的基础补给点位在地图里有对应刷点**：`spec.json` 里每个 `item_spawn` 物件附近 `supply_match_r_u` 内有对应类名的补给实体（`weapon_*_spawn`、`weapon_spawn`、`weapon_item_spawn` 等），且实体 `count` 之和不少于设计数量。设计层面的安全屋和大事件前下限（`supply_base`）由 `kit spec` 核验。
+- **S2 补给和武器刷点落在真实承载面上**：所有 `weapon_*_spawn`、`weapon_spawn`、`weapon_item_spawn`、`upgrade_*` 刷点读取其 `.mdl`（或 FGD 默认模型 / 标准包络）的可见底面，必须落在下方真实存在的可见承载面（地面、桌面、货架层板、箱顶）上，不得悬空或陷入承载面超过 `ground_snap_tol_u`。L4D2 刷点在未开启物理下落（`spawnflags=1`）时进游戏会一直浮在半空；仅当实体在 FGD 支持物理下落且明确开启 `spawnflags=1`、并且下方 96 u 内有真实落点时才放宽，否则一律按静止摆放核查。
 
 ### 致死地面（hazard，G4 起）
 

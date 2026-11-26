@@ -451,6 +451,18 @@ def prt_bloat(m):
             m.box((x0, y0, 0), (x0 + 16, y0 + 16, 128), mat="brick/brick_ext_07")
 
 
+def floating_supply(m):
+    """Supply spawners placed at table height (36 u) with spawnflags=2 (no physics) and no table beneath them."""
+    m.ent("weapon_first_aid_kit_spawn", targetname="yard-o_med_float", origin="500 600 36", angles="0 0 0", spawnflags="2")
+    m.ent("weapon_spawn", targetname="yard-o_gun_float", weapon_selection="tier1_any", count="2",
+          origin="530 600 40", angles="0 0 0", spawnflags="2")
+
+
+def supply_on_floor_and_table(m):
+    """Supply spawner resting directly on the floor (z=0), plus existing ones on TABLE (z=36) -> S2 passes."""
+    m.ent("weapon_first_aid_kit_spawn", targetname="yard-o_med_floor", origin="500 600 0", angles="0 0 0", spawnflags="2")
+
+
 _HAZARD_GROUND_TYPES = json.dumps([
     {"id": "road", "walkable": True, "elev_m": 0},
     {"id": "grass", "walkable": True, "elev_m": 0},
@@ -503,10 +515,12 @@ SAMPLES = [
     ("carved_door_wall", "为过通行检查把门口一侧内墙挖出大块空洞（缺失设计内墙）", carved_door_wall, ["B1"]),
     ("scaled_prop", "把模型 modelscale 缩到 0.7 绕过碰撞", scaled_prop, ["B2"]),
     ("prt_bloat", "漏转 func_detail 导致局部 world portal 暴涨（X2 预警）", prt_bloat, ["X2"]),
+    ("floating_supply", "补给/武器刷点按桌面高度放在 36u 且未开物理，下方没有桌子（S2 悬空）", floating_supply, ["S2"]),
+    ("supply_on_floor_and_table", "（应通过）补给刷点分别落在桌面（36u）和真实地面（0u）上，S2 全过", supply_on_floor_and_table, []),
 ]
 
 # samples that must pass every check (a change that must not be reported)
-MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick", "desk_on_floor", "hazard_covered"}
+MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick", "desk_on_floor", "hazard_covered", "supply_on_floor_and_table"}
 
 # samples run with their own kit verify arguments instead of --step G6; "warn": the named checks count as found
 # when they warn; "absent": checks that must not report anything; "compile": run vvis and vrad after vbsp
@@ -530,6 +544,8 @@ RUN = {
     "carved_door_wall": {"args": ["--step", "G3"]},
     "scaled_prop": {"args": ["--step", "G3"]},
     "prt_bloat": {"args": ["--step", "G3", "--only", "compile", "--build", "quick"], "compile": "quick", "warn": True},
+    "floating_supply": {"args": ["--step", "G4"]},
+    "supply_on_floor_and_table": {"args": ["--step", "G4"]},
 }
 
 
