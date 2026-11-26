@@ -42,10 +42,16 @@ EPS_W = 0.05
 # step -> groups it adds (each step re-runs the groups of the steps before it)
 STEP_GROUPS = [("G3", ["fresh", "compile", "walk", "doors"]),
                ("G4", ["logic", "level", "interact", "entities"]),
-               ("G5", ["resources", "text", "models"]),
-               ("G6", ["placement"]),
+               ("G5", ["resources", "text", "models", "looks"]),
+               ("G6", ["placement", "dressing"]),
                ("G7", ["light", "vis"]),
                ("G9", [])]
+
+# checks only a full compile can judge (vvis without -fast, vrad without -fast): on a quick compile they are
+# marked "待完整编译", neither failed nor passed (references/verify.md, "快速档和完整编译")
+FULL_ONLY = {"C6": "快速档本来就用 -fast", "C7": "只在完整编译上查", "G1": "vrad -fast 不细分补丁，补丁数要完整编译才准",
+             "X1": "vvis -fast 的可见性是粗估，可见比例要完整编译才准"}
+PROGRESS = re.compile(r"0\.\.\.1\.\.\.2\.\.\.3\.\.\.4\.\.\.5\.\.\.6\.\.\.7\.\.\.8\.\.\.9\.\.\.10")
 
 # design object kind -> map classes that really do the job (moving things move, solid things collide)
 REAL_CLASSES = {
@@ -77,6 +83,8 @@ for _cid, _g, _t in [
     ("F1", "fresh", "地图 VMF 是用这一关依赖的生成器、设计和标准值的现状做的"), ("F2", "fresh", "BSP 比 VMF（含实例文件）新"), ("F3", "fresh", "编译日志里有这次编译"),
     ("C1", "compile", "没有漏点"), ("C2", "compile", "vbsp 日志没有 bounds out of range"), ("C3", "compile", "编译后世界范围在 ±16384 以内"),
     ("C4", "compile", "笔刷、笔刷面、平面、实体在上限内"), ("C5", "compile", "vbsp 没有丢掉模型（加载失败、出界）"),
+    ("C6", "compile", "说是完整编译的，日志里 vvis、vrad 都完整跑过（没用 -fast）"),
+    ("C7", "compile", "完整编译的这份 VMF 先在快速档上过了 kit verify"),
     ("W1", "walk", "从起点走到终点（站立或蹲伏碰撞体）"), ("W2", "walk", "设计路线上每个点都走得到"), ("W3", "walk", "必达点都走得到"),
     ("W4", "walk", "过道净宽不小于设计"),
     ("D1", "doors", "开门后门洞和门前 0.9 m 的净宽、净高不小于路线门最小尺寸"),
@@ -92,6 +100,8 @@ for _cid, _g, _t in [
     ("P1", "placement", "模型和模型不相交"), ("P2", "placement", "模型不穿进墙和地面"), ("P3", "placement", "模型不悬空"),
     ("P4", "placement", "看得见的模型落在承载面上：不悬空、不陷进地面台面、层板不穿过它（有没有碰撞都查）"),
     ("P5", "placement", "不做碰撞的装饰模型不和别的模型、墙穿插"),
+    ("Q1", "looks", "编译的地图带外观：看得见的面没有白盒材质"),
+    ("Q2", "dressing", "编译的地图带摆件：设计里的空间有模型"),
     ("G1", "light", "跑过 vrad，补丁数在上限内"), ("G2", "light", "路线上光源间距不超标，事件触发物附近有光"),
     ("G3", "light", "光源附近有灯具（没有有光没灯）"), ("G4", "light", "有音景"),
     ("X1", "vis", "跑过 vvis，可见比例在上限内"),
@@ -148,6 +158,15 @@ class Ctx:
         self.items = {i["id"]: i for i in decision_items()}
         self.used = set()
         self.rep = Report()
+        self.build, self.build_from, self.build_why, self.step, self.out_dir = "full", "", [], "G9", None
+
+    def quick_record(self):
+        """The last quick-compile run of kit verify for this level (verify-quick.json beside verify.json), or None."""
+        p = (self.out_dir or root() / "work" / f"L{self.level:02d}") / "verify-quick.json"
+        try:
+            return rd(p) if p.exists() else None
+        except ValueError:
+            return None
 
     def dec(self, key):
         self.used.add(key)
@@ -167,6 +186,18 @@ class Ctx:
 
 def stamp(p):
     return time.strftime("%m-%d %H:%M:%S", time.localtime(p.stat().st_mtime))
+
+
+def vmf_sha(vmf):
+    """Content fingerprint of the VMF and its instance files: the quick and the full compile must be of the same map."""
+    import hashlib
+    h = hashlib.sha256()
+    if not vmf or not Path(vmf).exists():
+        return None
+    for p in [Path(vmf)] + instance_files(Path(vmf)):
+        if p.exists():
+            h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:16]
 
 
 def rel(p):
@@ -316,6 +347,27 @@ def check_fresh(c, md, design_files, spec=None):
 
 # ---------------------------------------------------------------- compile
 
+def build_mode(runs):
+    """Quick or full compile, read from the log: ('full' | 'quick', [reasons it is not full]). Full vvis runs
+    PortalFlow after BasePortalVis (two progress bars); vvis -fast only the first. Full vrad subdivides patches
+    (more after subdivision than before); vrad -fast does not. Logs that tools append to hold older runs: only the
+    last vvis and vrad runs count."""
+    why = []
+    vv, vr = runs.get("vvis", ""), runs.get("vrad", "")
+    if not vv.strip():
+        why.append("日志里没有 vvis")
+    elif len(PROGRESS.findall(vv)) < 2:
+        why.append("vvis 是 -fast（或没跑完）")
+    if not vr.strip():
+        why.append("日志里没有 vrad")
+    else:
+        b = re.findall(r"(\d+) patches before subdivision", vr)
+        a = re.findall(r"(\d+) patches after subdivision", vr)
+        if not a or not b or int(a[-1]) <= int(b[-1]):
+            why.append("vrad 是 -fast（补丁没有细分，或没跑完）")
+    return ("quick" if why else "full"), why
+
+
 def check_compile(c, md, log):
     import vmap
     rep, b = c.rep, md.bsp
@@ -364,6 +416,24 @@ def check_compile(c, md, log):
     for m in re.finditer(r"(\S+\.mdl).*(?:not a static prop|has no static prop|is not marked static)", runs["vbsp"], re.I):
         rep.add("C5", f"模型 {m.group(1)} 不能做静态道具，vbsp 删掉了它", "日志里只有一行。", "改用 prop_dynamic，或换能做静态道具的模型。",
                 entity={"class": "prop_static", "model": m.group(1)})
+    rep.ran("C6")
+    if c.build == "full" and c.build_why:
+        rep.add("C6", "说是完整编译（--build full），日志里却不是：" + "；".join(c.build_why),
+                "快速档的可见性、光照是粗估，拿它当完整编译交付或发布，进游戏才发现帧率和光照不对。",
+                "按完整编译重跑 vvis、vrad（都不加 -fast），输出追加进同一份日志，再跑 kit verify。")
+    rep.ran("C7")
+    if c.build == "full":
+        q = c.quick_record()
+        sha = vmf_sha(c.vmf_path)
+        steps = [s for s, _ in STEP_GROUPS]
+        if not q or (q.get("build") or {}).get("vmf_sha") != sha:
+            rep.add("C7", "这份 VMF 没有在快速档上过 kit verify 就做了完整编译" + ("（快速档的记录是另一份 VMF 的）" if q else "（没有快速档的记录）"),
+                    "完整编译要一个小时以上；快速档就能查出的摆件、路线、外观问题拖到完整编译以后才发现，每发现一批就再编一次。",
+                    "同一份 VMF 先快速编译（vvis、vrad 都 -fast，带外观和摆件），跑 kit verify --build quick 到除“待完整编译”以外全过，再做完整编译。")
+        elif not q.get("passed") or q.get("only") or steps.index(q.get("step", "G3")) < steps.index(c.step):
+            rep.add("C7", f"这份 VMF 的快速档 kit verify 没有全过（到 {q.get('step')}，错 {q.get('fail')} 条" + ("，只跑了部分组" if q.get("only") else "") + "）",
+                    "快速档没过就完整编译，问题要在完整编译以后再查一遍、再编一次。",
+                    f"先让快速档的 kit verify 跑到 {c.step}、不加 --only，除“待完整编译”以外全过，再完整编译。")
     return runs
 
 
@@ -1985,6 +2055,57 @@ def mounted(m, g_brush):
     return False
 
 
+# ---------------------------------------------------------------- looks and dressing (a quick compile is the real map)
+
+def check_looks(c, md, design):
+    """Q1: visible faces of the compiled map with a white-box material (whitebox_materials). A map checked without
+    its looks passes the walk, door and logic checks and hides every look problem until the full compile."""
+    rep = c.rep
+    pats = [p.lower() for p in c.dec("whitebox_materials")]
+    by = {}
+    n = 0
+    for f, pts, nout, ti in md.faces():
+        n += 1
+        m = ti.mat.lower()
+        if any(fnmatch.fnmatch(m, p) for p in pats):
+            by.setdefault(m, []).append(pts.mean(0))
+    rep.ran("Q1", n)
+    for m, ctrs in sorted(by.items(), key=lambda kv: -len(kv[1]))[:12]:
+        p = ctrs[0]
+        rep.add("Q1", f"{len(ctrs)} 个看得见的面还是白盒材质 {m}", "白盒的地图过了走路、门、接线的检查，外观、文字、贴图的问题全藏到完整编译以后才暴露。",
+                "按外观规则把这些面换成成品材质（G5），带着外观和摆件重新快速编译再跑 kit verify；白盒材质的范围写在 decisions.json 的 whitebox_materials。",
+                key=design.locate(p) if design else None, where=p, entity={"material": m}, extra={"faces": len(ctrs)})
+    if len(by) > 12:
+        rep.notes.append(f"Q1 另有 {len(by) - 12} 种白盒材质没逐条列出")
+
+
+def check_dressing(c, md, design):
+    """Q2: every designed room, hall and service space has at least one model in it (by the visible mesh's centre),
+    and the map has models at all. A map compiled without its dressing cannot show floating, sunk or clipping
+    models; they turn up after the full compile."""
+    from shapely.geometry import Point
+    rep = c.rep
+    vm = md.visible_models()
+    C = np.array([(m["lo"] + m["hi"]) / 2 for m in vm]).reshape(-1, 3)
+    bare = [k.lower() for k in c.dec("verify_bare_keys")]
+    sp = [s for s in (design.spaces() if design else []) if (s[6].get("kind") in ("room", "hall", "service"))
+          and not s[6].get("void") and not s[6].get("visible_only")]
+    rep.ran("Q2", len(sp) + 1)
+    if not len(C):
+        rep.add("Q2", "地图里一个模型都没有（静态道具和 prop_* 实体都是 0）", "没有摆件的地图查不出悬空、陷进去、穿插；问题全藏到完整编译以后才暴露。",
+                "把摆件（G6）放进地图，重新快速编译再跑 kit verify。")
+        return
+    for key, poly, z0, z1, sid, lv, s in sp:
+        if any(key.lower().startswith(k) for k in bare):
+            continue
+        inside = [i for i, p in enumerate(C) if z0 - 8 <= p[2] <= z1 and poly.contains(Point(p[0], p[1]))]
+        if not inside:
+            q = poly.representative_point()
+            rep.add("Q2", f"设计空间 {key}（{s.get('use') or s.get('kind')}）里一个模型都没有", "空房间看不出是什么房间；编译时没带摆件的话，摆件的问题要到完整编译以后才暴露。",
+                    "按 G6 布景给这个空间摆东西；设计本来就空的，把它的 key 写进 decisions.json 的 verify_bare_keys 并在 manual-checks.md 写理由。",
+                    key=key, where=[q.x, q.y, z0])
+
+
 # ---------------------------------------------------------------- light, sound, vis
 
 def check_light(c, md, design, runs):
@@ -2130,6 +2251,8 @@ def run(level, a) -> int:
             over[k] = v
     c = Ctx(level, bsp, vmf, log, over, gen)
     step = (a.step or "G9").upper()
+    c.step = step
+    c.out_dir = Path(a.out).resolve() if a.out else root() / "work" / f"L{level:02d}"
     groups = []
     for s, gs in STEP_GROUPS:
         groups += gs
@@ -2142,6 +2265,13 @@ def run(level, a) -> int:
         groups = [g for g in groups if g in want]
     md = vmap.MapData(bsp)
     log_text = log.read_text(encoding="utf-8", errors="ignore") if log.exists() else ""
+    # quick or full compile: --build says which one this is meant to be; without it, read from the log
+    mode, why = build_mode(vmap.last_runs(log_text))
+    c.build_why = why
+    if getattr(a, "build", None):
+        c.build, c.build_from = a.build, "--build"
+    else:
+        c.build, c.build_from = mode, "日志"
     if "fresh" in groups:
         check_fresh(c, md, [spec_p, el_p, root() / "standards" / "decisions.json"], spec)
     runs = check_compile(c, md, log_text) if "compile" in groups else vmap.last_runs(log_text)
@@ -2171,6 +2301,10 @@ def run(level, a) -> int:
     if "placement" in groups:
         check_placement(c, md, design)
         check_visible(c, md, design)
+    if "looks" in groups:
+        check_looks(c, md, design)
+    if "dressing" in groups:
+        check_dressing(c, md, design)
     if "light" in groups:
         check_light(c, md, design, runs)
     if "vis" in groups:
@@ -2201,6 +2335,11 @@ def kit_version():
 
 def write(c, level, step, groups, bsp, vmf, log, a, secs):
     rep = c.rep
+    pending = {}
+    if c.build == "quick":
+        # what only a full compile can judge: neither failed nor passed on a quick compile
+        pending = {cid: why for cid, why in FULL_ONLY.items() if CHECKS[cid][0] in groups}
+        rep.findings = [f for f in rep.findings if f["check"] not in pending]
     fails = [f for f in rep.findings if f["severity"] == "FAIL"]
     warns = [f for f in rep.findings if f["severity"] == "WARN"]
     checks = []
@@ -2208,22 +2347,33 @@ def write(c, level, step, groups, bsp, vmf, log, a, secs):
         if g in groups:
             n_f = sum(1 for f in fails if f["check"] == cid)
             n_w = sum(1 for f in warns if f["check"] == cid)
-            checks.append({"id": cid, "group": g, "title": title, "checked": rep.counts.get(cid, 0), "fail": n_f, "warn": n_w, "pass": n_f == 0})
+            st = "待完整编译" if cid in pending else ("错" if n_f else "提醒" if n_w else "过")
+            checks.append({"id": cid, "group": g, "title": title, "checked": rep.counts.get(cid, 0), "fail": n_f, "warn": n_w,
+                           "pass": None if cid in pending else n_f == 0, "status": st})
+    build = {"mode": c.build, "from": c.build_from, "log_says": "quick" if c.build_why else "full", "why": c.build_why,
+             "vmf_sha": vmf_sha(vmf)}
     out = plain({
         "schema": "kit.verify/1.0", "level": level, "step": step, "groups": groups,
         "map": {"bsp": rel(bsp), "vmf": rel(vmf), "log": rel(log), "bsp_mtime": int(bsp.stat().st_mtime), "bsp_size": bsp.stat().st_size},
-        "kit": kit_version(), "seconds": round(secs, 1),
+        "kit": kit_version(), "seconds": round(secs, 1), "build": build, "only": a.only or None,
         "passed": not fails, "fail": len(fails), "warn": len(warns),
+        "pending_full": sorted(pending),
         "provisional": rep.provisional, "decisions_used": sorted(c.used), "notes": rep.notes,
         "checks": checks, "findings": fails + warns,
     })
-    od = Path(a.out).resolve() if a.out else root() / "work" / f"L{level:02d}"
+    od = c.out_dir
     wr(od / "verify.json", out)
+    if c.build == "quick":
+        wr(od / "verify-quick.json", out)
     (od / "VERIFY.md").write_text(markdown(out), encoding="utf-8")
-    print(f"kit verify L{level:02d}（到 {step}）：{'通过' if not fails else f'{len(fails)} 条错误'}" + (f"，{len(warns)} 条提醒" if warns else "")
+    print(f"kit verify L{level:02d}（到 {step}，{'快速档' if c.build == 'quick' else '完整编译'}）：{'通过' if not fails else f'{len(fails)} 条错误'}"
+          + (f"，{len(warns)} 条提醒" if warns else "") + (f"，待完整编译 {'、'.join(sorted(pending))}" if pending else "")
           + f"；{rel(od / 'verify.json')}、{rel(od / 'VERIFY.md')}（{secs:.0f} 秒）")
     for ch in checks:
-        if ch["fail"] or ch["warn"] or "-v" in sys.argv:
+        if ch["id"] in pending:
+            if "-v" in sys.argv:
+                print(f"  WAIT {ch['id']} {ch['title']}：待完整编译（{pending[ch['id']]}）")
+        elif ch["fail"] or ch["warn"] or "-v" in sys.argv:
             print(f"  {'FAIL' if ch['fail'] else 'WARN' if ch['warn'] else 'PASS'} {ch['id']} {ch['title']}：查了 {ch['checked']}，错 {ch['fail']}" + (f"，提醒 {ch['warn']}" if ch["warn"] else ""))
     if rep.provisional:
         print("  待补的待决定项（用了 Kit 起始值）：" + "、".join(sorted(rep.provisional)))
@@ -2233,14 +2383,17 @@ def write(c, level, step, groups, bsp, vmf, log, a, secs):
 def markdown(o):
     L = [f"# kit verify L{o['level']:02d}（到 {o['step']}）", "",
          f"地图 {o['map']['bsp']}；结果：{'通过' if o['passed'] else '没通过'}，错误 {o['fail']} 条，提醒 {o['warn']} 条。Kit {o['kit']}。", "",
+         f"编译：{'快速档' if o['build']['mode'] == 'quick' else '完整编译'}（按{o['build']['from']}）"
+         + (f"；日志里：{'；'.join(o['build']['why'])}" if o["build"]["why"] else "")
+         + (f"。待完整编译（快速档上不判，完整编译后再跑一次 kit verify）：{'、'.join(o['pending_full'])}" if o["pending_full"] else "") + "。", "",
          "每条错误写了：哪一项检查、设计元素 key、Hammer 坐标、地图里的实体、错在哪、为什么要紧、怎么改。改完重新生成、编译，再跑 kit verify。"
          "检查项的说明见 Kit 的 references/verify.md。", ""]
     if o["provisional"]:
         L += ["## 待补的待决定项", "", "下面这些值项目还没定，这次用了 Kit 的起始值。按 G0 第 7 条加进 standards/decisions.json（暂定，写 why 和 verify）：", ""]
         L += [f"- {k} = {json.dumps(v['value'], ensure_ascii=False)}（{v['from']}）" for k, v in sorted(o["provisional"].items())]
         L.append("")
-    L += ["## 各项检查", "", "| 编号 | 检查 | 查了 | 错 | 提醒 |", "|---|---|---|---|---|"]
-    L += [f"| {c['id']} | {c['title']} | {c['checked']} | {c['fail']} | {c['warn']} |" for c in o["checks"]]
+    L += ["## 各项检查", "", "| 编号 | 检查 | 结果 | 查了 | 错 | 提醒 |", "|---|---|---|---|---|---|"]
+    L += [f"| {c['id']} | {c['title']} | {c['status']} | {c['checked']} | {c['fail']} | {c['warn']} |" for c in o["checks"]]
     L.append("")
     if o["notes"]:
         L += ["说明：" + "；".join(o["notes"]), ""]

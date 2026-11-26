@@ -51,7 +51,7 @@ spec 里的结构体、开放区、总图；美术规范的预算规则。
 - 坐标在 ±(16384 − map_margin_u) 以内（[engine-facts.md](../engine-facts.md)）。
 - 可见性：vis_ratio（每个分区平均看得到的分区数 ÷ 分区总数）低于 decisions.json 的 vis_ratio_max，kit verify 的 X1 在跑过 vvis 的地图上查；第一次实测后由生成线填暂定值、写 why，不问负责人；超了才由 AI 看是哪一片出了问题，改法写回生成规则。
 - **覆盖检查**（脚本）：kinds.json 里 need 含 look 的 key，加上 spawn（对应 info_target）和 event（对应 logic_relay，G4 后查），在 parts.json 里至少有一行。space 对应生成器挖这个空腔时记的一行；access 为 none 的 opening 对应它所在外墙立面那一行（立面行写上它覆盖的 opening key），不另要一行；link 对应它指向的那扇门，不另要一行；同一个轮廓的 shown_structure 在任一段有一行即可。没有的单列，“不建”的写理由，其余算错。
-- 日常迭代用快速档（vvis、vrad 都 -fast），完整编译只在 G9 交付时跑。
+- 日常迭代用快速档（vvis、vrad 都 -fast），完整编译只在 G9 交付和发布前跑。先快速档后完整编译（[verify.md](../verify.md) 的“快速档和完整编译”）：带外观和摆件快速编译，`kit verify <关号> --step G3 --build quick` 除“待完整编译”的项以外全过，才开始完整编译；完整编译后再跑一次 `--build full`。G3 还没有外观和摆件，快速档的 Q1、Q2 从 G5、G6 起才查。
 
 ## 常见坑
 

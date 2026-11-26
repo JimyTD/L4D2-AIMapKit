@@ -23,7 +23,7 @@
 
 ## 完成
 
-`kit verify <关号> --step G7` 通过（[verify.md](../verify.md)）：跑过 vrad、补丁数 ≤ vrad_patch_max；跑过 vvis、可见比例 ≤ vis_ratio_max；有音景；布光提醒（路线和互动物附近有光、光源附近有灯具）逐条处理，设计本该暗的写进 verify_dark_keys 并在 manual-checks.md 写理由。生成线自己写的检查只作自查，不作完成依据。起点终点的暖光、每种空间类型对应的音景名，由本步 agent 按美术规范核对，结果写进 `work/L<nn>/manual-checks.md`。
+`kit verify <关号> --step G7` 通过（[verify.md](../verify.md)）：跑过 vrad、补丁数 ≤ vrad_patch_max；跑过 vvis、可见比例 ≤ vis_ratio_max；有音景；布光提醒（路线和互动物附近有光、光源附近有灯具）逐条处理，设计本该暗的写进 verify_dark_keys 并在 manual-checks.md 写理由。生成线自己写的检查只作自查，不作完成依据。先快速档后完整编译（[verify.md](../verify.md) 的“快速档和完整编译”）：带外观和摆件快速编译，`kit verify <关号> --step G7 --build quick` 除“待完整编译”的项以外全过，才开始完整编译；完整编译后再跑一次 `--build full`。G1 补丁数、X1 可见比例在快速档上标“待完整编译”，完整编译后才判。起点终点的暖光、每种空间类型对应的音景名，由本步 agent 按美术规范核对，结果写进 `work/L<nn>/manual-checks.md`。
 
 ## 常见坑
 

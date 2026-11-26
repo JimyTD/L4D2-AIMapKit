@@ -437,7 +437,18 @@ def verify_samples(only=None) -> int:
             os.utime(ld / "spec.json")
             os.utime(ld / "elements.json")
             _t.sleep(1.1)
-            vsamples.build(proj, name, fn, vbsp, Path(g))
+            bsp = vsamples.build(proj, name, fn, vbsp, Path(g))
+            run = vsamples.RUN.get(name, {})
+            if run.get("quick_first"):
+                vsamples.compile_rest(bsp, Path(g), fast=True)
+                code, out = kit(proj, "verify", "1", "--step", "G6", "--build", "quick")
+                if code != 0:
+                    print(f"FAIL kit verify 样本 {name}：快速档本该通过\n{out[-1500:]}")
+                    bad += 1
+                    continue
+                vsamples.run_vbsp(bsp.with_suffix(".vmf"), vbsp, Path(g))
+            if run.get("compile"):
+                vsamples.compile_rest(bsp, Path(g), fast=run["compile"] == "quick")
             if name == "stale_vmf":
                 _t.sleep(1.1)
                 (proj / "generator" / "gen.py").write_text("# changed after the map was built\n", encoding="utf-8")
@@ -454,7 +465,6 @@ def verify_samples(only=None) -> int:
                 _t.sleep(1.1)
                 vm = next((proj / "build" / "L01").glob("*.vmf"))
                 vm.write_text(vm.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-            run = vsamples.RUN.get(name, {})
             code, out = kit(proj, "verify", "1", *(run.get("args") or ["--step", "G6"]))
             try:
                 res = json.loads((proj / "work" / "L01" / "verify.json").read_text(encoding="utf-8"))
@@ -472,7 +482,14 @@ def verify_samples(only=None) -> int:
             got = {f["check"] for f in res["findings"] if f["severity"] == "FAIL"}
             if run.get("warn"):
                 got |= {f["check"] for f in res["findings"] if f["severity"] == "WARN"}
-            if run.get("absent"):
+            if run.get("pending"):
+                st = {ch["id"]: ch.get("status") for ch in res["checks"]}
+                miss = [cid for cid in run["pending"] if st.get(cid) != "待完整编译" or cid not in res.get("pending_full", [])]
+                hit = sorted({f["check"] for f in res["findings"]} & set(run.get("absent", [])))
+                ok = not miss and not hit and res["passed"]
+                print(("OK   " if ok else "FAIL ") + f"kit verify 样本 {name}（{what}）：{'、'.join(run['pending'])} 标为待完整编译"
+                      + ("" if ok else f"：状态 {[(c, st.get(c)) for c in run['pending']]}，报出 {hit}，passed {res['passed']}"))
+            elif run.get("absent"):
                 hit = sorted({f["check"] for f in res["findings"]} & set(run["absent"]))
                 ok = not hit
                 print(("OK   " if ok else "FAIL ") + f"kit verify 样本 {name}（{what}）不报 {'、'.join(run['absent'])}"

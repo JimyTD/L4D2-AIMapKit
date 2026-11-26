@@ -350,6 +350,28 @@
    "step": "G9",
    "start": 4,
    "hint": "kit verify 门：设计本身就窄的门（squeeze、窗洞）量出的净宽、净高最多比设计小多少"
+  },
+  {
+   "id": "whitebox_materials",
+   "value": null,
+   "unit": "材质路径通配",
+   "status": "暂定",
+   "step": "G5",
+   "start": [
+    "dev/*",
+    "tools/toolsgray*",
+    "tools/toolswhite*"
+   ],
+   "hint": "kit verify 外观（Q1）：哪些材质算白盒。G5 起看得见的面不能用；快速编译也要带外观。项目白盒阶段用了别的材质就补进来"
+  },
+  {
+   "id": "verify_bare_keys",
+   "value": null,
+   "unit": "设计元素 key 前缀",
+   "status": "暂定",
+   "step": "G6",
+   "start": [],
+   "hint": "kit verify 摆件（Q2）：设计本来就空的房间、大厅、设备间（不查有没有模型），每条在 manual-checks 写理由"
   }
  ]
 }

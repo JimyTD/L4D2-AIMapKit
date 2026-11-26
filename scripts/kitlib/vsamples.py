@@ -337,6 +337,34 @@ def lights_evenly(m):
     m.ent("light", _light="255 220 180 200", origin="1408 384 200")
 
 
+def whitebox_floor(m):
+    """A quick compile without its looks: a visible slab in the yard still has the white-box material."""
+    m.box((800, 500, 0), (1000, 700, 8), mat="dev/dev_measuregeneric01")
+
+
+def no_dressing(m):
+    """A quick compile without its dressing: every model left out."""
+    m.v.entities[:] = [e for e in m.v.entities if e["classname"] != "prop_static"]
+
+
+def full_without_quick(m):
+    """Marker only: the runner makes a full compile (vvis, vrad) without a quick kit verify of the same VMF first."""
+
+
+def full_after_quick(m):
+    """Marker only: the runner makes a quick compile, runs kit verify --build quick (passes), then the full compile of
+    the same VMF."""
+
+
+def fast_called_full(m):
+    """Marker only: the runner compiles with vvis -fast and vrad -fast and runs kit verify --build full."""
+
+
+def quick_pending(m):
+    """Marker only: quick compile, light and vis checks with a patch limit the map is over: only a full compile can
+    judge them, so they are pending, not failed."""
+
+
 SAMPLES = [
     ("narrow_door", "门被砌窄过不去（门洞按小门扇补墙垛）", narrow_door, ["D1"]),
     ("mirrored_sign", "门牌文字镜像", mirrored_sign, ["T1"]),
@@ -366,17 +394,41 @@ SAMPLES = [
     ("stale_bsp", "VMF 改了没重新编译", stale_bsp, ["F2"]),
     ("lights_at_waypoints", "灯只放在路线点上，两点之间一段暗（相邻灯距超标）", lights_at_waypoints, ["G2"]),
     ("lights_evenly", "（G2 应不报）沿路线每 400 单位一盏灯", lights_evenly, []),
+    ("whitebox_floor", "快速编译不带外观：看得见的面还是白盒材质", whitebox_floor, ["Q1"]),
+    ("no_dressing", "快速编译不带摆件：地图里一个模型都没有", no_dressing, ["Q2"]),
+    ("full_without_quick", "没在快速档上过 kit verify 就完整编译", full_without_quick, ["C7"]),
+    ("full_after_quick", "（应通过）同一份 VMF 先快速档过了，再完整编译", full_after_quick, []),
+    ("fast_called_full", "快速编译的图当完整编译交", fast_called_full, ["C6"]),
+    ("quick_pending", "（不报 G1、X1）快速档上补丁数、可见比例待完整编译", quick_pending, []),
 ]
 
 # samples that must pass every check (a change that must not be reported)
-MUST_PASS = {"other_level_generator", "unused_decision"}
+MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick"}
 
 # samples run with their own kit verify arguments instead of --step G6; "warn": the named checks count as found
-# when they warn; "absent": checks that must not report anything
+# when they warn; "absent": checks that must not report anything; "compile": run vvis and vrad after vbsp
+# ("quick": both -fast, "full": both without); "quick_first": run kit verify --build quick on a quick compile of
+# the same VMF before the full compile; "pending": checks that must come out "待完整编译"
 RUN = {
     "lights_at_waypoints": {"args": ["--step", "G7", "--only", "light", "--set", "light_gap_max_u=600"], "warn": True},
     "lights_evenly": {"args": ["--step", "G7", "--only", "light", "--set", "light_gap_max_u=600"], "absent": ["G2"]},
+    "whitebox_floor": {"args": ["--step", "G6", "--build", "quick"], "compile": "quick"},
+    "no_dressing": {"args": ["--step", "G6", "--build", "quick"], "compile": "quick"},
+    "full_without_quick": {"args": ["--step", "G6", "--build", "full"], "compile": "full"},
+    "full_after_quick": {"args": ["--step", "G6", "--build", "full"], "compile": "full", "quick_first": True},
+    "fast_called_full": {"args": ["--step", "G6", "--build", "full"], "compile": "quick"},
+    "quick_pending": {"args": ["--step", "G7", "--only", "light,vis", "--set", "vrad_patch_max=1", "--set", "vis_ratio_max=0.01"],
+                      "compile": "quick", "absent": ["G1", "X1"], "pending": ["G1", "X1"]},
 }
+
+
+def compile_rest(bsp: Path, game: Path, fast: bool):
+    """vvis and vrad after vbsp, their output appended to the same log (the way a build script does)."""
+    for tool in ("vvis", "vrad"):
+        args = [str(game / "bin" / f"{tool}.exe")] + (["-fast"] if fast else []) + ["-game", str(game / "left4dead2"), str(bsp.with_suffix(""))]
+        r = subprocess.run(args, capture_output=True, text=True, errors="ignore")
+        with open(bsp.with_suffix(".log"), "a", encoding="utf-8") as f:
+            f.write(r.stdout + r.stderr)
 
 
 def build(proj: Path, name: str, mutate, vbsp: Path, game: Path):
@@ -407,6 +459,11 @@ def build(proj: Path, name: str, mutate, vbsp: Path, game: Path):
     vmf = bd / f"{mp}.vmf"
     with open(vmf, "w", encoding="utf-8") as f:
         m.v.export(f)
+    return run_vbsp(vmf, vbsp, game)
+
+
+def run_vbsp(vmf: Path, vbsp: Path, game: Path):
+    """vbsp on the VMF; the log starts over (vvis, vrad append to it)."""
     r = subprocess.run([str(vbsp), "-game", str(game / "left4dead2"), str(vmf)], capture_output=True, text=True, errors="ignore")
-    (bd / f"{mp}.log").write_text(r.stdout + r.stderr, encoding="utf-8")
-    return bd / f"{mp}.bsp"
+    vmf.with_suffix(".log").write_text(r.stdout + r.stderr, encoding="utf-8")
+    return vmf.with_suffix(".bsp")

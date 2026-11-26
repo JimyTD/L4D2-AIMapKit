@@ -204,7 +204,9 @@ def parser():
     x = s.add_parser("verify", help="G3–G9 通用验收：只读最终地图、设计数据和游戏文件，结果写 work/L<nn>/verify.json")
     x.add_argument("level", type=int)
     x.add_argument("--step", default="G9", help="跑到哪一步的检查（G3 G4 G5 G6 G7 G9），默认 G9 全部")
-    x.add_argument("--only", help="只跑这些组（逗号分隔：fresh,compile,walk,doors,logic,level,interact,entities,resources,text,models,placement,light,vis）")
+    x.add_argument("--build", choices=("quick", "full"), help="这张图是快速编译（vvis、vrad -fast）还是完整编译；不写时按日志判断。"
+                   "快速档上只有完整编译才能判的项标“待完整编译”，完整编译要求同一份 VMF 先在快速档上过")
+    x.add_argument("--only", help="只跑这些组（逗号分隔：fresh,compile,walk,doors,logic,level,interact,entities,resources,text,models,looks,placement,dressing,light,vis）")
     x.add_argument("--bsp", help="最终 BSP（默认 build/L<nn>/ 里唯一的那张）")
     x.add_argument("--vmf", help="编译它用的 VMF（默认和 BSP 同名）")
     x.add_argument("--log", help="编译日志（默认和 BSP 同名的 .log）")
