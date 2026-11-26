@@ -128,6 +128,9 @@ def cmd(a) -> int:
     if c == "inputs":
         import verify
         return verify.write_inputs(a.level, _path(a.vmf), a.used)
+    if c == "release":
+        import release
+        return release.run(a)
     if c == "selftest":
         import selftest
         return selftest.run()
@@ -218,6 +221,11 @@ def parser():
     x.add_argument("level", type=int)
     x.add_argument("--vmf", required=True, help="刚写出的 VMF")
     x.add_argument("--used", action="append", required=True, help="这一关生成时读过的待决定项 id，逗号分隔，可重复")
+    x = s.add_parser("release", help="发布（负责人要求时才做）：检查做出来的几关能连成战役，打包成插件装进游戏 addons（不启动游戏、不上传）")
+    x.add_argument("--upto", type=int, help="发布到第几关（默认 build/ 里连续做出来的最后一关）")
+    x.add_argument("--notes", help="这一版的更新说明（写进 release/CHANGELOG.md）")
+    x.add_argument("--dry-run", action="store_true", help="只检查，不打包、不装、不改版本号")
+    x.add_argument("--addons", help="装到哪个目录（默认 <游戏>/left4dead2/addons）")
     s.add_parser("selftest", help="Kit 自测（改脚本后跑）")
     return p
 

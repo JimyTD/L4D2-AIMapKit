@@ -35,6 +35,9 @@
   build/_regress/L<nn>/ 生成器改了以后对已交付的关回归（不写 build/L<nn>/）
   build/tmp/            试验、临时编译
   nav/<地图>.nav        用户交回的导航网格
+  release/              release.json（版本号、每一版的记录）、CHANGELOG.md（更新说明），kit release 写，提交
+  RELEASE-GUIDE.md      试玩发布版的人工指南（第一次发布时从 Kit 模板复制，通用）
+  build/release/        kit release 摆的插件和 vpk（不提交）
 ```
 
 ## 资料索引 `sources/index.json`

@@ -126,7 +126,7 @@ def sign_face(sd, mirrored):
     sd.vaxis = UVAxis(0, 0, -1, offset=(192 * 4) % 512, scale=0.25)
 
 
-def design(level_dir: Path):
+def design(level_dir: Path, level: int = 1):
     """spec.json / elements.json for the sample map: a yard 'yard' with route along y = 384 from the start to the end,
     a must-reach point behind the wall, a button that fires ev_btn, events ev_btn -> event:0 (then), a structure 'A'
     holding the wall's door d_mid (so D1 has a door to measure)."""
@@ -134,7 +134,7 @@ def design(level_dir: Path):
     to_m = lambda x, y: [round(x * U, 3), round(y * U, 3)]  # noqa: E731  (origin_m = 0, 0)
     door_c = [(WALL_X0 + WALL_X1) / 2, DOOR_Y0 + DOOR_W / 2]
     spec = {
-        "schema": "detail.spec/1.0", "level": 1, "name": "样本",
+        "schema": "detail.spec/1.0", "level": level, "name": "样本",
         "layout": {"convention": "", "origin_m": [0, 0], "default_ground_m": 0, "compression": {"used": False}},
         "start_room": {"id": "R0", "name": "起点", "room": to_m(128, 384), "piece": "yard"},
         "end_room": {"id": "R1", "name": "终点", "room": to_m(1408, 384), "entry": to_m(1408, 384), "piece": "yard"},
@@ -431,13 +431,42 @@ def compile_rest(bsp: Path, game: Path, fast: bool):
             f.write(r.stdout + r.stderr)
 
 
-def build(proj: Path, name: str, mutate, vbsp: Path, game: Path):
+# ---------------------------------------------------------------- release samples (kit release)
+# a two-level pack: L01 changes level to L02 at its end, L02 ends in the temporary finale
+
+def landmark(m):
+    """The next level's start: the landmark the previous level's change-level names."""
+    m.ent("info_landmark", targetname="lm_next", origin="128 384 16")
+
+
+def change_to(target):
+    def mutate(m):
+        for e in list(m.v.entities):
+            if e["classname"] == "trigger_finale" or e["targetname"] == "end_room":
+                m.v.remove_ent(e)
+        m.ent("info_landmark", targetname="lm_next", origin="1408 384 16")
+        c = m.ent("info_changelevel", targetname="end_change", map=target, landmark="lm_next", origin="1408 384 40")
+        m.box((1344, 320, 0), (1472, 448, 96), mat="tools/toolstrigger", ent=c)
+    return mutate
+
+
+# name -> (real problem, how the runner makes it, check of kit release that must report it)
+RELEASE = [
+    ("last_not_finale", "只发第一关，它的终点还在换关（包里最后一关不是临时终局）", "A2"),
+    ("wrong_next", "第一关换关到包里没有的地图", "A3"),
+    ("map_after_verify", "kit verify 之后地图又编译过", "A1"),
+    ("verify_too_early", "只跑到 G3 的检查就发布", "A1"),
+    ("verify_quick_only", "只在快速档上跑过 kit verify", "A1"),
+]
+
+
+def build(proj: Path, name: str, mutate, vbsp: Path, game: Path, level: int = 1):
     """Write the sample map to build/L01/<map>.vmf, compile it with vbsp, write the log. Returns the BSP path."""
-    bd = proj / "build" / "L01"
+    bd = proj / "build" / f"L{level:02d}"
     if bd.exists():
         shutil.rmtree(bd)
     bd.mkdir(parents=True)
-    mp = "kitsample_c1m1"
+    mp = f"kitsample_c1m{level}"
     m = good()
     m.instance = None
     if mutate:

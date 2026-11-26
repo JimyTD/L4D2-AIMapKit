@@ -163,6 +163,7 @@ def run() -> int:
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     bad += verify_samples()
+    bad += release_samples()
     print("selftest: " + ("全部通过" if not bad else f"{bad} 项没通过"))
     return 1 if bad else 0
 
@@ -413,15 +414,7 @@ def verify_samples(only=None) -> int:
     bad = 0
     tmp, proj = fresh()
     try:
-        (proj / "generator").mkdir()
-        (proj / "generator" / "gen.py").write_text("# sample generator\n", encoding="utf-8")
-        (proj / "generator" / "levels").mkdir()
-        for lv in ("L01", "L02"):
-            (proj / "generator" / "levels" / f"{lv}.py").write_text(f"# {lv} only\n", encoding="utf-8")
-        loc = json.loads((proj / "kit.local.json").read_text(encoding="utf-8"))
-        # the common part is the whole directory; each level's own file is listed under levels (F1 per level)
-        loc["verify"] = {"generator": {"common": ["generator"], "levels": {"L01": ["generator/levels/L01.py"], "L02": ["generator/levels/L02.py"]}}}
-        (proj / "kit.local.json").write_text(json.dumps(loc), encoding="utf-8")
+        verify_project(proj)
         dec_p = proj / "standards" / "decisions.json"
         dec_text = dec_p.read_text(encoding="utf-8")
         ld = proj / L
@@ -505,4 +498,121 @@ def verify_samples(only=None) -> int:
             bad += 0 if ok else 1
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    return bad
+
+
+def verify_project(proj):
+    """The temporary project the kit verify samples use: a generator split into common and per-level parts."""
+    (proj / "generator").mkdir()
+    (proj / "generator" / "gen.py").write_text("# sample generator\n", encoding="utf-8")
+    (proj / "generator" / "levels").mkdir()
+    for lv in ("L01", "L02"):
+        (proj / "generator" / "levels" / f"{lv}.py").write_text(f"# {lv} only\n", encoding="utf-8")
+    loc = json.loads((proj / "kit.local.json").read_text(encoding="utf-8"))
+    # the common part is the whole directory; each level's own file is listed under levels (F1 per level)
+    loc["verify"] = {"generator": {"common": ["generator"], "levels": {"L01": ["generator/levels/L01.py"], "L02": ["generator/levels/L02.py"]}}}
+    (proj / "kit.local.json").write_text(json.dumps(loc), encoding="utf-8")
+
+
+def release_samples(only=None) -> int:
+    """kit release on a two-level pack built from the sample map: L01 changes level to L02, L02 is the temporary
+    finale; both are compiled quick, checked, compiled full, checked to G4. The good pack must pass and be installed
+    (into a temporary addons folder, never the game's); each bad pack must be stopped by the check it names."""
+    import vsamples
+    g = game_dir()
+    vbsp = Path(g, "bin", "vbsp.exe") if g else None
+    if not g or not vbsp.exists() or not Path(g, "bin", "vpk.exe").exists():
+        print("NOTE 本机没找到游戏、vbsp 或 vpk：kit release 的样本没跑")
+        return 0
+    try:
+        import srctools  # noqa: F401
+        import scipy  # noqa: F401
+    except ImportError:
+        print("NOTE 当前 python 没装 srctools 或 scipy：kit release 的样本没跑")
+        return 0
+    G = Path(g)
+    bad = 0
+    import time as _t
+
+    def pack(proj, muts, step1="G4", full1=True):
+        """Build every level first (the changelevel checks look at the next map), then for each: quick compile, kit
+        verify --build quick, full compile of the same VMF, kit verify --build full. Returns an error text or None."""
+        bsps = {}
+        for n, mut in muts.items():
+            ld = proj / "design" / "detail" / f"L{n:02d}"
+            ld.mkdir(parents=True, exist_ok=True)
+            vsamples.design(ld, n)
+        _t.sleep(1.1)
+        for n, mut in muts.items():
+            bsps[n] = vsamples.build(proj, f"L{n}", mut, vbsp, G, level=n)
+            vsamples.compile_rest(bsps[n], G, fast=True)
+        for n, bsp in bsps.items():
+            step = step1 if n == 1 else "G4"
+            code, out = kit(proj, "verify", str(n), "--step", step, "--build", "quick")
+            if code != 0:
+                return f"L{n:02d} 的快速档没过 kit verify：{out[-600:]}"
+            if n == 1 and not full1:
+                continue
+            vsamples.run_vbsp(bsp.with_suffix(".vmf"), vbsp, G)
+            vsamples.compile_rest(bsp, G, fast=False)
+            code, out = kit(proj, "verify", str(n), "--step", step, "--build", "full")
+            if code != 0:
+                return f"L{n:02d} 的完整编译没过 kit verify：{out[-600:]}"
+        return None
+
+    two = {1: vsamples.change_to("kitsample_c1m2"), 2: vsamples.landmark}
+
+    cases = [("good", "好样本：两关，第一关换关到第二关，第二关临时终局", None)] + vsamples.RELEASE
+    for name, what, must in cases:
+        if only and name not in only:
+            continue
+        tmp, proj = fresh()
+        try:
+            verify_project(proj)
+            addons = tmp / "addons"
+            err = None
+            args = []
+            if name == "good":
+                err = pack(proj, two)
+                args = ["--notes", "样本"]
+            elif name == "last_not_finale":
+                err = pack(proj, two)
+                args = ["--upto", "1", "--dry-run"]
+            elif name == "wrong_next":
+                err = pack(proj, {1: vsamples.change_to("kitsample_c1m9"), 2: vsamples.landmark})
+                args = ["--dry-run"]
+            elif name == "map_after_verify":
+                err = pack(proj, two)
+                _t.sleep(1.1)
+                bsp = next((proj / "build" / "L02").glob("*.bsp"))
+                vsamples.run_vbsp(bsp.with_suffix(".vmf"), vbsp, G)
+                args = ["--dry-run"]
+            elif name == "verify_too_early":
+                err = pack(proj, two, step1="G3")
+                args = ["--dry-run"]
+            elif name == "verify_quick_only":
+                err = pack(proj, two, full1=False)
+                args = ["--dry-run"]
+            if err:
+                print(f"FAIL kit release 样本 {name}：准备地图时出错：{err}")
+                bad += 1
+                continue
+            code, out = kit(proj, "release", "--addons", str(addons), *args)
+            if name == "good":
+                inst = list(addons.glob("*.vpk")) if addons.exists() else []
+                ok = code == 0 and len(inst) == 1 and (proj / "release" / "CHANGELOG.md").exists() and (proj / "RELEASE-GUIDE.md").exists()
+                if ok:
+                    from srctools.vpk import VPK
+                    files = {f.filename for f in VPK(inst[0])}
+                    ok = {"addoninfo.txt", "maps/kitsample_c1m1.bsp", "maps/kitsample_c1m2.bsp"} <= files and any(f.startswith("missions/") for f in files)
+                code2, out2 = kit(proj, "release", "--addons", str(addons), "--notes", "第二版")
+                ok = ok and code2 == 0 and json.loads((proj / "release" / "release.json").read_text(encoding="utf-8"))["version"] == 2
+                print(("OK   " if ok else "FAIL ") + f"kit release 好样本：检查过、打包、装进插件目录、版本号加一" + ("" if ok else f"\n{out[-1200:]}\n{out2[-600:]}"))
+            else:
+                line = next((ln for ln in out.splitlines() if ln.strip().startswith(f"FAIL {must}")), "")
+                ok = code == 1 and bool(line) and "Traceback" not in out and not (addons.exists() and any(addons.iterdir()))
+                print(("OK   " if ok else "MISS ") + f"kit release 坏样本 {name}（{what}）" + (f"→ {line.strip()[:120]}" if ok else f"：{out[-800:]}"))
+            bad += 0 if ok else 1
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
     return bad
