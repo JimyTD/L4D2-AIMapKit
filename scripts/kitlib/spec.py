@@ -304,16 +304,21 @@ def run(level_dir: Path):
                         if o.get("kind") == "saferoom_door" and (ref_tag in o.get("plan", []) or o.get("id") in ref_ids) and o.get("level") is not None and o.get("in"):
                             sp_key = (bid, o["level"], o["in"])
                             break
-                    # 2. space polygon containing room["room"], preferring the route's start/end floor
+                    # 2. route start/end space if room["room"] is near it, else polygon containing room["room"]
                     if sp_key is None:
                         path_sp = [p for p in (src[bid].get("route") or {}).get("path", []) if isinstance(p, list) and p[0] != "core"]
-                        pref_lv = path_sp[0][0] if (key == "start_room" and path_sp) else (path_sp[-1][0] if path_sp else None)
-                        hits = [k for k, p in sp_polys.items() if k[0] == bid and p.buffer(1.0).contains(pt)]
-                        if hits:
-                            hits.sort(key=lambda k: k[1] != pref_lv)
-                            sp_key = hits[0]
-                        elif path_sp:
-                            sp_key = (bid, path_sp[0][0], path_sp[0][1]) if key == "start_room" else (bid, path_sp[-1][0], path_sp[-1][1])
+                        end_pt = path_sp[0] if key == "start_room" else (path_sp[-1] if path_sp else None)
+                        end_key = (bid, end_pt[0], end_pt[1]) if end_pt else None
+                        if end_key in sp_polys and sp_polys[end_key].buffer(2.0).contains(pt):
+                            sp_key = end_key
+                        else:
+                            pref_lv = end_pt[0] if end_pt else None
+                            hits = [k for k, p in sp_polys.items() if k[0] == bid and p.buffer(1.0).contains(pt)]
+                            if hits:
+                                hits.sort(key=lambda k: k[1] != pref_lv)
+                                sp_key = hits[0]
+                            elif end_key in sp_polys:
+                                sp_key = end_key
                 in_room = [x for x in supply_objs if (x["space"] == sp_key if sp_key else x["pid"] == bid)]
             else:
                 in_room = [x for x in supply_objs if x["pt"].distance(pt) <= near_r]
