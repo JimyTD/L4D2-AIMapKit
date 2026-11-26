@@ -35,7 +35,7 @@ from shapely.geometry import Point, Polygon
 
 from project import COORD_MAX_U, KitError, decision_items, decisions, decisions_stamp, plan, plan_level, root
 from project import level_dir as ldir
-from fmt import vehicle_events
+from fmt import BIG_EVENT_TYPES, supply_counts_design, supply_req_label, vehicle_events
 from structure import Frame, base_file, load_spec, plan_refs_valid
 
 
@@ -245,6 +245,114 @@ def run(level_dir: Path):
         ok("事件", f"{e['id']} 有东西触发或引用", e["id"] in fired, "、".join(fired.get(e["id"], [])[:3]))
     for ev in fired:
         ok("事件", f"被引用的事件 {ev} 在事件表里", ev in ev_ids, "、".join(fired[ev][:2]))
+
+    # ---- supply baseline (P1 supply_base: lower bound for every safe room and before every big event)
+    sb = dec.get("supply_base")
+    if sb:
+        # structure spaces as project-coordinate polygons (to locate objects in a room or open-area safe room)
+        sp_polys = {}
+        for bid, b in blds.items():
+            fr = Frame(tuple(b["frame"]["origin"]), b["frame"]["u_angle_deg"])
+            for fl in built[bid].get("floors", []):
+                for sp in fl.get("spaces", []):
+                    pts = sp.get("poly_m") or ([(r[0], r[1]), (r[2], r[1]), (r[2], r[3]), (r[0], r[3])] for r in (sp.get("rects_m") or [])[:1])
+                    pts = list(pts)
+                    if pts:
+                        sp_polys[(bid, fl["level"], sp["id"])] = Polygon([fr.xy(u, v) for u, v in pts])
+        # every item_spawn object with its project-coordinate point (special / easter_egg excluded later by supply_counts_design)
+        supply_objs = []
+        for pid, s in src.items():
+            if pid in blds:
+                b = blds[pid]
+                main_fr = Frame(tuple(b["frame"]["origin"]), b["frame"]["u_angle_deg"])
+                for o in s.get("objects", []):
+                    if o.get("kind") != "item_spawn":
+                        continue
+                    fr = Frame(tuple(b["frames"][o["frame"]]["origin"]), b["frames"][o["frame"]]["u_angle_deg"]) if o.get("frame") else main_fr
+                    wx, wy = fr.xy(*o["at"])
+                    supply_objs.append({"pid": pid, "obj": o, "pt": Point(wx, wy), "space": (pid, o.get("level"), o.get("in"))})
+            else:
+                for o in s.get("objects", []):
+                    if o.get("kind") != "item_spawn":
+                        continue
+                    supply_objs.append({"pid": pid, "obj": o, "pt": Point(o["at"]), "space": None})
+
+        def check_reqs(where_label, objs, reqs):
+            for req in reqs or []:
+                want_n = int(req.get("count", 0))
+                if want_n <= 0:
+                    continue
+                have = sum(supply_counts_design(x["obj"], req) for x in objs)
+                ok("补给", f"{where_label} 至少有 {want_n} 个 {supply_req_label(req)}（不含 special）", have >= want_n, f"现在 {have} / {want_n}")
+
+        near_r = float(sb.get("radius_m", 15))
+        for key, label in (("start_room", "起点安全屋"), ("end_room", "终点安全屋")):
+            reqs = sb.get(key) if key in sb else sb.get("safe_room")
+            if not reqs:
+                continue
+            rid = lvl[key]
+            room = rooms[rid]
+            pt = Point(room["room"])
+            if room.get("outline"):
+                bid = next((b_id for b_id, b in blds.items() if b["outline"] == room["outline"]), None)
+                sp_key = None
+                if bid:
+                    # 1. explicit room:<rid> tag on a saferoom_door in that structure
+                    ref_tag = f"room:{rid}"
+                    ref_ids = {r["at"] for r in src[bid].get("plan_refs", []) if r.get("ref") == ref_tag}
+                    for o in src[bid].get("objects", []):
+                        if o.get("kind") == "saferoom_door" and (ref_tag in o.get("plan", []) or o.get("id") in ref_ids) and o.get("level") is not None and o.get("in"):
+                            sp_key = (bid, o["level"], o["in"])
+                            break
+                    # 2. space polygon containing room["room"], preferring the route's start/end floor
+                    if sp_key is None:
+                        path_sp = [p for p in (src[bid].get("route") or {}).get("path", []) if isinstance(p, list) and p[0] != "core"]
+                        pref_lv = path_sp[0][0] if (key == "start_room" and path_sp) else (path_sp[-1][0] if path_sp else None)
+                        hits = [k for k, p in sp_polys.items() if k[0] == bid and p.buffer(1.0).contains(pt)]
+                        if hits:
+                            hits.sort(key=lambda k: k[1] != pref_lv)
+                            sp_key = hits[0]
+                        elif path_sp:
+                            sp_key = (bid, path_sp[0][0], path_sp[0][1]) if key == "start_room" else (bid, path_sp[-1][0], path_sp[-1][1])
+                in_room = [x for x in supply_objs if (x["space"] == sp_key if sp_key else x["pid"] == bid)]
+            else:
+                in_room = [x for x in supply_objs if x["pt"].distance(pt) <= near_r]
+            check_reqs(f"{label} {rid}", in_room, reqs)
+
+        ev_reqs = sb.get("before_event") or []
+        if ev_reqs:
+            ev_pts = {}
+            for pid, s in src.items():
+                is_b = pid in blds
+                main_fr = Frame(tuple(blds[pid]["frame"]["origin"]), blds[pid]["frame"]["u_angle_deg"]) if is_b else None
+                for o in s.get("objects", []):
+                    if is_b:
+                        fr = Frame(tuple(blds[pid]["frames"][o["frame"]]["origin"]), blds[pid]["frames"][o["frame"]]["u_angle_deg"]) if o.get("frame") else main_fr
+                        pt = Point(fr.xy(*o["at"]))
+                    else:
+                        pt = Point(o["at"])
+                    for ev in o.get("fires", []):
+                        ev_pts.setdefault(ev, []).append(pt)
+                    for k in ("opened_by", "enabled_by"):
+                        v = o.get(k, "")
+                        if isinstance(v, str) and v in ev_ids:
+                            ev_pts.setdefault(v, []).append(pt)
+                    if o.get("kind") == "vehicle":
+                        vf, _ = vehicle_events(o)
+                        for st in o.get("stops", []) + o.get("passes", []):
+                            if isinstance(st, dict) and st.get("at"):
+                                for ev in st.get("fires", []):
+                                    ev_pts.setdefault(ev, []).append(Point(st["at"]))
+                        for ev in vf:
+                            ev_pts.setdefault(ev, []).append(pt)
+            for e in events:
+                if e.get("type") not in BIG_EVENT_TYPES:
+                    continue
+                pts = ev_pts.get(e["id"]) or []
+                if not pts:
+                    continue
+                near = [x for x in supply_objs if any(x["pt"].distance(p) <= near_r for p in pts)]
+                check_reqs(f"大事件 {e['id']}（{e.get('name', e['type'])}）前 {near_r:g} m 内", near, ev_reqs)
 
     # ---- brushside budget (design-time estimate; the generator measures the real number after compiling)
     est = {pid: built[pid]["stats"].get("brushside_estimate") for k, pid, _ in pieces if k == "structure"}

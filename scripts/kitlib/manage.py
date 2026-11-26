@@ -768,6 +768,13 @@ def check_campaign() -> int:
             bad.append("缺 curve_why（为什么这样起伏）")
     if c.get("realism") in ("replica", "inspired") and not c.get("geo", {}).get("bbox"):
         bad.append("真实地点要写 geo.bbox（P2 采地理数据用）")
+    dec_p = root() / "standards" / "decisions.json"
+    if dec_p.exists():
+        sb = next((i.get("value") for i in rd(dec_p).get("items", []) if i.get("id") == "supply_base"), None)
+        if not isinstance(sb, dict) or not isinstance(sb.get("before_event"), list) or not (
+            isinstance(sb.get("safe_room"), list) or isinstance(sb.get("start_room"), list)
+        ):
+            bad.append("缺基础补给标准 supply_base（standards/decisions.json：safe_room 和 before_event 列表）")
     for b in bad:
         print("FAIL " + b)
     print(f"campaign check: {len(bad)} 个问题")

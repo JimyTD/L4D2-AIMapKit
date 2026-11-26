@@ -373,6 +373,37 @@
    "see_through": true,
    "vault": false
   },
+    {
+     "id": "o_gun",
+     "level": 2,
+     "in": "r_start",
+     "at": [
+      28,
+      10
+     ],
+     "yaw_deg": 0,
+     "size_m": [
+      0.8,
+      0.3,
+      0.2
+     ],
+     "kind": "item_spawn",
+     "items": [
+      {
+       "entity": "weapon_spawn",
+       "count": 2,
+       "options": "tier1_any"
+      }
+     ],
+     "plan": [
+      "room:R0"
+     ],
+     "what": "起点安全屋的主武器",
+     "src": "@made",
+     "blocks": false,
+     "see_through": true,
+     "vault": false
+    },
   {
    "id": "o_btn",
    "level": 1,

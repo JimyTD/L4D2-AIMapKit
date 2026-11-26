@@ -41,7 +41,7 @@ EPS_W = 0.05
 
 # step -> groups it adds (each step re-runs the groups of the steps before it)
 STEP_GROUPS = [("G3", ["fresh", "compile", "walk", "doors"]),
-               ("G4", ["logic", "level", "interact", "entities"]),
+               ("G4", ["logic", "level", "interact", "entities", "supply"]),
                ("G5", ["resources", "text", "models", "looks"]),
                ("G6", ["placement", "dressing"]),
                ("G7", ["light", "vis"]),
@@ -93,6 +93,7 @@ for _cid, _g, _t in [
     ("L4", "logic", "事件按设计的先后发生（一次性的输出不被提前用掉）"), ("L5", "logic", "事件类型做到了（开锁、尸潮）"),
     ("L6", "logic", "用到的实体类型原版战役用过"),
     ("E1", "entities", "设计里的玩法实体在地图里是对应的类型（会动、有碰撞）"), ("E2", "entities", "载具沿设计路线走"),
+    ("S1", "supply", "设计里写的基础补给点位（种类和数量）在地图里有对应刷点"),
     ("V1", "level", "换关不指回本图，两边 landmark 同名都在"), ("V2", "level", "已做出的最后一关是临时终局"),
     ("R1", "resources", "没有缺失或 0 字节的资源"), ("R2", "resources", "自制贴图是 VTF 7.4、尺寸是 2 的幂"),
     ("T1", "text", "文字不镜像"), ("T2", "text", "文字不超出承载面、不重复、不被截断"),
@@ -1709,6 +1710,47 @@ def find_map(name):
     return p if p.exists() else None
 
 
+def check_supply(c, md, design):
+    """S1: every designed item_spawn (special/easter_egg aside, or checked if placed) has matching supply entities
+    near its designed point whose total count reaches the designed count."""
+    import fmt
+    rep = c.rep
+    if not design:
+        return
+    r_u = float(c.dec("supply_match_r_u"))
+    sp_ents = [(e, vmap_vec(e["origin"])) for e in md.ents if e["classname"].lower() in fmt.SUPPLY_ENTITIES]
+    for key, owner, o, p, lv in design.objects():
+        if o.get("kind") != "item_spawn" or p is None:
+            continue
+        items = o.get("items") or []
+        if not items:
+            continue
+        rep.ran("S1")
+        near = [(e, pos) for e, pos in sp_ents if np.linalg.norm(pos[:2] - p[:2]) <= r_u and abs(pos[2] - p[2]) <= 96.0]
+        by_item = []
+        for it in items:
+            want_ent = str(it.get("entity") or "")
+            want_opt = str(it.get("options") or "")
+            want_n = int(it.get("count", 1))
+            have = sum(fmt.ent_supply_raw_count(e) for e, _ in near if fmt.ent_matches_item(e, want_ent, want_opt))
+            by_item.append((it, want_n, have))
+        if o.get("pick"):
+            ok_all = any(have >= want_n for _, want_n, have in by_item)
+        else:
+            ok_all = all(have >= want_n for _, want_n, have in by_item)
+        if not ok_all:
+            parts = []
+            for it, wn, hv in by_item:
+                if hv < wn:
+                    opt_s = f"({it.get('options')})" if it.get("options") else ""
+                    parts.append(f"{it.get('entity')}{opt_s} 要 {wn} 个、地图有 {hv} 个")
+            miss = "；".join(parts)
+            found = ", ".join(sorted({f"{e['classname']}({fmt.ent_supply_raw_count(e)})" for e, _ in near})) or "附近没有补给实体"
+            rep.add("S1", f"{key} 设计要求的补给在地图里不够或缺失（{miss}）",
+                    "设计里安全屋、大事件前和路线上的补给刷点（weapon_*_spawn、weapon_spawn 等）数量和种类要按设计做进地图。",
+                    f"在设计点位 {r_u:.0f} u 内放齐对应类名的补给实体并设好 count（当前附近：{found}）。", key=key, where=p)
+
+
 def check_level(c, md, design):
     from srctools.bsp import BSP
     rep = c.rep
@@ -2290,6 +2332,8 @@ def run(level, a) -> int:
         check_interact(c, md, design, W, reach, sim, graph)
     if "entities" in groups:
         check_entities(c, md, design)
+    if "supply" in groups:
+        check_supply(c, md, design)
     if "level" in groups:
         check_level(c, md, design)
     if "resources" in groups:

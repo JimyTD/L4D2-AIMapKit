@@ -112,6 +112,7 @@
 | `infected` | `type`（Tank、Witch 等）、`count`、`when`、可选 `points` | 固定刷特殊感染者 |
 
 所有物件都可以写 `enabled_by`，表示先发生哪个事件，这个物件才能用。`prop`、`clutter_block` 可以写 `breakable: true`，表示能被打坏（加 `enabled_by` 就是那个事件之前打不坏），打坏时触发的事件写 `fires`。会开的车只放在开放区，见 [area.md](area.md) 的“载具”；载具的 `stops` 是停车点对象列表，和电梯的 `stops`（层号）同名不同义，按 `kind` 区分。
+`item_spawn` 可以写 `"special": true` 表示特殊探索补给，不计入 `supply_base` 基础补给下限（见 [rules.md](../rules.md)）。
 
 **`fixtures`**：`{"id", "level", "in", "at", "yaw_deg", "size_m", "kind": furniture|equipment|partition|clutter|plant|structure, "blocks", "see_through", "vault", "what", "src"}`。挡路的构件不能挡住门口（门两侧 0.9 m 以内）。
 

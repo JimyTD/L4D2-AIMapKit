@@ -315,6 +315,62 @@
    "see_through": true,
    "vault": true
   },
+   {
+    "id": "o_ev_molo",
+    "at": [
+     8,
+     18
+    ],
+    "yaw_deg": 0,
+    "size_m": [
+     0.3,
+     0.3,
+     0.3
+    ],
+    "kind": "item_spawn",
+    "items": [
+     {
+      "entity": "weapon_molotov_spawn",
+      "count": 1
+     }
+    ],
+    "plan": [
+     "event:0"
+    ],
+    "what": "院子尸潮前的燃烧瓶",
+    "src": "@made",
+    "blocks": false,
+    "see_through": true,
+    "vault": false
+   },
+   {
+    "id": "o_end_med",
+    "at": [
+     50,
+     20
+    ],
+    "yaw_deg": 0,
+    "size_m": [
+     0.4,
+     0.3,
+     0.2
+    ],
+    "kind": "item_spawn",
+    "items": [
+     {
+      "entity": "weapon_first_aid_kit_spawn",
+      "count": 1
+     }
+    ],
+    "plan": [
+     "room:R1"
+    ],
+    "what": "终点安全屋的医疗包",
+    "src": "@made",
+    "blocks": false,
+    "see_through": true,
+    "vault": false
+   },
   {
    "id": "o_truck",
    "kind": "vehicle",

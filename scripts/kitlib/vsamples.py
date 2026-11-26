@@ -102,6 +102,9 @@ def good():
     m.ent("prop_static", model=TABLE, origin="256 160 0", angles="0 0 0", solid="6")
     m.ent("prop_static", model=CHAIR, origin="320 160 0", angles="0 180 0", solid="6")
     m.ent("prop_static", model=CRATE, origin="40 40 0", angles="0 0 0", solid="6")
+    # base supply in the start room (on the table): medkit and primary weapon
+    m.ent("weapon_first_aid_kit_spawn", targetname="yard-o_med", origin="248 160 36", angles="0 0 0")
+    m.ent("weapon_spawn", targetname="yard-o_gun", weapon_selection="tier1_any", count="2", origin="268 160 36", angles="0 0 0")
     # text sign on the start-side face of the wall (outward normal -x), reading correctly
     s = m.box((WALL_X0 - 2, 448, 64), (WALL_X0, 576, 192), mat="tools/toolsnodraw")
     for sd in s.sides:  # the face at x = WALL_X0 - 2 faces the start (srctools Side.normal() points into the brush)
@@ -152,13 +155,18 @@ def design(level_dir: Path, level: int = 1):
             "route": {"main": [to_m(128, 384), to_m(600, 384), to_m(720, 384), to_m(1408, 384)], "alts": [],
                       "must_reach": {"墙后": to_m(1000, 200)}, "must_not_reach": {}},
             "objects": [{"id": "o_btn", "kind": "button", "at": to_m(WALL_X0 - 2, 300), "z_m": round(56 * U, 3), "fires": ["ev_btn"],
-                         "what": "按钮"}],
+                         "what": "按钮"},
+                        {"id": "o_med", "kind": "item_spawn", "at": to_m(248, 160), "z_m": round(36 * U, 3),
+                         "items": [{"entity": "weapon_first_aid_kit_spawn", "count": 1}], "what": "医疗包"},
+                        {"id": "o_gun", "kind": "item_spawn", "at": to_m(268, 160), "z_m": round(36 * U, 3),
+                         "items": [{"entity": "weapon_spawn", "count": 2, "options": "tier1_any"}], "what": "主武器"}],
             "passages": [], "blockers": [], "fixtures": []}}],
         "events": [{"id": "ev_btn", "name": "按钮", "type": "Effect", "then": "event:0", "what": "按下"},
                    {"id": "event:0", "name": "尸潮", "type": "PanicEvent"}],
         "standards": [],
     }
-    els = [{"key": "A/door/1/d_mid"}, {"key": "yard/object/-/o_btn"}, {"key": "events/event/-/ev_btn"}, {"key": "events/event/-/event:0"}]
+    els = [{"key": "A/door/1/d_mid"}, {"key": "yard/object/-/o_btn"}, {"key": "yard/object/-/o_med"},
+           {"key": "yard/object/-/o_gun"}, {"key": "events/event/-/ev_btn"}, {"key": "events/event/-/event:0"}]
     (level_dir / "spec.json").write_text(json.dumps(spec, ensure_ascii=False), encoding="utf-8")
     (level_dir / "elements.json").write_text(json.dumps({"elements": els}), encoding="utf-8")
 
@@ -365,6 +373,11 @@ def quick_pending(m):
     judge them, so they are pending, not failed."""
 
 
+def missing_supply(m):
+    """The start room primary weapon spawner designed in spec is missing from the compiled map."""
+    m.v.entities[:] = [e for e in m.v.entities if e["classname"] != "weapon_spawn"]
+
+
 SAMPLES = [
     ("narrow_door", "门被砌窄过不去（门洞按小门扇补墙垛）", narrow_door, ["D1"]),
     ("mirrored_sign", "门牌文字镜像", mirrored_sign, ["T1"]),
@@ -400,6 +413,7 @@ SAMPLES = [
     ("full_after_quick", "（应通过）同一份 VMF 先快速档过了，再完整编译", full_after_quick, []),
     ("fast_called_full", "快速编译的图当完整编译交", fast_called_full, ["C6"]),
     ("quick_pending", "（不报 G1、X1）快速档上补丁数、可见比例待完整编译", quick_pending, []),
+    ("missing_supply", "设计写了起点安全屋主武器，地图里没放对应的武器刷点", missing_supply, ["S1"]),
 ]
 
 # samples that must pass every check (a change that must not be reported)
@@ -419,6 +433,7 @@ RUN = {
     "fast_called_full": {"args": ["--step", "G6", "--build", "full"], "compile": "quick"},
     "quick_pending": {"args": ["--step", "G7", "--only", "light,vis", "--set", "vrad_patch_max=1", "--set", "vis_ratio_max=0.01"],
                       "compile": "quick", "absent": ["G1", "X1"], "pending": ["G1", "X1"]},
+    "missing_supply": {"args": ["--step", "G4"]},
 }
 
 

@@ -32,6 +32,42 @@
    "why": "自测"
   },
   {
+   "id": "supply_base",
+   "value": {
+    "start_room": [
+     {
+      "kind": "primary",
+      "count": 1
+     },
+     {
+      "kind": "medkit",
+      "count": 1
+     }
+    ],
+    "end_room": [
+     {
+      "kind": "medkit",
+      "count": 1
+     }
+    ],
+    "before_event": [
+     {
+      "kind": "throwable",
+      "count": 1
+     }
+    ],
+    "radius_m": 15
+   },
+   "status": "已定",
+   "why": "自测"
+  },
+  {
+   "id": "supply_match_r_u",
+   "value": 256,
+   "status": "已定",
+   "why": "自测"
+  },
+  {
    "id": "map_margin_u",
    "value": 1024,
    "status": "已定",

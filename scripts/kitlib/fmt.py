@@ -32,6 +32,218 @@ VEHICLE_WAIT = {"humans", "survivors", "none"}  # who the vehicle waits for befo
 VEHICLE_STRAGGLERS = {"teleport", "left"}  # survivors not aboard when it moves on: put back aboard, or left behind
 RESUME_KEYS = {"fired", "ended", "time_s", "boarded"}
 BREAKABLE_KINDS = {"prop", "clutter_block"}
+BIG_EVENT_TYPES = {"PanicEvent", "ScriptedPanicEvent", "Tank", "Hold", "Alarm"}
+
+PRIMARY_TIER1_ENTS = {
+    "weapon_smg_spawn", "weapon_smg_silenced_spawn", "weapon_smg_mp5_spawn",
+    "weapon_pumpshotgun_spawn", "weapon_shotgun_chrome_spawn",
+}
+PRIMARY_TIER2_ENTS = {
+    "weapon_autoshotgun_spawn", "weapon_shotgun_spas_spawn",
+    "weapon_rifle_spawn", "weapon_rifle_desert_spawn", "weapon_rifle_ak47_spawn",
+    "weapon_rifle_sg552_spawn", "weapon_rifle_m60_spawn",
+    "weapon_hunting_rifle_spawn", "weapon_sniper_military_spawn",
+    "weapon_sniper_awp_spawn", "weapon_sniper_scout_spawn",
+    "weapon_grenade_launcher_spawn",
+}
+PRIMARY_ENTS = PRIMARY_TIER1_ENTS | PRIMARY_TIER2_ENTS
+PISTOL_ENTS = {"weapon_pistol_spawn", "weapon_pistol_magnum_spawn"}
+MELEE_ENTS = {"weapon_melee_spawn", "weapon_chainsaw_spawn"}
+SECONDARY_ENTS = PISTOL_ENTS | MELEE_ENTS
+MEDKIT_ENTS = {"weapon_first_aid_kit_spawn", "weapon_first_aid_kit"}
+PILL_ENTS = {"weapon_pain_pills_spawn", "weapon_adrenaline_spawn"}
+THROWABLE_ENTS = {"weapon_molotov_spawn", "weapon_pipe_bomb_spawn", "weapon_vomitjar_spawn"}
+AMMO_ENTS = {"weapon_ammo_spawn"}
+UPGRADE_ENTS = {"weapon_upgradepack_incendiary_spawn", "weapon_upgradepack_explosive_spawn", "upgrade_spawn"}
+SUPPLY_ENTITIES = (
+    PRIMARY_ENTS | SECONDARY_ENTS | MEDKIT_ENTS | PILL_ENTS | THROWABLE_ENTS | AMMO_ENTS | UPGRADE_ENTS
+    | {"weapon_spawn", "weapon_item_spawn", "weapon_defibrillator_spawn", "weapon_gascan_spawn", "weapon_scavenge_item_spawn"}
+)
+WEAPON_SPAWN_MULTI = (
+    PRIMARY_ENTS | SECONDARY_ENTS | THROWABLE_ENTS | {"weapon_spawn"}
+)
+
+WEAPON_SPAWN_TIER1_SELS = {"tier1_any", "any_smg", "tier1_shotgun"} | {e[:-6] for e in PRIMARY_TIER1_ENTS}
+WEAPON_SPAWN_TIER2_SELS = {"tier2_any", "any_rifle", "any_sniper_rifle", "tier2_shotgun"} | {e[:-6] for e in PRIMARY_TIER2_ENTS}
+WEAPON_SPAWN_PRIMARY_SELS = {"any_primary", "any_shotgun"} | WEAPON_SPAWN_TIER1_SELS | WEAPON_SPAWN_TIER2_SELS
+WEAPON_SPAWN_PISTOL_SELS = {"any_pistol", "weapon_pistol", "weapon_pistol_magnum"}
+SEL_SUBSETS = {
+    "any_primary": WEAPON_SPAWN_PRIMARY_SELS,
+    "tier1_any": WEAPON_SPAWN_TIER1_SELS,
+    "tier2_any": WEAPON_SPAWN_TIER2_SELS,
+    "any_smg": {"any_smg", "weapon_smg", "weapon_smg_silenced", "weapon_smg_mp5"},
+    "any_shotgun": {"any_shotgun", "tier1_shotgun", "tier2_shotgun", "weapon_pumpshotgun", "weapon_shotgun_chrome",
+                    "weapon_autoshotgun", "weapon_shotgun_spas"},
+    "tier1_shotgun": {"tier1_shotgun", "weapon_pumpshotgun", "weapon_shotgun_chrome"},
+    "tier2_shotgun": {"tier2_shotgun", "weapon_autoshotgun", "weapon_shotgun_spas"},
+    "any_rifle": {"any_rifle", "weapon_rifle", "weapon_rifle_desert", "weapon_rifle_ak47", "weapon_rifle_sg552"},
+    "any_sniper_rifle": {"any_sniper_rifle", "weapon_hunting_rifle", "weapon_sniper_military", "weapon_sniper_awp", "weapon_sniper_scout"},
+    "any_pistol": WEAPON_SPAWN_PISTOL_SELS,
+    "any": {"any"} | WEAPON_SPAWN_PRIMARY_SELS | WEAPON_SPAWN_PISTOL_SELS,
+}
+SUPPLY_KIND_ENTS = {
+    "primary": PRIMARY_ENTS,
+    "tier1": PRIMARY_TIER1_ENTS,
+    "tier2": PRIMARY_TIER2_ENTS,
+    "secondary": SECONDARY_ENTS,
+    "pistol": PISTOL_ENTS,
+    "melee": MELEE_ENTS,
+    "medkit": MEDKIT_ENTS,
+    "pill": PILL_ENTS,
+    "pills": PILL_ENTS,
+    "throwable": THROWABLE_ENTS,
+    "throw": THROWABLE_ENTS,
+    "ammo": AMMO_ENTS,
+    "upgrade": UPGRADE_ENTS,
+}
+SUPPLY_KIND_SELS = {
+    "primary": WEAPON_SPAWN_PRIMARY_SELS,
+    "tier1": WEAPON_SPAWN_TIER1_SELS,
+    "tier2": WEAPON_SPAWN_TIER2_SELS,
+    "secondary": WEAPON_SPAWN_PISTOL_SELS,
+    "pistol": WEAPON_SPAWN_PISTOL_SELS,
+}
+ITEM_TOKEN_TO_ENT = {
+    "ammo": "weapon_ammo_spawn",
+    "first_aid_kit": "weapon_first_aid_kit_spawn",
+    "medkit": "weapon_first_aid_kit_spawn",
+    "molotov": "weapon_molotov_spawn",
+    "pain_pills": "weapon_pain_pills_spawn",
+    "pills": "weapon_pain_pills_spawn",
+    "pipe_bomb": "weapon_pipe_bomb_spawn",
+    "adrenaline": "weapon_adrenaline_spawn",
+    "defibrillator": "weapon_defibrillator_spawn",
+    "vomitjar": "weapon_vomitjar_spawn",
+    "chainsaw": "weapon_chainsaw_spawn",
+    "grenade_launcher": "weapon_grenade_launcher_spawn",
+    "m60": "weapon_rifle_m60_spawn",
+}
+ITEM_SPAWN_KEYS = {
+    "ammo": ("item1", 1),
+    "first_aid_kit": ("item2", 0),
+    "medkit": ("item2", 0),
+    "molotov": ("item3", 1),
+    "pain_pills": ("item4", 1),
+    "pills": ("item4", 1),
+    "pipe_bomb": ("item5", 1),
+    "adrenaline": ("item11", 1),
+    "defibrillator": ("item12", 0),
+    "vomitjar": ("item13", 0),
+    "chainsaw": ("item16", 0),
+    "grenade_launcher": ("item17", 0),
+    "m60": ("item18", 0),
+}
+
+
+def supply_req_label(req: dict) -> str:
+    return str(req.get("kind") or req.get("entity") or "?")
+
+
+def item_matches_req(entity: str, options: str, req: dict) -> bool:
+    ent = (entity or "").strip().lower()
+    opt = (options or "").strip().lower()
+    want_ent = str(req.get("entity") or "").strip().lower()
+    if want_ent:
+        if ent == want_ent:
+            return True
+        if ent == "weapon_spawn" and want_ent in (PRIMARY_ENTS | PISTOL_ENTS):
+            return (opt or "any_primary") == want_ent[:-6]
+        return False
+    kind = str(req.get("kind") or "").strip().lower()
+    if not kind:
+        return False
+    if ent in SUPPLY_KIND_ENTS.get(kind, ()):
+        return True
+    if ent == "weapon_spawn":
+        sel = opt or "any_primary"
+        return sel in SUPPLY_KIND_SELS.get(kind, ())
+    if ent == "weapon_item_spawn" and opt:
+        tokens = [t.strip() for t in opt.split(",") if t.strip()]
+        mapped = [ITEM_TOKEN_TO_ENT.get(t) for t in tokens]
+        return bool(mapped) and all(m in SUPPLY_KIND_ENTS.get(kind, ()) for m in mapped)
+    return False
+
+
+def supply_counts_design(obj: dict, req: dict) -> int:
+    """Guaranteed item count of req from one design item_spawn object (special / easter_egg excluded)."""
+    if obj.get("kind") != "item_spawn" or obj.get("special") or obj.get("easter_egg"):
+        return 0
+    items = obj.get("items") or []
+    if not items:
+        return 0
+    if obj.get("pick"):
+        matched = [int(it.get("count", 0)) for it in items if item_matches_req(it.get("entity", ""), it.get("options", ""), req)]
+        return min(matched) if len(matched) == len(items) else 0
+    return sum(int(it.get("count", 0)) for it in items if item_matches_req(it.get("entity", ""), it.get("options", ""), req))
+
+
+def ent_supply_raw_count(ent) -> int:
+    """Maximum number of pickups a compiled BSP supply entity provides (FGD defaults)."""
+    cls = ent["classname"].lower()
+    if cls not in SUPPLY_ENTITIES:
+        return 0
+    try:
+        flags = int(ent["spawnflags"] or 0)
+    except ValueError:
+        flags = 0
+    if flags & 8:  # Infinite items
+        return 999
+    raw_c = ent["count"]
+    if raw_c not in (None, ""):
+        try:
+            return max(0, int(raw_c))
+        except ValueError:
+            return 0
+    if cls == "weapon_ammo_spawn":
+        return 999
+    if cls == "upgrade_spawn":
+        return 4
+    if cls in WEAPON_SPAWN_MULTI:
+        return 5
+    return 1
+
+
+def ent_matches_item(ent, want_ent: str, want_opt: str) -> bool:
+    """Whether a compiled BSP entity matches a designed item_spawn entry (entity, options)."""
+    cls = ent["classname"].lower()
+    we = (want_ent or "").strip().lower()
+    wo = (want_opt or "").strip().lower()
+    if cls == we:
+        if we == "weapon_spawn":
+            sel = (ent["weapon_selection"] or "any_primary").strip().lower()
+            if not wo:
+                return True
+            return sel == wo or sel in SEL_SUBSETS.get(wo, {wo})
+        if we == "weapon_item_spawn" and wo:
+            tokens = [t.strip() for t in wo.split(",") if t.strip()]
+            for tok in tokens:
+                if tok in ITEM_SPAWN_KEYS:
+                    k, default = ITEM_SPAWN_KEYS[tok]
+                    val = ent[k]
+                    try:
+                        on = (int(val) if val not in (None, "") else default) > 0
+                    except ValueError:
+                        on = False
+                    if on:
+                        return True
+                elif (ent["melee_weapon"] or "").strip():
+                    return True
+            return False
+        if we == "weapon_melee_spawn" and wo:
+            mw = (ent["melee_weapon"] or "").strip().lower()
+            if not mw or mw == "any":
+                return True
+            return bool({t.strip() for t in wo.split(",")} & {x.strip() for x in mw.split(",")})
+        return True
+    if we == "weapon_spawn" and cls in (PRIMARY_ENTS | PISTOL_ENTS):
+        w = cls[:-6]
+        if not wo:
+            return True
+        return w == wo or w in SEL_SUBSETS.get(wo, set())
+    if we in (PRIMARY_ENTS | PISTOL_ENTS) and cls == "weapon_spawn":
+        sel = (ent["weapon_selection"] or "any_primary").strip().lower()
+        return sel == we[:-6]
+    return False
 
 
 @lru_cache(None)

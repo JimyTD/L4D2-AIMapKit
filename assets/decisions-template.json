@@ -42,6 +42,23 @@
    "why": "MAX_MAP_BRUSHES"
   },
   {
+  "id": "supply_base",
+  "value": null,
+  "unit": "种类和数量",
+  "status": "暂定",
+  "step": "P1",
+  "hint": "安全屋和每个大事件前最少放什么基础补给（通关下限；P1 问卷第 8 题定）。写法：{\"safe_room\": [{\"kind\": \"primary\"|\"secondary\"|\"medkit\"|\"ammo\"|\"throwable\"|\"pill\"|\"melee\" 或实体类名, \"count\": 数量}], \"before_event\": [...]}；可加 start_room / end_room 分别要求、radius_m 指定大事件前判定半径（默认 15 m）"
+ },
+ {
+  "id": "supply_match_r_u",
+  "value": null,
+  "unit": "u",
+  "status": "暂定",
+  "step": "G4",
+  "start": 256,
+  "hint": "kit verify 补给（S1）：地图里的补给实体离设计点位多少单位内算对上号"
+ },
+ {
    "id": "map_margin_u",
    "value": null,
    "unit": "u",
