@@ -277,6 +277,19 @@ def stale_vmf(m):
     """Marker only: the runner touches the generator file after compiling."""
 
 
+def other_level_generator(m):
+    """Marker only: the runner changes another level's own generator file after compiling (must not be F1)."""
+
+
+def unused_decision(m):
+    """Marker only: the runner records the standards the map used (kit inputs), then changes a standard it did not
+    use (must not be F1)."""
+
+
+def used_decision(m):
+    """Marker only: the runner records the standards the map used (kit inputs), then changes one of them."""
+
+
 def leak(m):
     """A hole in the outer shell."""
     for s in list(m.v.brushes):
@@ -329,12 +342,18 @@ SAMPLES = [
     ("locked_forever", "锁着的门没有开锁路径", locked_forever, ["I2", "W1"]),
     ("missing_model", "缺模型（vbsp 删掉了）", missing_model, ["C5", "R1"]),
     ("stale_vmf", "改了生成器没重新生成就编译", stale_vmf, ["F1"]),
+    ("other_level_generator", "（应通过）改了别的关自己的生成器文件，这一关的地图不算旧", other_level_generator, []),
+    ("unused_decision", "（应通过）改了这一关没用到的标准，这一关的地图不算旧", unused_decision, []),
+    ("used_decision", "改了这一关用到的标准值，没重新生成", used_decision, ["F1"]),
     ("leak", "外壳有缝（漏点）", leak, ["C1"]),
     ("blocked_route", "主路线被墙挡死", blocked_corridor_point, ["W1", "W2"]),
     ("instance_overlap", "主图和实例之间的摆件穿插（只在单个文件内比较会漏）", instance_overlap, ["P1"]),
     ("lift_button_in_doorway", "电梯按钮块挡在门口", lift_button_in_doorway, ["D1"]),
     ("stale_bsp", "VMF 改了没重新编译", stale_bsp, ["F2"]),
 ]
+
+# samples that must pass every check (a change that must not be reported)
+MUST_PASS = {"other_level_generator", "unused_decision"}
 
 
 def build(proj: Path, name: str, mutate, vbsp: Path, game: Path):

@@ -21,10 +21,11 @@ spec 里的结构体、开放区、总图；美术规范的预算规则。
 8. **不静默退回**：没有外观规则管到的可见面，不悄悄退回灰盒；via 记成“匹配失败”，在报告里单列，G5 处理。
 9. **看不见的面画 nodraw**：贴地的底面、贴墙的背面、封死的面由生成器画成 nodraw；看不见的整体本来就不建。所以没有“看不见所以留着白盒”的情况。
 10. 预算按美术规范的预算规则；超了先看是哪类构件占大头，再按规则改做法（如凹进的改画贴图）。
+11. **生成器分公共和每关两部分**：只对这一关成立的处理放在这一关自己的文件里，不在公共代码里按关号分支；`kit.local.json` 的 `verify.generator` 按 common、levels 写（[sessions.md](../sessions.md) 的“多条生成线共用一个生成器”）。生成器每次写完 VMF 跑 `kit inputs <关号> --vmf <VMF> --used <这一关读过的待决定项>`，记下这张图用到的标准值，kit verify 的 F1 只在这些值改了时判过期。回归、试验和临时编译不写 `build/L<nn>/`。
 
 ## 产物
 
-`build/L<nn>/instances/<结构体>.vmf`、`build/L<nn>/<地图>.vmf`（内部中间产物，不对外交付）、`build/L<nn>/report.json`、`build/L<nn>/stamps/G3.json`。
+`build/L<nn>/instances/<结构体>.vmf`、`build/L<nn>/<地图>.vmf`（内部中间产物，不对外交付）、`build/L<nn>/<地图>.inputs.json`、`build/L<nn>/report.json`、`build/L<nn>/stamps/G3.json`。
 
 ## 交给下一步
 

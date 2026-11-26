@@ -74,7 +74,7 @@ def starts():
 
 CHECKS = {}  # id -> (group, title)
 for _cid, _g, _t in [
-    ("F1", "fresh", "地图 VMF 比生成器和设计数据新"), ("F2", "fresh", "BSP 比 VMF（含实例文件）新"), ("F3", "fresh", "编译日志里有这次编译"),
+    ("F1", "fresh", "地图 VMF 是用这一关依赖的生成器、设计和标准值的现状做的"), ("F2", "fresh", "BSP 比 VMF（含实例文件）新"), ("F3", "fresh", "编译日志里有这次编译"),
     ("C1", "compile", "没有漏点"), ("C2", "compile", "vbsp 日志没有 bounds out of range"), ("C3", "compile", "编译后世界范围在 ±16384 以内"),
     ("C4", "compile", "笔刷、笔刷面、平面、实体在上限内"), ("C5", "compile", "vbsp 没有丢掉模型（加载失败、出界）"),
     ("W1", "walk", "从起点走到终点（站立或蹲伏碰撞体）"), ("W2", "walk", "设计路线上每个点都走得到"), ("W3", "walk", "必达点都走得到"),
@@ -192,7 +192,50 @@ def instance_files(vmf: Path):
 
 # ---------------------------------------------------------------- fresh
 
-def check_fresh(c, md, design_files):
+def generator_paths(gen, level):
+    """The generator files this level depends on: verify.generator is a list (all common) or
+    {"common": [...], "levels": {"L01": [...], ...}}. Files under a common directory that another level lists as
+    its own are left out: changing one level's code does not make another level's map old."""
+    if isinstance(gen, str):
+        gen = [gen]
+    if isinstance(gen, dict):
+        common, levels = list(gen.get("common") or []), dict(gen.get("levels") or {})
+    else:
+        common, levels = list(gen or []), {}
+    mine = list(levels.get(f"L{level:02d}") or levels.get(str(level)) or [])
+    others = [g for k, v in levels.items() if k not in (f"L{level:02d}", str(level)) for g in v]
+    return common + mine, others
+
+
+def spec_fp(spec):
+    """Fingerprint of spec.json without its embedded standards (those are compared one by one, F1)."""
+    import hashlib
+    body = {k: v for k, v in spec.items() if k != "standards"}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
+
+
+def write_inputs(level, vmf, used) -> int:
+    """kit inputs: the generator records what a VMF was made from, right after writing it: <map>.inputs.json beside
+    the VMF with the values of the standards this level read and the spec fingerprint. F1 then compares only those."""
+    vmf = Path(vmf).resolve()
+    if not vmf.exists():
+        raise KitError(f"找不到 {vmf}：生成器写完 VMF 再跑 kit inputs")
+    spec_p = level_dir(level) / "spec.json"
+    if not spec_p.exists():
+        raise KitError(f"没有 {rel(spec_p)}：先跑 kit spec {level}")
+    ids = [x for u in used or [] for x in u.split(",") if x]
+    now = {i["id"]: i.get("value") for i in decision_items()}
+    miss = [k for k in ids if k not in now]
+    if miss:
+        raise KitError(f"decisions.json 里没有 {', '.join(miss)}")
+    out = {"schema": "kit.inputs/1.0", "level": level, "vmf": vmf.name, "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+           "spec": spec_fp(rd(spec_p)), "decisions": {k: now[k] for k in sorted(set(ids))}}
+    wr(vmf.with_suffix(".inputs.json"), out)
+    print(f"{rel(vmf.with_suffix('.inputs.json'))}：{len(out['decisions'])} 项标准值，spec {out['spec']}")
+    return 0
+
+
+def check_fresh(c, md, design_files, spec=None):
     rep = c.rep
     vmf, bsp = c.vmf_path, c.bsp_path
     rep.ran("F1")
@@ -200,21 +243,53 @@ def check_fresh(c, md, design_files):
         rep.add("F1", f"找不到编译这张 BSP 用的 VMF（{vmf}）", "没有 VMF 就判断不了地图是不是用最新生成器和设计做的，也查不到被 vbsp 丢掉的东西。",
                 "把 VMF 放在 BSP 旁边、同名；或用 kit verify --vmf 指定。")
     else:
+        # what the generator says this map was made from (<map>.inputs.json beside the VMF, written when it wrote the
+        # VMF): the values of the standards it read and the spec fingerprint. With it, F1 compares those and nothing
+        # else from the design; without it, the file times of spec.json, elements.json and decisions.json.
+        inp_p = vmf.with_suffix(".inputs.json")
+        inputs = None
+        if inp_p.exists():
+            try:
+                inputs = rd(inp_p)
+            except ValueError:
+                rep.add("F1", f"{rel(inp_p)} 不是合法的 JSON", "F1 要读它判断地图用的是哪些标准值。", "让生成器重新写出它（字段见 references/verify.md 的 F1）。")
+        dec_p = root() / "standards" / "decisions.json"
         newest, what = 0, None
-        for p in design_files:
+        files = list(design_files)
+        if inputs is not None:
+            # elements.json is derived from spec.json, so with a spec fingerprint neither file's time matters
+            files = [p for p in files if p.name != "decisions.json" and not (p.name in ("spec.json", "elements.json") and "spec" in inputs)]
+            now = {i["id"]: i.get("value") for i in decision_items()}
+            changed = [k for k, v in (inputs.get("decisions") or {}).items() if now.get(k) != v]
+            if changed:
+                rep.add("F1", f"地图用到的标准值改过了：{', '.join(changed[:8])}" + ("…" if len(changed) > 8 else "") + "（生成时的值和 decisions.json 现在的值不同）",
+                        "这一关用到的标准改了却没重新生成，地图还是按旧值做的。没用到的标准改了不算。",
+                        "重新跑生成器生成 VMF，再编译，再跑 kit verify。", extra={"file": rel(dec_p), "items": changed})
+            if "spec" in inputs and spec is not None and inputs["spec"] != spec_fp(spec):
+                rep.add("F1", "spec.json 的设计内容比生成时变了（不算嵌在里面的标准值）", "设计改了却没重新生成，编译出来的还是旧地图。",
+                        "重新跑生成器生成 VMF，再编译，再跑 kit verify。", extra={"file": rel(design_files[0])})
+        else:
+            rep.notes.append(f"没有 {rel(inp_p)}：F1 按 decisions.json 整个文件的修改时间比，改了这一关没用到的标准也会判旧"
+                             "（生成器写 VMF 时在旁边写这份文件，字段见 references/verify.md 的 F1）")
+        for p in files:
             if p.exists() and p.stat().st_mtime > newest:
                 newest, what = p.stat().st_mtime, p
         if not c.generator:
             rep.add("F1", "kit.local.json 没写生成器在哪（verify.generator：生成器代码所在的目录或文件，相对项目根）",
                     "要比较 VMF 和生成器代码的时间：改了生成器没重新生成，拿旧地图编译后会报“已修好”。",
                     "在 kit.local.json 加 \"verify\": {\"generator\": [\"<生成器目录>\"]}；或这次用 kit verify --generator 指定。")
-        for g in c.generator or []:
+        mine, others = generator_paths(c.generator, c.level)
+        skip = [(root() / g).resolve() for g in others]
+        for g in mine:
             p = root() / g
             if not p.exists():
                 rep.add("F1", f"verify.generator 写的 {g} 不存在", "要比较 VMF 和生成器代码的时间。", "改正 kit.local.json 的 verify.generator。")
                 continue
             files = [p] if p.is_file() else [q for q in p.rglob("*") if q.is_file() and "__pycache__" not in q.parts]
             for q in files:
+                qr = q.resolve()
+                if any(qr == s or s in qr.parents for s in skip):
+                    continue
                 if q.stat().st_mtime > newest:
                     newest, what = q.stat().st_mtime, q
         if what is not None and vmf.stat().st_mtime + 1 < newest:
@@ -2016,7 +2091,8 @@ def run(level, a) -> int:
     spec_p, el_p = lv / "spec.json", lv / "elements.json"
     if not spec_p.exists():
         raise KitError(f"没有 {rel(spec_p)}：先跑 kit spec {level}")
-    design = vdesign.Design(rd(spec_p), rd(el_p)["elements"] if el_p.exists() else [])
+    spec = rd(spec_p)
+    design = vdesign.Design(spec, rd(el_p)["elements"] if el_p.exists() else [])
     bsp, vmf, log = find_files(level, a)
     gen = a.generator or (local().get("verify", {}) or {}).get("generator") or []
     gen = [gen] if isinstance(gen, str) else gen
@@ -2042,7 +2118,7 @@ def run(level, a) -> int:
     md = vmap.MapData(bsp)
     log_text = log.read_text(encoding="utf-8", errors="ignore") if log.exists() else ""
     if "fresh" in groups:
-        check_fresh(c, md, [spec_p, el_p, root() / "standards" / "decisions.json"])
+        check_fresh(c, md, [spec_p, el_p, root() / "standards" / "decisions.json"], spec)
     runs = check_compile(c, md, log_text) if "compile" in groups else vmap.last_runs(log_text)
     graph = vlogic.Graph(md)
     W = reach = sim = start = None

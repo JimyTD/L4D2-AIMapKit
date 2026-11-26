@@ -30,8 +30,10 @@
     其他 *.json         生成器自己的项目共用配置（如环境、运行层、音景）；只属于一关的放 L<nn>/
     L<nn>/              gaps.json（交回设计的缺口）、dressing/、interior-review.json（G6 室内盲审）、fallbacks.json、playtest.json、human-todo.json、feedback.json、
                         manual-checks.md（脚本还没有时的人工核对结果）、invalidated.json、delivered/parts.json
-  build/L<nn>/          生成线能重新生成的产物，不提交：vmf、bsp、instances/、kinds.json、parts.json、intake.json、
-                        faces.json、report.json、REPORT.md、HUMAN-TODO.md、check/、stamps/、_regress/
+  build/L<nn>/          生成线能重新生成的产物，不提交，只放这一关正式编译的：vmf、<地图>.inputs.json（kit inputs）、bsp、instances/、
+                        kinds.json、parts.json、intake.json、faces.json、report.json、REPORT.md、HUMAN-TODO.md、check/、stamps/
+  build/_regress/L<nn>/ 生成器改了以后对已交付的关回归（不写 build/L<nn>/）
+  build/tmp/            试验、临时编译
   nav/<地图>.nav        用户交回的导航网格
 ```
 

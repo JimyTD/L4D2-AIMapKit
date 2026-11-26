@@ -23,7 +23,8 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--only 组,组] [--bsp 文件] [
 - 默认找 `build/L<nn>/` 里唯一的 BSP，VMF、日志和它同名（`.vmf`、`.log`；日志是 vbsp、vvis、vrad 的输出按顺序追加的那一份）。
 - `--step` 跑到哪一步为止的全部检查（每一步都把前面步骤的检查重跑一遍）：G3 新旧、编译、走路、门；G4 加接线、换关、互动、玩法实体；G5 加资源、文字、模型和贴图；G6 加摆放；G7 加光照、音景、可见性；G9 全部。
 - 结果写进固定文件 `work/L<nn>/verify.json`（机器读）和 `work/L<nn>/VERIFY.md`（人读），每次覆盖。退出码 0 是通过，1 是有错误。
-- 生成器在哪写在 `kit.local.json`：`"verify": {"generator": ["<生成器目录或文件，相对项目根>"]}`。
+- 生成器在哪写在 `kit.local.json`，公共部分和每关自己的部分分开写：`"verify": {"generator": {"common": ["<公共部分的目录或文件>"], "levels": {"L01": ["<只给 L01 用的文件>"], "L02": […]}}}`（路径相对项目根）。只写一个列表的，整份算公共部分。
+- 生成器写完 VMF 后跑 `kit inputs <关号> --vmf <VMF> --used <这一关读过的待决定项 id，逗号分隔>`，在 VMF 旁边写 `<地图>.inputs.json`（这张图用到的标准值、spec 指纹），F1 按它判断（见 F1）。
 - 阈值全部从 `standards/decisions.json` 读。项目还没有的项，用 Kit 模板（`assets/decisions-template.json` 的 start）里的起始值跑，报告开头列为“待补”，按 [G0](steps/G0-art-standard.md) 第 7 条加进项目（暂定，写 why 和 verify）。
 
 ## 命名约定（kit verify 靠它把地图和设计对上）
@@ -38,7 +39,11 @@ kit verify <关号> [--step G3|G4|G5|G6|G7|G9] [--only 组,组] [--bsp 文件] [
 
 ### 新旧（fresh，G3 起）
 
-- **F1 VMF 比生成器和设计数据新**。改了生成器或设计却没重新生成，编译的还是旧地图，这时报“已修好”是假的。比较 VMF 和 spec.json、elements.json、decisions.json、生成器代码的修改时间。
+- **F1 VMF 是用现在的生成器和设计数据做的**。改了生成器或设计却没重新生成，编译的还是旧地图，这时报“已修好”是假的。按这一关的依赖判断，别的关改了不算：
+  - 生成器：比较 VMF 和这一关依赖的代码的修改时间——公共部分加这一关自己的部分；公共目录里被别的关列为“自己的”文件不算。
+  - 标准：有 `<地图>.inputs.json` 的，逐项比较它记下的值和 decisions.json 现在的值，只比这一关用到的项；没用到的项改了不算，why、status 改了也不算。没有这份文件的，退回比较 decisions.json 整个文件的修改时间，报告的说明里写一句。
+  - 设计：有 inputs.json 的比较 spec 指纹（spec.json 去掉嵌在里面的标准表）；没有的比较 spec.json、elements.json 的修改时间。
+  常见错误：每关的特殊处理写在公共代码里，只影响一关的修改把所有关都判旧，大家习惯性忽略 F1；或者反过来，改了某关用到的标准，地图没重新生成。
 - **F2 BSP 比 VMF 和全部实例文件新**。VMF 改了没重新编译等于没改。
 - **F3 编译日志是这次编译的**。漏点、bounds out of range、vbsp 丢模型都只写在日志里，退出码照样是 0。日志比 BSP 早超过 15 分钟（打包会改 BSP 的时间）就算旧。
 

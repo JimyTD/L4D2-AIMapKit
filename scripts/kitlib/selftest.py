@@ -415,9 +415,15 @@ def verify_samples(only=None) -> int:
     try:
         (proj / "generator").mkdir()
         (proj / "generator" / "gen.py").write_text("# sample generator\n", encoding="utf-8")
+        (proj / "generator" / "levels").mkdir()
+        for lv in ("L01", "L02"):
+            (proj / "generator" / "levels" / f"{lv}.py").write_text(f"# {lv} only\n", encoding="utf-8")
         loc = json.loads((proj / "kit.local.json").read_text(encoding="utf-8"))
-        loc["verify"] = {"generator": ["generator"]}
+        # the common part is the whole directory; each level's own file is listed under levels (F1 per level)
+        loc["verify"] = {"generator": {"common": ["generator"], "levels": {"L01": ["generator/levels/L01.py"], "L02": ["generator/levels/L02.py"]}}}
         (proj / "kit.local.json").write_text(json.dumps(loc), encoding="utf-8")
+        dec_p = proj / "standards" / "decisions.json"
+        dec_text = dec_p.read_text(encoding="utf-8")
         ld = proj / L
         ld.mkdir(parents=True, exist_ok=True)
         vsamples.design(ld)
@@ -427,6 +433,7 @@ def verify_samples(only=None) -> int:
                 continue
             _t.sleep(1.1)  # file times: the map must be newer than the design and the generator
             (proj / "generator" / "gen.py").write_text("# sample generator\n", encoding="utf-8")
+            dec_p.write_text(dec_text, encoding="utf-8")
             os.utime(ld / "spec.json")
             os.utime(ld / "elements.json")
             _t.sleep(1.1)
@@ -434,6 +441,15 @@ def verify_samples(only=None) -> int:
             if name == "stale_vmf":
                 _t.sleep(1.1)
                 (proj / "generator" / "gen.py").write_text("# changed after the map was built\n", encoding="utf-8")
+            if name == "other_level_generator":
+                _t.sleep(1.1)
+                (proj / "generator" / "levels" / "L02.py").write_text("# L02 changed after this map was built\n", encoding="utf-8")
+            if name in ("unused_decision", "used_decision"):
+                vm = next((proj / "build" / "L01").glob("*.vmf"))
+                kit(proj, "inputs", "1", "--vmf", str(vm), "--used", "corridor_min,route_door_w_min")
+                _t.sleep(1.1)
+                changed = "plan_route_pad_m" if name == "unused_decision" else "corridor_min"
+                edit(proj, "standards/decisions.json", lambda d: byid(d["items"], changed).__setitem__("value", byid(d["items"], changed)["value"] + 1))
             if name == "stale_bsp":
                 _t.sleep(1.1)
                 vm = next((proj / "build" / "L01").glob("*.vmf"))
@@ -453,9 +469,10 @@ def verify_samples(only=None) -> int:
                 bad += 1
                 continue
             got = {f["check"] for f in res["findings"] if f["severity"] == "FAIL"}
-            if name == "good":
+            if name == "good" or name in vsamples.MUST_PASS:
                 ok = res["passed"]
-                print(("OK   " if ok else "FAIL ") + "kit verify 好样本全过" + ("" if ok else "：" + "；".join(f"{f['check']} {f['what'][:90]}" for f in res["findings"] if f["severity"] == "FAIL")[:1500]))
+                print(("OK   " if ok else "FAIL ") + ("kit verify 好样本全过" if name == "good" else f"kit verify 应通过的样本 {name}（{what}）全过")
+                      + ("" if ok else "：" + "；".join(f"{f['check']} {f['what'][:90]}" for f in res["findings"] if f["severity"] == "FAIL")[:1500]))
             else:
                 miss = [c for c in must if c not in got]
                 ok = not miss and code == 1

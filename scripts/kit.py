@@ -125,6 +125,9 @@ def cmd(a) -> int:
     if c == "verify":
         import verify
         return verify.run(a.level, a)
+    if c == "inputs":
+        import verify
+        return verify.write_inputs(a.level, _path(a.vmf), a.used)
     if c == "selftest":
         import selftest
         return selftest.run()
@@ -209,6 +212,10 @@ def parser():
     x.add_argument("--set", action="append", help="这次运行临时用的待决定值 id=json，不写回项目")
     x.add_argument("--out", help="结果目录（默认 work/L<nn>/）")
     x.add_argument("-v", "--verbose", action="store_true")
+    x = s.add_parser("inputs", help="生成器写完 VMF 后记下这张图用到的标准值和 spec 指纹（<地图>.inputs.json，kit verify F1 读）")
+    x.add_argument("level", type=int)
+    x.add_argument("--vmf", required=True, help="刚写出的 VMF")
+    x.add_argument("--used", action="append", required=True, help="这一关生成时读过的待决定项 id，逗号分隔，可重复")
     s.add_parser("selftest", help="Kit 自测（改脚本后跑）")
     return p
 
