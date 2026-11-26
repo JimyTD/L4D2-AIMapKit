@@ -1815,7 +1815,7 @@ def check_visible(c, md, design):
                 return ((f"{m['src'].get('model')} 悬空：看得见的底面比下面的地面、台面、层板高 {gap:.0f} 单位（容许 {snap:.0f}）" if gap is not None else
                          f"{m['src'].get('model')} 下面 512 单位内没有承载面"),
                         "悬空的东西一眼就假；没有碰撞的装饰也一样看得见。常见原因：支撑它的家具被删了它还在，或高度是手写的、没按支撑物的层板算。",
-                        "按支撑物看得见的层板、台面顶面定高度（G6 第 6 条）；支撑物删了就一起删；挂墙、吊顶的写进 hanging_models。"), None, gap
+                        "按支撑物看得见的层板、台面顶面定高度（G6 第 3 条）；支撑物删了就一起删；挂墙、吊顶的写进 hanging_models。"), None, gap
         # a board, a shelf or a table top through a small item's body: a horizontal slab of something else that lies
         # wholly inside the item's height on a quarter of the lines through it at least
         if not small:
@@ -1837,7 +1837,7 @@ def check_visible(c, md, design):
                 a, b = hit
                 return (f"{label(x)} 在 z {a:.0f}–{b:.0f} 横穿 {m['src'].get('model')}",
                         "层板、台面从东西的身体中间穿过去：东西放在了两层层板之间，或支撑物挪了它没跟着挪。",
-                        "把它放到支撑物某一层看得见的顶面上（G6 第 6 条），XY 跟着支撑物的位置和朝向走。"), x, b - a
+                        "把它放到支撑物某一层看得见的顶面上（G6 第 3 条），XY 跟着支撑物的位置和朝向走。"), x, b - a
         return None
 
     def clipping(i, m):
