@@ -25,6 +25,12 @@
 
 每条一行：版本号、地图名、`getpos` 的输出（控制台打 `getpos`，复制那一行）、看到了什么、觉得应该怎样。截图放在同一行后面。agent 按坐标查回设计数据，分给对应的线处理。
 
-## 5. 导航网格（要重做时）
+## 5. 导航网格（生成或重做）
 
-按项目 HUMAN.md 里导航网格的方法：单开那一关，`sv_cheats 1`、`nav_generate`，等它跑完自动保存，再按 HUMAN.md 标起点、安全屋属性；做好的 `<地图>.nav` 从 `left4dead2/maps/` 复制到项目的 `nav/`，告诉 agent，下一版沿用。
+- 用 `kit nav` 流转（无需重编 BSP）：
+  1. 放入散装目录：`kit nav stage <关号>`（主机从 `build/L<nn>/` 复制 `.bsp`，副机自动从 `addons/<addon>.vpk` 解出 `.bsp`；仓库已有 `nav/<地图>.nav` 时也会一并放入以便增量修补）。
+  2. 启动游戏单开那一关：`sv_cheats 1; map <地图名>; nav_edit 1`，用 `nav_generate` 或修补并标好安全屋/起点属性后执行 `nav_analyze; nav_save`。
+  3. **退出游戏后**收回并清理：`kit nav collect <关号>`（把 `.nav` 收回仓库 `nav/` 走 Git LFS 提交，并自动删掉 `left4dead2/maps/` 下的散装 `.bsp`/`.nav`）。
+- **散装遮蔽原理**：`left4dead2/maps/` 下的散装 `.bsp`/`.nav` 优先级高于 `addons/*.vpk`。如果没跑 `collect` 或 `kit nav clean` 清掉散装文件，后续即使更新了 `addons/*.vpk`，进游戏加载的仍是旧散装图。
+- 收回 `nav/<地图>.nav` 后无需重编 BSP，直接让 agent 跑 `kit release` 即可把新 `.nav` 并排打进 `.vpk`。
+- **多机/协作者分发 `.vpk`**：推荐把打包好的 `.vpk` 传到仓库 Release 附件分发，不要把大体积 `.vpk`/`.bsp` 塞进 Git LFS（`.nav` 走 Git LFS 即可）。

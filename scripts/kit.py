@@ -128,6 +128,13 @@ def cmd(a) -> int:
     if c == "inputs":
         import verify
         return verify.write_inputs(a.level, _path(a.vmf), a.used)
+    if c == "nav":
+        import nav
+        if a.sub == "stage":
+            return nav.stage(a.level, a.game_dir, a.addons, a.vpk)
+        if a.sub == "collect":
+            return nav.collect(a.level, a.game_dir, a.keep_loose)
+        return nav.clean(a.game_dir)
     if c == "release":
         import release
         return release.run(a)
@@ -228,6 +235,19 @@ def parser():
     x.add_argument("level", type=int)
     x.add_argument("--vmf", required=True, help="刚写出的 VMF")
     x.add_argument("--used", action="append", required=True, help="这一关生成时读过的待决定项 id，逗号分隔，可重复")
+    x = s.add_parser("nav", help="导航网格流转：stage 放散装图进游戏生成/修补，collect 收回 nav/ 并清理散装，clean 清理残留")
+    ss = x.add_subparsers(dest="sub", required=True)
+    y = ss.add_parser("stage", help="把这一关的 .bsp（本地 build 或 VPK 解出）和已有 .nav 放到游戏 left4dead2/maps/")
+    y.add_argument("level", type=int)
+    y.add_argument("--game-dir", help="游戏根目录（默认 kit.local.json 的 game_dir）")
+    y.add_argument("--addons", help="VPK 所在 addons 目录（默认 <游戏>/left4dead2/addons）")
+    y.add_argument("--vpk", help="显式指定 VPK 文件（副机无 build/ 时从里面解出 .bsp）")
+    y = ss.add_parser("collect", help="把游戏 left4dead2/maps/<map>.nav 收回仓库 nav/ 并默认删除散装 .bsp/.nav")
+    y.add_argument("level", type=int)
+    y.add_argument("--game-dir", help="游戏根目录（默认 kit.local.json 的 game_dir）")
+    y.add_argument("--keep-loose", action="store_true", help="收回后保留散装 .bsp/.nav（注意：会遮蔽 addons/*.vpk）")
+    y = ss.add_parser("clean", help="清理游戏 left4dead2/maps/ 下属于本项目的散装 .bsp/.nav 残留（若散装 .nav 更新则拒绝误删）")
+    y.add_argument("--game-dir", help="游戏根目录（默认 kit.local.json 的 game_dir）")
     x = s.add_parser("release", help="发布（负责人要求时才做）：检查做出来的几关能连成战役，打包成插件装进游戏 addons（不启动游戏、不上传）")
     x.add_argument("--upto", type=int, help="发布到第几关（默认 build/ 里连续做出来的最后一关）")
     x.add_argument("--notes", help="这一版的更新说明（写进 release/CHANGELOG.md）")

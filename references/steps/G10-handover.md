@@ -18,7 +18,7 @@ G9 交付的地图；`work/L<nn>/invalidated.json`；`work/L<nn>/playtest.json`�
 
 ## 交给下一步
 
-gaps.json 里交给设计的条目；负责人交回的导航网格 `nav/<地图>.nav`。
+gaps.json 里交给设计的条目；负责人通过 `kit nav stage <关号>` → 游戏内生成/修补 → `kit nav collect <关号>` 收回并清理散装文件后的导航网格 `nav/<地图>.nav`（走 Git LFS 提交，无需重编 BSP，重跑 `kit release` 即可打进 VPK；多机/协作者分发 `.vpk` 走仓库 Release 附件，不把 `.vpk`/`.bsp` 塞进 Git LFS）。
 
 ## 完成
 

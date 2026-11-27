@@ -235,6 +235,18 @@ def run(a) -> int:
     if not guide.exists():
         shutil.copy2(KIT / "assets" / "project-template" / "RELEASE-GUIDE.md", guide)
     print(f"  打包 {vpk.name}，装进 {addons}；更新说明 release/CHANGELOG.md；怎么试玩、怎么反馈见 RELEASE-GUIDE.md（没启动游戏、没上传）")
+    maps_dir = g / "left4dead2" / "maps"
+    if maps_dir.exists():
+        loose = []
+        for n in levels:
+            mp = maps[n]
+            for ext in (".bsp", ".nav"):
+                if (maps_dir / f"{mp}{ext}").exists():
+                    loose.append(f"{mp}{ext}")
+        if loose:
+            print(f"  WARN 检测到 {maps_dir} 存在散装残留（{", ".join(loose)}）："
+                  f"游戏加载散装目录优先级高于 addons/{vpk.name}，不清理的话进游戏加载的仍是旧散装图！"
+                  "请运行 kit nav collect <关号> 或 kit nav clean 清理。")
     return 0
 
 

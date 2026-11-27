@@ -178,6 +178,7 @@ def run() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
     bad += verify_samples()
     bad += release_samples()
+    bad += nav_checks()
     print("selftest: " + ("全部通过" if not bad else f"{bad} 项没通过"))
     return 1 if bad else 0
 
@@ -803,4 +804,116 @@ def release_samples(only=None) -> int:
             bad += 0 if ok else 1
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
+    return bad
+
+
+def nav_checks() -> int:
+    """kit nav stage / collect / clean + release loose-file shadowing warning (uses temporary fake game dirs only)."""
+    import os
+    import time as _t
+    bad = 0
+
+    # 1 & 2: Main machine stage -> collect -> clean protection (no real game binaries required)
+    tmp, proj = fresh()
+    try:
+        tmp_game = tmp / "fake_game"
+        maps_dir = tmp_game / "left4dead2" / "maps"
+        maps_dir.mkdir(parents=True)
+        bsp_dir = proj / "build" / "L01"
+        bsp_dir.mkdir(parents=True)
+        (bsp_dir / "kitsample_c1m1.bsp").write_bytes(b"VBSP_DUMMY_1")
+
+        code, out = kit(proj, "nav", "stage", "1", "--game-dir", str(tmp_game))
+        staged_bsp = maps_dir / "kitsample_c1m1.bsp"
+        ok1 = code == 0 and staged_bsp.exists() and staged_bsp.read_bytes() == b"VBSP_DUMMY_1" and "Traceback" not in out
+        print(("OK   " if ok1 else "FAIL ") + "kit nav stage：从 build/ 放入散装 .bsp" + ("" if ok1 else f"\n{out[-600:]}"))
+        bad += 0 if ok1 else 1
+
+        staged_nav = maps_dir / "kitsample_c1m1.nav"
+        staged_nav.write_bytes(b"NAV_DATA_1")
+        code, out = kit(proj, "nav", "collect", "1", "--game-dir", str(tmp_game))
+        repo_nav = proj / "nav" / "kitsample_c1m1.nav"
+        ok2 = (code == 0 and repo_nav.exists() and repo_nav.read_bytes() == b"NAV_DATA_1"
+               and not staged_bsp.exists() and not staged_nav.exists() and "Traceback" not in out)
+        print(("OK   " if ok2 else "FAIL ") + "kit nav collect：收回 nav/ 并清除散装 .bsp/.nav" + ("" if ok2 else f"\n{out[-600:]}"))
+        bad += 0 if ok2 else 1
+
+        # Protection against deleting newer uncollected .nav
+        staged_nav.write_bytes(b"NAV_DATA_NEWER")
+        future = _t.time() + 10
+        os.utime(staged_nav, (future, future))
+        code, out = kit(proj, "nav", "clean", "--game-dir", str(tmp_game))
+        ok3 = code != 0 and staged_nav.exists() and "collect" in out and "Traceback" not in out
+        print(("OK   " if ok3 else "FAIL ") + "kit nav clean：散装 .nav 更新时拒绝误删并提示 collect" + ("" if ok3 else f"\n{out[-600:]}"))
+        bad += 0 if ok3 else 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # 3 & 4: Secondary machine (no build/, extract from VPK) + release loose-file WARN
+    real_g = game_dir()
+    vbsp = Path(real_g, "bin", "vbsp.exe") if real_g else None
+    if not real_g or not vbsp.exists() or not Path(real_g, "bin", "vpk.exe").exists():
+        print("NOTE 本机没找到游戏、vbsp 或 vpk：kit nav 副机解 VPK 与 release 遮蔽提醒样本跳过")
+        return bad
+    try:
+        import srctools  # noqa: F401
+        import scipy  # noqa: F401
+        import vsamples
+    except ImportError:
+        print("NOTE 缺 srctools 或 scipy：kit nav 副机解 VPK 与 release 遮蔽提醒样本跳过")
+        return bad
+
+    tmp, proj = fresh()
+    tmp_game2 = tmp / "fake_game2"
+    bin_link = tmp_game2 / "bin"
+    try:
+        verify_project(proj)
+        G = Path(real_g)
+        ld = proj / "design" / "detail" / "L01"
+        ld.mkdir(parents=True, exist_ok=True)
+        vsamples.design(ld, 1)
+        _t.sleep(1.1)
+        bsp = vsamples.build(proj, "L1", vsamples.landmark, vbsp, G, level=1)
+        vsamples.compile_rest(bsp, G, fast=True)
+        code, out = kit(proj, "verify", "1", "--step", "G4", "--build", "quick")
+        assert code == 0, out[-600:]
+        vsamples.run_vbsp(bsp.with_suffix(".vmf"), vbsp, G)
+        vsamples.compile_rest(bsp, G, fast=False)
+        code, out = kit(proj, "verify", "1", "--step", "G4", "--build", "full")
+        assert code == 0, out[-600:]
+
+        maps_dir2 = tmp_game2 / "left4dead2" / "maps"
+        addons_dir2 = tmp_game2 / "left4dead2" / "addons"
+        maps_dir2.mkdir(parents=True)
+        addons_dir2.mkdir(parents=True)
+        import subprocess
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(bin_link), str(G / "bin")],
+                       capture_output=True, check=True)
+        (proj / "kit.local.json").write_text(
+            json.dumps({"python": sys.executable, "game_dir": str(tmp_game2), "agents": {}}), encoding="utf-8"
+        )
+
+        # Leave a loose .bsp in fake_game2/left4dead2/maps/ and run kit release -> expect WARN
+        loose_bsp = maps_dir2 / f"{bsp.stem}.bsp"
+        loose_bsp.write_bytes(b"OLD_LOOSE")
+        code, out = kit(proj, "release", "--notes", "nav遮蔽测试")
+        vpk_file = addons_dir2 / "kitsample.vpk"
+        ok4 = code == 0 and vpk_file.exists() and "WARN" in out and "散装残留" in out and "Traceback" not in out
+        print(("OK   " if ok4 else "FAIL ") + "kit release：检测到散装残留时输出 WARN 遮蔽提醒" + ("" if ok4 else f"\n{out[-800:]}"))
+        bad += 0 if ok4 else 1
+
+        # Secondary machine: delete build/ and loose_bsp, stage from VPK
+        loose_bsp.unlink()
+        shutil.rmtree(proj / "build")
+        code, out = kit(proj, "nav", "stage", "1", "--game-dir", str(tmp_game2), "--addons", str(addons_dir2))
+        ok5 = code == 0 and loose_bsp.exists() and loose_bsp.stat().st_size > 100 and "Traceback" not in out
+        print(("OK   " if ok5 else "FAIL ") + "kit nav stage：副机无 build/ 时从 VPK 解出 .bsp" + ("" if ok5 else f"\n{out[-800:]}"))
+        bad += 0 if ok5 else 1
+    finally:
+        if bin_link.exists():
+            try:
+                bin_link.rmdir()
+            except OSError:
+                pass
+        shutil.rmtree(tmp, ignore_errors=True)
     return bad

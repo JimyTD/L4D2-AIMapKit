@@ -45,9 +45,17 @@ kit release [--upto <关号>] --notes "<这一版改了什么>" [--dry-run] [--a
 
 `release/release.json`、`release/CHANGELOG.md`（提交）；`build/release/`（不提交）；addons 里的 `<名字>.vpk`；项目根的 `RELEASE-GUIDE.md`（第一次发布时）。
 
+## 导航网格与多机流转（`kit nav`）
+
+- 导航文件 `nav/<地图>.nav` 走 Git LFS 提交；**无需重编 BSP**，收回 `.nav` 后重跑 `kit release` 即可 1 秒并排打进 `.vpk`。
+- 在游戏里做导航必须把散装 `.bsp` 放到 `<游戏>/left4dead2/maps/`，用完必须清理：散装 `.bsp`/`.nav` 的加载优先级高于 `addons/*.vpk`，残留会遮蔽后续 VPK。使用 `kit nav stage <关号>` 放入（副机无 `build/` 时自动从 `addons/*.vpk` 或 `--vpk` 解出 `.bsp`），退出游戏后用 `kit nav collect <关号>` 收回 `nav/` 并自动删除散装文件；也可随时用 `kit nav clean` 清理残留（若散装 `.nav` 更新会拒绝误删并提示先 `collect`）。
+- `kit release` 安装 `.vpk` 到 `addons/` 时若检测到 `left4dead2/maps/` 仍有同名散装 `.bsp`/`.nav`，会打印 `WARN` 提醒清理。
+- **多机/协作者分发 `.vpk`**：推荐走仓库 Release 附件分发，不要把大体积 `.vpk`/`.bsp` 塞进 Git LFS。
+
 ## 常见坑
 
 - 拿快速档的地图发布：可见性和光照是粗估，进游戏帧率和光照不对。A1 要求完整编译。
 - 只发了前几关，最后一关的终点还指向没发布的地图：玩到那里卡在加载。A2 拦。
 - 改了地图没重做导航，也没告诉试玩的人：感染者不出、队友卡住，以为是新问题。版本说明里标“导航要重做”。
+- 做完导航忘了删 `left4dead2/maps/` 下的散装 `.bsp`/`.nav`：进游戏一直加载旧散装图，以为 `kit release` 没生效。用 `kit nav collect` / `kit nav clean`。
 - 每次发布都改插件名：游戏里装了好几个版本互相冲突。名字固定，靠版本号区分。
