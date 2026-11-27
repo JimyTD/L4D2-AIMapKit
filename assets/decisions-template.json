@@ -230,7 +230,7 @@
    "status": "暂定",
    "step": "G6",
    "start": [],
-   "hint": "kit verify 摆放：挂墙、吊顶、本该悬空的模型（不查悬空），如 models/props_lighting/*"
+   "hint": "kit verify 摆放：声明按挂墙、吊顶或挂架方式安装的模型（无需下方水平承托面），仍须紧贴墙面、顶棚或已落位支撑模型；贴墙/贴顶模型本来就会按贴附放行，严禁当作屏蔽悬空报错的豁免垃圾桶，如 models/props_lighting/*"
   },
   {
    "id": "text_materials",

@@ -26,6 +26,11 @@ CRATE = "models/props_crates/static_crate_40.mdl"  # 42 x 42 x 42, static
 SHELF = "models/props/cs_office/shelves_metal.mdl"  # visible boards' tops at z 5, 31, 57, 79; footprint x ±14, y ±32
 PARCEL = "models/props/cs_office/cardboard_box01.mdl"  # visible mesh x, y ±12.5, z 0..19.3
 DESK = "models/props_interiors/desk_metal.mdl"   # collision bottom 6.8 above the visible mesh's bottom
+WALL_LIGHT = "models/props_urban/emergency_light001.mdl"  # mesh/phy [-5.1, 0, -6.38]..[5.1, 5.74, 6.38]
+MED_CABINET = "models/props_interiors/medicalcabinet02.mdl"  # origin at floor z 0, mesh/phy z 36.14..65.07
+CEIL_LIGHT = "models/props/cs_office/light_ceiling.mdl"  # top z 6.0, bottom mesh z 0, phy z 3.57
+SHOP_LIGHT = "models/props_lighting/light_shop.mdl"    # mesh z 0..23.02 (chains to ceiling), phy z 0..7.2
+HANGER = "models/props_interiors/clotheshanger01.mdl"  # mesh/phy [0, -13.18, -9.94]..[0.7, 13.56, 1.58]
 DOOR = "models/props_doors/checkpoint_door_01.mdl"     # leaf 60 wide (y 0..60 when closed), hinge at origin, 105 tall centred
 SIGN = "signs/hotel_sign003"                           # 512 x 512, text
 
@@ -463,12 +468,46 @@ def supply_on_floor_and_table(m):
     m.ent("weapon_first_aid_kit_spawn", targetname="yard-o_med_floor", origin="500 600 0", angles="0 0 0", spawnflags="2")
 
 
+def hanging_solid_floating(m):
+    """A solid prop matching hanging_models floating isolated in mid-air (away from floor, ceiling, walls and racks)."""
+    m.ent("prop_static", model=WALL_LIGHT, origin="400 500 120", angles="0 0 0", solid="6")
+
+
+def hanging_noclip_floating(m):
+    """A non-solid decoration matching hanging_models floating isolated in mid-air (caught by P4)."""
+    m.ent("prop_dynamic", model=HANGER, origin="350 500 120", angles="0 0 0", solid="0")
+
+
+def hanging_cabinet_floating(m):
+    """A prop_health_cabinet matching hanging_models whose origin is on the floor (z 0) while mesh and .phy float at z 36..65."""
+    m.ent("prop_health_cabinet", model=MED_CABINET, origin="450 500 0", angles="0 0 0", solid="6", HealthCount="1")
+
+
+def hanging_pair_floating(m):
+    """Two hanging_models props touching each other in mid-air without touching any floor, wall, ceiling or grounded rack."""
+    m.ent("prop_static", model=WALL_LIGHT, origin="400 550 120", angles="0 0 0", solid="6")
+    m.ent("prop_dynamic", model=HANGER, origin="400 556 120", angles="0 90 0", solid="0")
+
+
+def hanging_attached_ok(m):
+    """(Should pass) hanging_models properly attached to: (1) vertical wall brush, (2) visible ceiling brush, (3) grounded rack model."""
+    m.ent("prop_static", model=WALL_LIGHT, origin=f"{WALL_X0} 200 120", angles="0 90 0", solid="6")
+    m.box((200, 500, 240), (500, 650, 256), mat="concrete/blacktop_ext_01")
+    m.ent("prop_static", model=CEIL_LIGHT, origin="300 560 234", angles="0 0 0", solid="6")
+    m.ent("prop_static", model=SHOP_LIGHT, origin="420 560 216.98", angles="0 0 0", solid="6")
+    m.ent("prop_static", model=SHELF, origin="200 560 0", angles="0 0 0", solid="6")
+    m.ent("prop_dynamic", model=HANGER, origin="214.5 560 65", angles="0 0 0", solid="0")
+    m.ent("prop_static", model=WALL_LIGHT, origin="214.5 540 50", angles="0 270 0", solid="6")
+
+
 _HAZARD_GROUND_TYPES = json.dumps([
     {"id": "road", "walkable": True, "elev_m": 0},
     {"id": "grass", "walkable": True, "elev_m": 0},
     {"id": "pond", "walkable": False, "elev_m": -0.5, "move": 0.6,
      "hazard": {"trigger": "trigger_hurt", "damage": 500, "damagetype": 16384}},
 ], ensure_ascii=False)
+
+_HANGING_MODELS = json.dumps([WALL_LIGHT, MED_CABINET, CEIL_LIGHT, SHOP_LIGHT, HANGER])
 
 
 SAMPLES = [
@@ -517,10 +556,15 @@ SAMPLES = [
     ("prt_bloat", "漏转 func_detail 导致局部 world portal 暴涨（X2 预警）", prt_bloat, ["X2"]),
     ("floating_supply", "补给/武器刷点按桌面高度放在 36u 且未开物理，下方没有桌子（S2 悬空）", floating_supply, ["S2"]),
     ("supply_on_floor_and_table", "（应通过）补给刷点分别落在桌面（36u）和真实地面（0u）上，S2 全过", supply_on_floor_and_table, []),
+    ("hanging_solid_floating", "列入 hanging_models 的有碰撞模型孤立悬在房间半空", hanging_solid_floating, ["P3", "P4"]),
+    ("hanging_noclip_floating", "列入 hanging_models 的无碰撞装饰孤立悬在房间半空", hanging_noclip_floating, ["P4"]),
+    ("hanging_cabinet_floating", "列入 hanging_models 的原点贴地但网格与碰撞悬空的医疗柜孤立悬在半空", hanging_cabinet_floating, ["P3", "P4"]),
+    ("hanging_pair_floating", "两个列入 hanging_models 的挂件在半空互相抱团贴靠、未附着任何墙顶或落地支撑", hanging_pair_floating, ["P3", "P4"]),
+    ("hanging_attached_ok", "（应通过）列入 hanging_models 的模型分别贴墙、贴顶（含吊杆网格贴顶）及挂在落地支撑架上，P3/P4 全过", hanging_attached_ok, []),
 ]
 
 # samples that must pass every check (a change that must not be reported)
-MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick", "desk_on_floor", "hazard_covered", "supply_on_floor_and_table"}
+MUST_PASS = {"other_level_generator", "unused_decision", "full_after_quick", "desk_on_floor", "hazard_covered", "supply_on_floor_and_table", "hanging_attached_ok"}
 
 # samples run with their own kit verify arguments instead of --step G6; "warn": the named checks count as found
 # when they warn; "absent": checks that must not report anything; "compile": run vvis and vrad after vbsp
@@ -546,6 +590,11 @@ RUN = {
     "prt_bloat": {"args": ["--step", "G3", "--only", "compile", "--build", "quick"], "compile": "quick", "warn": True},
     "floating_supply": {"args": ["--step", "G4"]},
     "supply_on_floor_and_table": {"args": ["--step", "G4"]},
+    "hanging_solid_floating": {"args": ["--step", "G6", "--set", f"hanging_models={_HANGING_MODELS}"]},
+    "hanging_noclip_floating": {"args": ["--step", "G6", "--set", f"hanging_models={_HANGING_MODELS}"]},
+    "hanging_cabinet_floating": {"args": ["--step", "G6", "--set", f"hanging_models={_HANGING_MODELS}"]},
+    "hanging_pair_floating": {"args": ["--step", "G6", "--set", f"hanging_models={_HANGING_MODELS}"]},
+    "hanging_attached_ok": {"args": ["--step", "G6", "--set", f"hanging_models={_HANGING_MODELS}"]},
 }
 
 
