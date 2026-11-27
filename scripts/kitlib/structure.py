@@ -14,13 +14,14 @@ from __future__ import annotations
 import html
 import json
 import math
+import heapq
 import re
 import sys
 from collections import deque
 from pathlib import Path
 
 from shapely.geometry import LineString, Point, Polygon, box
-from shapely.ops import unary_union
+from shapely.ops import nearest_points, unary_union
 
 import fmt
 import imagery
@@ -927,6 +928,85 @@ def route_points(spec, m):
         t = max(-L / 2, min(L / 2, t))
         return (ctr.x + ux * t, ctr.y + uy * t)
 
+    def poly_shortest(g, start_pt, end_pt):
+        """Shortest polyline from start_pt to end_pt strictly inside g, preferring an inset safe zone."""
+        g_ok = g.buffer(1e-6)
+
+        def clamp_in(geom, pt):
+            pt_obj = Point(pt)
+            if geom.buffer(1e-6).contains(pt_obj):
+                return (float(pt[0]), float(pt[1]))
+            q = nearest_points(geom, pt_obj)[0]
+            return (float(q.x), float(q.y))
+
+        s0 = clamp_in(g, start_pt)
+        e0 = clamp_in(g, end_pt)
+        if math.dist(s0, e0) <= 1e-6:
+            return [s0]
+
+        def vis_path(poly, a, b):
+            p_ok = poly.buffer(1e-6)
+            if p_ok.covers(LineString([a, b])):
+                return [a, b]
+            verts = [a, b]
+            for ring in [poly.exterior, *poly.interiors]:
+                for x, y in list(ring.coords)[:-1]:
+                    verts.append((float(x), float(y)))
+            n = len(verts)
+            dist_arr = [float("inf")] * n
+            prev = [-1] * n
+            dist_arr[0] = 0.0
+            pq = [(0.0, 0)]
+            while pq:
+                d, u = heapq.heappop(pq)
+                if d > dist_arr[u]:
+                    continue
+                if u == 1:
+                    break
+                pu = verts[u]
+                for v in range(n):
+                    if v == u:
+                        continue
+                    pv = verts[v]
+                    nd = d + math.dist(pu, pv)
+                    if nd >= dist_arr[v]:
+                        continue
+                    if p_ok.covers(LineString([pu, pv])):
+                        dist_arr[v] = nd
+                        prev[v] = u
+                        heapq.heappush(pq, (nd, v))
+            if prev[1] == -1:
+                return None
+            out = []
+            cur = 1
+            while cur != -1:
+                out.append(verts[cur])
+                cur = prev[cur]
+            out.reverse()
+            return out
+
+        for inset in (0.7, 0.5, 0.3, 0.15, 0.05, 0.0):
+            safe = g if inset == 0.0 else g.buffer(-inset, join_style=2)
+            if safe.is_empty or safe.area <= 0.01:
+                continue
+            comps = [cm for cm in getattr(safe, "geoms", [safe]) if cm.geom_type == "Polygon" and cm.area > 0.01]
+            best = None
+            for comp in comps:
+                s_in = clamp_in(comp, s0)
+                e_in = clamp_in(comp, e0)
+                if not (g_ok.covers(LineString([s0, s_in])) and g_ok.covers(LineString([e_in, e0]))):
+                    continue
+                mid = vis_path(comp, s_in, e_in)
+                if mid is None:
+                    continue
+                full = [s0] + mid + [e0]
+                length = sum(math.dist(u, v) for u, v in zip(full, full[1:]))
+                if best is None or length < best[0]:
+                    best = (length, full)
+            if best is not None:
+                return best[1]
+        return [s0, e0]
+
     for i, p in enumerate(path):
         if p == "outside" or p[0] == "core":
             continue
@@ -937,14 +1017,31 @@ def route_points(spec, m):
         din = door(fl, p[1], nb(i - 1)) if i > 0 else None
         dout = door(fl, p[1], nb(i + 1)) if i + 1 < len(path) else None
         c = s["geom"].centroid
+        seg = []
         if din:
             a = tuple(din.get("at_main") or din["at"])
-            pts += [a, centre_line(s, a)]
+            seg += [a, centre_line(s, a)]
         else:
-            pts.append((c.x, c.y))
+            seg.append((c.x, c.y))
         if dout:
             b = tuple(dout.get("at_main") or dout["at"])
-            pts += [centre_line(s, b), b]
+            seg += [centre_line(s, b), b]
+        g = s["geom"]
+        g_ok = g.buffer(1e-6)
+        inside = all(g_ok.contains(Point(q)) for q in seg) and (len(seg) < 2 or g_ok.covers(LineString(seg)))
+        if not inside:
+            if din and dout:
+                seg = poly_shortest(g, seg[0], seg[-1])
+            elif din:
+                rp = g.representative_point()
+                seg = poly_shortest(g, seg[0], (rp.x, rp.y))
+            elif dout:
+                rp = g.representative_point()
+                seg = poly_shortest(g, (rp.x, rp.y), seg[-1])
+            else:
+                rp = g.representative_point()
+                seg = [(rp.x, rp.y)]
+        pts += seg
     for lv, pts in per.items():
         m["floors"][lv]["route_pts"] = [pts[0]] + [q for a, q in zip(pts, pts[1:]) if q != a]
 

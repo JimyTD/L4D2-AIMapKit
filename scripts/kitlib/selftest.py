@@ -155,6 +155,7 @@ def run() -> int:
         bad += extension_checks(proj)
         bad += legacy_approval_checks(proj)
         bad += kb_checks(proj)
+        bad += route_geom_checks()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     for what, rel, fn, must in CASES:
@@ -459,6 +460,116 @@ def kb_checks(proj) -> int:
     expect("kit kb show 正常输出紧凑/JSON 条目且缺条目按 KitError 退出",
            code_sh == 0 and "c1m1_hotel" in out_sh and code_shj == 0 and "c3m1_plankcountry" in out_shj and code_miss == 2 and "Traceback" not in out_miss,
            out_sh + "\n" + out_shj + "\n" + out_miss)
+    return bad
+
+
+def route_geom_checks() -> int:
+    """Regression checks for concave/ring structure route_m and elevated area ground_at snapping."""
+    from shapely.geometry import LineString, Point, Polygon
+    import structure
+    import vdesign
+
+    bad = 0
+
+    def expect(what, passed, detail=""):
+        nonlocal bad
+        print(("OK   " if passed else "FAIL ") + what + ("" if passed else f"\n{detail}"))
+        if not passed:
+            bad += 1
+
+    # 1. 回字形环廊：外圈 [0,0]-[16,16]，中庭内洞 [4,4]-[12,12]，南门 (8,0) 到北门 (8,16)
+    ring_poly = Polygon(
+        [(0, 0), (16, 0), (16, 16), (0, 16)],
+        [[(4, 4), (12, 4), (12, 12), (4, 12)]],
+    )
+    rect_poly = Polygon([(0, 0), (10, 0), (10, 4), (0, 4)])
+    spec_ring = {"route": {"path": ["outside", [1, "corridor_ring"], [1, "exit_room"]]}}
+    m_ring = {
+        "floors": {
+            1: {
+                "spaces": [
+                    {"id": "corridor_ring", "geom": ring_poly},
+                    {"id": "exit_room", "geom": Polygon([(6, 16), (10, 16), (10, 20), (6, 20)])},
+                ],
+                "doors": [
+                    {"id": "d_in", "between": ["outside", "corridor_ring"], "at": [8.0, 0.0]},
+                    {"id": "d_out", "between": ["corridor_ring", "exit_room"], "at": [8.0, 16.0]},
+                ],
+            }
+        }
+    }
+    structure.route_points(spec_ring, m_ring)
+    rpts = [q for q in m_ring["floors"][1]["route_pts"] if q[1] <= 16.0 + 1e-6]
+    ring_ok = ring_poly.buffer(1e-5)
+    ring_valid = (
+        len(rpts) >= 3
+        and all(ring_ok.contains(Point(q)) for q in rpts)
+        and ring_ok.covers(LineString(rpts))
+    )
+    expect("回字形环廊 route_m 点与连线均严格落在走廊多边形内", ring_valid, f"pts={rpts}")
+
+    # 常规凸矩形仍走长轴中心线
+    spec_rect = {"route": {"path": ["outside", [1, "rect_hall"], [1, "next_room"]]}}
+    m_rect = {
+        "floors": {
+            1: {
+                "spaces": [
+                    {"id": "rect_hall", "geom": rect_poly, "rects": [[0.0, 0.0, 10.0, 4.0]]},
+                    {"id": "next_room", "geom": Polygon([(8, 4), (10, 4), (10, 6), (8, 6)])},
+                ],
+                "doors": [
+                    {"id": "d_in", "between": ["outside", "rect_hall"], "at": [1.0, 0.0]},
+                    {"id": "d_out", "between": ["rect_hall", "next_room"], "at": [9.0, 4.0]},
+                ],
+            }
+        }
+    }
+    structure.route_points(spec_rect, m_rect)
+    rect_pts = m_rect["floors"][1]["route_pts"]
+    expect(
+        "常规凸矩形保持原有长轴中心线投影",
+        rect_pts[:4] == [(1.0, 0.0), (1.0, 2.0), (9.0, 2.0), (9.0, 4.0)],
+        f"pts={rect_pts}",
+    )
+
+    # 2. 架空平台门口外墙中心线偏出 0.15 m 时应吸附到平台 elev_m，而不是回退 default_ground_m
+    design = vdesign.Design(
+        {
+            "layout": {"origin_m": [0.0, 0.0], "default_ground_m": 0.0},
+            "structures": [],
+            "areas": [
+                {
+                    "id": "skybridge",
+                    "data": {
+                        "area": [[0, 0], [20, 0], [20, 20], [0, 20]],
+                        "ground": [
+                            {"id": "deck", "elev_m": 8.4, "polys": [[[2.0, 2.0], [10.0, 2.0], [10.0, 6.0], [2.0, 6.0]]]},
+                        ],
+                        "route": {"main": [[1.85, 4.0], [6.0, 4.0]]},
+                    },
+                },
+                {
+                    "id": "yard",
+                    "data": {
+                        "area": [[0, 0], [20, 0], [20, 20], [0, 20]],
+                        "ground": [
+                            {"id": "low", "elev_m": 0.0, "polys": [[[0.0, 0.0], [1.75, 0.0], [1.75, 8.0], [0.0, 8.0]]]},
+                        ],
+                    },
+                },
+            ],
+        },
+        [],
+    )
+    elev_self = design.ground_at(1.85, 4.0, area_id="skybridge")
+    elev_far = design.ground_at(1.5, 10.0, area_id="skybridge")
+    wps = design.waypoints()
+    wp0_z_m = wps[0][2][2] * 0.0254 if wps else None
+    expect(
+        "架空平台门口边沿 0.15 m 路线点优先吸附所属开放区 elev_m",
+        abs(elev_self - 8.4) < 1e-6 and wp0_z_m is not None and abs(wp0_z_m - 8.4) < 1e-4 and abs(elev_far - 0.0) < 1e-6,
+        f"elev_self={elev_self}, wp0_z_m={wp0_z_m}, elev_far={elev_far}",
+    )
     return bad
 
 

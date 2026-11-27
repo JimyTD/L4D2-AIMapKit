@@ -27,8 +27,8 @@ class Design:
         self._spaces = None
 
     # ---- coordinates
-    def area_pt(self, x, y, z_m=None):
-        z = self.ground_at(x, y) if z_m is None else z_m
+    def area_pt(self, x, y, z_m=None, area_id=None):
+        z = self.ground_at(x, y, area_id=area_id) if z_m is None else z_m
         return np.array([(x - self.ox) * U, (y - self.oy) * U, z * U])
 
     def s_xy(self, st, u, v):
@@ -49,18 +49,28 @@ class Design:
         x, y = self.s_xy(st, u, v)
         return np.array([x, y, self.s_floor(st, level)[0] + dz])
 
-    def ground_at(self, x, y):
+    def ground_at(self, x, y, area_id=None, snap_m=0.35):
         p = Point(x, y)
-        for a in self.areas.values():
+        areas = ([self.areas[area_id]] + [a for k, a in self.areas.items() if k != area_id]) if area_id in self.areas else list(self.areas.values())
+        polys = []
+        for idx, a in enumerate(areas):
             for g in a["data"].get("ground", []):
+                elev = g.get("elev_m", self.ground0)
+                elev = self.ground0 if elev is None else elev
                 for poly in g.get("polys", []):
                     ring = poly["shell"] if isinstance(poly, dict) else poly
                     holes = poly.get("holes", []) if isinstance(poly, dict) else []
                     try:
-                        if Polygon(ring, holes).buffer(0.01).contains(p):
-                            return g.get("elev_m", self.ground0) or 0
+                        pg = Polygon(ring, holes)
                     except ValueError:
                         continue
+                    if pg.buffer(0.01).contains(p):
+                        return elev
+                    polys.append((0 if idx == 0 and area_id in self.areas else 1, pg.distance(p), elev))
+        near = [item for item in polys if item[1] <= snap_m]
+        if near:
+            near.sort(key=lambda item: (item[0], item[1]))
+            return near[0][2]
         return self.ground0
 
     # ---- keys
@@ -135,13 +145,13 @@ class Design:
         for aid, a in self.areas.items():
             rt = a["data"].get("route") or {}
             for i, (x, y) in enumerate(rt.get("main") or []):
-                out.append((f"{aid}/route/main", f"{aid} 主路线第 {i + 1} 点", self.area_pt(x, y), "route"))
+                out.append((f"{aid}/route/main", f"{aid} 主路线第 {i + 1} 点", self.area_pt(x, y, area_id=aid), "route"))
             for alt in rt.get("alts") or []:
                 for i, (x, y) in enumerate(alt.get("path") or []):
-                    out.append((f"{aid}/route/{alt.get('name')}", f"{aid} 分支“{alt.get('name')}”第 {i + 1} 点", self.area_pt(x, y), "route"))
+                    out.append((f"{aid}/route/{alt.get('name')}", f"{aid} 分支“{alt.get('name')}”第 {i + 1} 点", self.area_pt(x, y, area_id=aid), "route"))
             for kind in ("must_reach", "must_not_reach"):
                 for name, (x, y) in (rt.get(kind) or {}).items():
-                    out.append((f"{aid}/route/{kind}/{name}", f"{aid} “{name}”", self.area_pt(x, y), kind))
+                    out.append((f"{aid}/route/{kind}/{name}", f"{aid} “{name}”", self.area_pt(x, y, area_id=aid), kind))
         return out
 
     def space_center(self, sid, item):
@@ -189,7 +199,7 @@ class Design:
                     return c
         if piece in self.areas and r.get("room"):
             x, y = r.get("entry") or r["room"] if which == "end_room" else r["room"]
-            return f"{piece}/route/main", self.area_pt(x, y)
+            return f"{piece}/route/main", self.area_pt(x, y, area_id=piece)
         return None
 
     # ---- doors (structure doors, core doors) in world
@@ -226,7 +236,7 @@ class Design:
         for aid, a in self.areas.items():
             for o in a["data"].get("objects", []):
                 at = o.get("at")
-                p = self.area_pt(at[0], at[1]) + np.array([0, 0, (o.get("z_m") or 0) * U]) if at else None
+                p = self.area_pt(at[0], at[1], area_id=aid) + np.array([0, 0, (o.get("z_m") or 0) * U]) if at else None
                 out.append((f"{aid}/object/-/{o['id']}", aid, o, p, None))
         return out
 
